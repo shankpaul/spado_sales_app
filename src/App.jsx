@@ -10,6 +10,7 @@ import { Loader2 } from 'lucide-react';
 const Login = lazy(() => import('./pages/Login'));
 const ForgotPassword = lazy(() => import('./pages/ForgotPassword'));
 const Dashboard = lazy(() => import('./pages/Dashboard'));
+const Customers = lazy(() => import('./pages/Customers'));
 
 // Loading fallback component
 const LoadingFallback = () => (
@@ -35,8 +36,8 @@ function App() {
         {/* Toast notifications */}
         <Toaster 
           position="top-right"
-          richColors
-          closeButton
+          // richColors
+          // closeButton
           duration={4000}
         />
 
@@ -63,10 +64,7 @@ function App() {
             element={
               <ProtectedRoute allowedRoles={['admin', 'sales_executive']}>
                 <Layout>
-                  <div className="text-center py-12">
-                    <h2 className="text-2xl font-bold text-gray-900 mb-2">Customers</h2>
-                    <p className="text-gray-600">Customer management page coming soon...</p>
-                  </div>
+                  <Customers />
                 </Layout>
               </ProtectedRoute>
             }

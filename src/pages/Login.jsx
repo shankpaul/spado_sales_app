@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { toast } from 'sonner';
 import authService from '../services/authService';
 import { Loader2, Eye, EyeOff } from 'lucide-react';
+import Logo from '../components/Logo';
 
 /**
  * Login Page Component
@@ -98,13 +99,11 @@ const Login = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-50 via-white to-primary-100 px-4 py-8">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 via-white to-gray-100 px-4 py-8">
       <div className="w-full max-w-md">
-        <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-primary-600 mb-2">
-            Spado Car Wash
-          </h1>
-          <p className="text-gray-600">Management System</p>
+        <div className="text-center mb-8 flex flex-col items-center">
+          <Logo width={150} height={50} textColor="#0846c1" className="mb-2" />
+          {/* <p className="text-gray-600">Management System</p> */}
         </div>
 
         <Card className="shadow-xl">
@@ -141,7 +140,7 @@ const Login = () => {
                   <Label htmlFor="password">Password</Label>
                   <Link
                     to="/forgot-password"
-                    className="text-sm text-primary-600 hover:text-primary-700 hover:underline"
+                    className="text-sm text-primary hover:underline"
                   >
                     Forgot password?
                   </Link>
@@ -178,7 +177,7 @@ const Login = () => {
 
               <Button
                 type="submit"
-                className="w-full bg-primary-500 hover:bg-primary-600"
+                className="w-full mt-4"
                 disabled={isLoading}
               >
                 {isLoading ? (
@@ -192,18 +191,10 @@ const Login = () => {
               </Button>
             </form>
           </CardContent>
-          <CardFooter className="flex flex-col space-y-4">
-            <div className="text-sm text-center text-gray-600">
-              <p>Demo Accounts:</p>
-              <p className="text-xs mt-1">
-                Admin • Sales Executive • Accountant
-              </p>
-            </div>
-          </CardFooter>
         </Card>
 
         <p className="text-center text-sm text-gray-600 mt-6">
-          © 2026 Spado Car Wash. All rights reserved.
+          © 2026 Spado. All rights reserved.
         </p>
       </div>
     </div>

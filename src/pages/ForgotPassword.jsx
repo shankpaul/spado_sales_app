@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { toast } from 'sonner';
 import authService from '../services/authService';
 import { Loader2, ArrowLeft, Mail, CheckCircle2, AlertCircle } from 'lucide-react';
+import Logo from '@/components/Logo';
 
 /**
  * Forgot Password Page Component
@@ -132,16 +133,10 @@ const ForgotPassword = () => {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-50 via-white to-primary-100 px-4 py-8">
       <div className="w-full max-w-md">
-        <div className="mb-6">
-          <Link
-            to="/login"
-            className="inline-flex items-center text-sm text-primary-600 hover:text-primary-700 hover:underline"
-          >
-            <ArrowLeft className="mr-1 h-4 w-4" />
-            Back to Sign In
-          </Link>
-        </div>
 
+        <div className="text-center mb-8 flex flex-col items-center">
+          <Logo width={150} height={50} textColor="#0846c1" className="mb-2" />
+          </div>
         <Card className="shadow-xl">
           <CardHeader className="space-y-1">
             <div className="mx-auto w-12 h-12 bg-primary-100 rounded-full flex items-center justify-center mb-4">
@@ -177,7 +172,7 @@ const ForgotPassword = () => {
 
               <Button
                 type="submit"
-                className="w-full bg-primary-500 hover:bg-primary-600"
+                className="w-full"
                 disabled={isLoading}
               >
                 {isLoading ? (
