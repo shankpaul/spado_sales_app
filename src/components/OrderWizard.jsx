@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react';
-import { Dialog, DialogContent } from './ui/dialog';
+import { useState, useEffect, useRef } from 'react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from './ui/dialog';
 import { Button } from './ui/button';
+import CustomerForm from './CustomerForm';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Textarea } from './ui/textarea';
@@ -52,6 +53,7 @@ import {
   Car,
   Truck,
   Search,
+  Phone,
 } from 'lucide-react';
 
 /**
@@ -67,6 +69,11 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
   const [identifyBrand, setIdentifyBrand] = useState('');
   const [identifyModel, setIdentifyModel] = useState('');
   const [deletePackageDialog, setDeletePackageDialog] = useState({ open: false, index: null });
+  const [showCustomerForm, setShowCustomerForm] = useState(false);
+  const [customerSearchTerm, setCustomerSearchTerm] = useState('');
+  const [customerSearchLoading, setCustomerSearchLoading] = useState(false);
+  const [showCustomerSuggestions, setShowCustomerSuggestions] = useState(false);
+  const customerSearchRef = useRef(null);
   
   // Data states
   const [customers, setCustomers] = useState([]);
@@ -90,6 +97,7 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
     map_link: '',
   });
   const [notes, setNotes] = useState('');
+  const [orderStatus, setOrderStatus] = useState('');
   
   // Validation errors
   const [errors, setErrors] = useState({});
@@ -107,6 +115,58 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
       fetchInitialData();
     }
   }, [open]);
+
+  // Fetch and prefill order data when editing
+  useEffect(() => {
+    if (open && orderId) {
+      fetchOrderData();
+    }
+  }, [open, orderId]);
+
+  // Debounced customer search
+  useEffect(() => {
+    if (!customerSearchTerm || customerSearchTerm.length < 2) {
+      setCustomers([]);
+      setShowCustomerSuggestions(false);
+      return;
+    }
+
+    setShowCustomerSuggestions(true);
+    const timeoutId = setTimeout(async () => {
+      setCustomerSearchLoading(true);
+      try {
+        const response = await customerService.getAllCustomers({
+          search: customerSearchTerm,
+          limit: 20,
+        });
+        setCustomers(response.customers || []);
+      } catch (error) {
+        console.error('Error searching customers:', error);
+        toast.error('Failed to search customers');
+      } finally {
+        setCustomerSearchLoading(false);
+      }
+    }, 300); // 300ms debounce
+
+    return () => clearTimeout(timeoutId);
+  }, [customerSearchTerm]);
+
+  // Click outside handler for customer suggestions
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (customerSearchRef.current && !customerSearchRef.current.contains(event.target)) {
+        setShowCustomerSuggestions(false);
+      }
+    };
+
+    if (showCustomerSuggestions) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showCustomerSuggestions]);
 
   // Load draft with expiry check
   const loadDraft = () => {
@@ -152,8 +212,11 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
     toast.info('Draft order restored');
   };
 
-  // Save to localStorage
+  // Save to localStorage (only for new orders, not edit mode)
   const saveDraft = (step = currentStep) => {
+    // Don't save draft when editing existing order
+    if (orderId) return;
+    
     const draftData = {
       currentStep: step,
       selectedCustomer,
@@ -184,13 +247,11 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
   // Fetch initial data
   const fetchInitialData = async () => {
     try {
-      const [customersRes, packagesRes, addonsRes, agentsRes] = await Promise.all([
-        customerService.getAllCustomers({ limit: 100 }),
+      const [packagesRes, addonsRes, agentsRes] = await Promise.all([
         orderService.getPackages(),
         orderService.getAddons(),
         orderService.getUsersByRole('agent'),
       ]);
-      setCustomers(customersRes.customers || []);
       setPackages(packagesRes.packages || packagesRes || []);
       setAddons(addonsRes.addons || addonsRes || []);
       setAgents(agentsRes.users || []);
@@ -205,6 +266,11 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
     try {
       const customer = await customerService.getCustomerById(id);
       setSelectedCustomer(customer);
+      // Add to customers list if not already there
+      setCustomers(prev => {
+        const exists = prev.some(c => c.id === customer.id);
+        return exists ? prev : [...prev, customer];
+      });
       // Prefill address from customer
       if (customer) {
         setAddress({
@@ -217,6 +283,107 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
       }
     } catch (error) {
       console.error('Error fetching customer:', error);
+    }
+  };
+
+  // Extract time in HH:MM format from datetime string
+  const extractTimeFromDateTime = (dateTimeString) => {
+    if (!dateTimeString) return '';
+    try {
+      const date = new Date(dateTimeString);
+      const hours = String(date.getHours()).padStart(2, '0');
+      const minutes = String(date.getMinutes()).padStart(2, '0');
+      return `${hours}:${minutes}`;
+    } catch {
+      return '';
+    }
+  };
+
+  // Fetch and prefill order data for editing
+  const fetchOrderData = async () => {
+    setLoading(true);
+    try {
+      const response = await orderService.getOrderById(orderId);
+      const order = response.order;
+      
+      if (order) {
+        // Store order status
+        setOrderStatus(order.status);
+        
+        // Set customer
+        if (order.customer) {
+          setSelectedCustomer({
+            id: order.customer_id,
+            name: order.customer.name,
+            phone: order.customer.phone,
+            email: order.customer.email,
+          });
+          // Add to customers list for display
+          setCustomers([{
+            id: order.customer_id,
+            name: order.customer.name,
+            phone: order.customer.phone,
+            email: order.customer.email,
+            area: order.customer.area,
+            city: order.customer.city,
+          }]);
+        }
+       
+        // Set packages with all necessary fields
+        const orderPackages = order.packages?.map(pkg => ({
+          package_id: String(pkg.package.id), // Convert to string for Select component
+          package_name: pkg.package.name,
+          vehicle_type: pkg.vehicle_type,
+          quantity: pkg.quantity || 1,
+          unit_price: parseFloat(pkg.price) || 0,
+          discount_value: parseFloat(pkg.discount) || 0,
+          discount_type: pkg.discount_type,
+          total_price: parseFloat(pkg.total_price) || 0,
+          notes: pkg.notes || '',
+          package: pkg.package, // Include full package details
+        })) || [];
+        setPackageItems(orderPackages);
+        
+        // Set addons
+        const orderAddons = order.addons?.map(addon => ({
+          addon_id: String(addon.addon.id), // Convert to string for Select component
+          addon_name: addon.addon_name,
+          quantity: addon.quantity || 1,
+          unit_price: parseFloat(addon.price) || 0,
+          discount_value: parseFloat(addon.discount) || 0,
+          discount_type: addon.discount_type,
+          total_price: parseFloat(addon.total_price) || 0,
+          addon: addon.addon, // Include full addon details
+        })) || [];
+        setAddonItems(orderAddons);
+        
+        // Set booking details
+        setBookingDate(order.booking_date || '');
+        setBookingTimeFrom(extractTimeFromDateTime(order.booking_time_from));
+        setBookingTimeTo(extractTimeFromDateTime(order.booking_time_to));
+        
+        // Set agent
+        setSelectedAgent(order.assigned_to?.id?.toString() || '');
+        
+        // Set address
+        setAddress({
+          area: order.area || '',
+          city: order.city || '',
+          district: order.district || '',
+          state: order.state || '',
+          map_link: order.map_link || '',
+        });
+        
+        // Set notes
+        setNotes(order.notes || '');
+        
+        toast.success('Order data loaded');
+      }
+    } catch (error) {
+      console.error('Error fetching order:', error);
+      toast.error('Failed to load order data');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -257,12 +424,16 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
     setSelectedAgent('');
     setAddress({ area: '', city: '', district: '', state: '', map_link: '' });
     setNotes('');
+    setOrderStatus('');
     setErrors({});
   };
 
   // Close handler
   const handleClose = () => {
-    saveDraft(currentStep);
+    // Only save draft for new orders, not when editing
+    if (!orderId) {
+      saveDraft(currentStep);
+    }
     onOpenChange(false);
   };
 
@@ -284,6 +455,14 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
         if (!item.vehicle_type) newErrors[`package_${index}_vehicle_type`] = 'Required';
         if (!item.package_id) newErrors[`package_${index}_package`] = 'Required';
         if (!item.quantity || item.quantity < 1) newErrors[`package_${index}_quantity`] = 'Required';
+      });
+    }
+    
+    if (step === 3) {
+      // Validate addons if any are added
+      addonItems.forEach((item, index) => {
+        if (!item.addon_id) newErrors[`addon_${index}_addon`] = 'Required';
+        if (!item.quantity || item.quantity < 1) newErrors[`addon_${index}_quantity`] = 'Required';
       });
     }
     
@@ -328,7 +507,7 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
         package_id: '',
         quantity: 1,
         unit_price: 0,
-        discount_type: DISCOUNT_TYPES.PERCENTAGE,
+        discount_type: DISCOUNT_TYPES.FIXED,
         discount_value: 0,
       },
     ]);
@@ -414,7 +593,7 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
         addon_id: '',
         quantity: 1,
         unit_price: 0,
-        discount_type: DISCOUNT_TYPES.PERCENTAGE,
+        discount_type: DISCOUNT_TYPES.FIXED,
         discount_value: 0,
       },
     ]);
@@ -440,14 +619,16 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
   };
 
   // Submit handlers
-  const handleSubmit = async (status) => {
+  const handleSubmit = async (status = null) => {
     if (!validateStep(4)) return;
-    console.log('Submitting order with status:', status);
+    // If no status provided and in edit mode, keep current status
+    const finalStatus = status || orderStatus || 'draft';
+    console.log('Submitting order with status:', finalStatus);
     setLoading(true);
     try {
       const orderData = {
         customer_id: selectedCustomer.id,
-        status,
+        status: finalStatus,
         booking_date: bookingDate,
         booking_time_from: bookingTimeFrom,
         booking_time_to: bookingTimeTo,
@@ -478,7 +659,7 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
         toast.success('Order updated successfully');
       } else {
         await orderService.createOrder(orderData);
-        toast.success(`Order ${status === 'draft' ? 'saved as draft' : 'confirmed'} successfully`);
+        toast.success(`Order ${finalStatus === 'draft' ? 'saved as draft' : 'confirmed'} successfully`);
       }
       
       clearDraft();
@@ -513,47 +694,122 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
     <div className="space-y-4">
       <div>
         <Label>Select Customer *</Label>
-        <ComboBox
-          value={selectedCustomer?.id ? String(selectedCustomer.id) : ''}
-          onValueChange={(value) => {
-            const customer = customers.find((c) => String(c.id) === String(value));
-            setSelectedCustomer(customer);
-            if (customer) {
-              setAddress({
-                area: customer.area || '',
-                city: customer.city || '',
-                district: customer.district || '',
-                state: customer.state || '',
-                map_link: customer.map_link || '',
-              });
-            }
-            saveDraft();
-          }}
-          options={customers.map((c) => ({
-            value: String(c.id),
-            label: `${c.name} - ${c.phone}`,
-          }))}
-          placeholder="Search customer by name or phone..."
-          emptyText="No customers found"
-        />
+        <div className="relative" ref={customerSearchRef}>
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search customer by name or phone..."
+              value={selectedCustomer ? `${selectedCustomer.name} - ${selectedCustomer.phone}` : customerSearchTerm}
+              onChange={(e) => {
+                const value = e.target.value;
+                setCustomerSearchTerm(value);
+                setSelectedCustomer(null);
+              }}
+              onFocus={() => {
+                if (customerSearchTerm.length >= 2) {
+                  setShowCustomerSuggestions(true);
+                }
+              }}
+              className="pl-10"
+            />
+            {customerSearchLoading && (
+              <Loader2 className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />
+            )}
+          </div>
+          
+          {/* Suggestions Dropdown */}
+          {showCustomerSuggestions && customerSearchTerm.length >= 2 && (
+            <Card className="absolute z-50 w-full mt-1 max-h-64 overflow-y-auto shadow-lg">
+              {customerSearchLoading ? (
+                <div className="p-4 text-center text-sm text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin mx-auto mb-2" />
+                  Searching...
+                </div>
+              ) : customers.length > 0 ? (
+                <div className="py-1">
+                  {customers.map((customer) => (
+                    <button
+                      key={customer.id}
+                      type="button"
+                      className="w-full px-4 py-3 text-left hover:bg-secondary transition-colors border-b last:border-b-0"
+                      onClick={() => {
+                        setSelectedCustomer(customer);
+                        setCustomerSearchTerm('');
+                        setShowCustomerSuggestions(false);
+                        setAddress({
+                          area: customer.area || '',
+                          city: customer.city || '',
+                          district: customer.district || '',
+                          state: customer.state || '',
+                          map_link: customer.map_link || '',
+                        });
+                        saveDraft();
+                      }}
+                    >
+                      <div className="font-medium">{customer.name}</div>
+                      <div className="text-sm text-muted-foreground flex items-center gap-2">
+                        <Phone className="h-3 w-3" />
+                        {customer.phone}
+                        {customer.area && (
+                          <>
+                            <span>•</span>
+                            <MapPin className="h-3 w-3" />
+                            {customer.area}
+                          </>
+                        )}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <div className="p-6 text-center">
+                  <p className="text-sm text-muted-foreground mb-3">
+                    No customers found matching "{customerSearchTerm}"
+                  </p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setShowCustomerSuggestions(false);
+                      setShowCustomerForm(true);
+                    }}
+                    className="gap-2"
+                  >
+                    <Plus className="h-4 w-4" />
+                    Create New Customer
+                  </Button>
+                </div>
+              )}
+            </Card>
+          )}
+        </div>
         {errors.customer && <p className="text-sm text-destructive mt-1">{errors.customer}</p>}
       </div>
       
       {selectedCustomer && (
         <Card className="p-4 bg-secondary/50">
-          <div className="space-y-2 text-sm">
-            <div><strong>Name:</strong> {selectedCustomer.name}</div>
-            <div><strong>Phone:</strong> {selectedCustomer.phone}</div>
-            {selectedCustomer.area && <div><strong>Area:</strong> {selectedCustomer.area}</div>}
-            {selectedCustomer.city && <div><strong>City:</strong> {selectedCustomer.city}</div>}
+          <div className="flex justify-between items-start">
+            <div className="space-y-2 text-sm flex-1">
+              <div><strong>Name:</strong> {selectedCustomer.name}</div>
+              <div><strong>Phone:</strong> {selectedCustomer.phone}</div>
+              {selectedCustomer.area && <div><strong>Area:</strong> {selectedCustomer.area}</div>}
+              {selectedCustomer.city && <div><strong>City:</strong> {selectedCustomer.city}</div>}
+            </div>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setSelectedCustomer(null);
+                setCustomerSearchTerm('');
+              }}
+            >
+              <X className="h-4 w-4" />
+            </Button>
           </div>
         </Card>
       )}
-      
-      <Button type="button" variant="outline" className="w-full" onClick={() => toast.info('Add customer feature coming soon')}>
-        <Plus className="h-4 w-4 mr-2" />
-        Add New Customer
-      </Button>
     </div>
   );
 
@@ -585,7 +841,7 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
           {packageItems.map((item, index) => {
             const hasError = errors[`package_${index}_vehicle_type`] || errors[`package_${index}_package`];
             return (
-          <Card key={index} className={`p-4 ${hasError ? 'border-destructive ring-2 ring-destructive' : ''}`}>
+          <Card key={index} className={`p-4 `}>
             <div className="space-y-3">
               <div className="flex justify-between items-start">
                 <span className="font-medium">Service {index + 1}</span>
@@ -627,14 +883,14 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
               
               <div className="grid grid-cols-2 gap-3">
                 <div className="col-span-2">
-                  <div className={`flex gap-2 ${errors[`package_${index}_vehicle_type`] ? 'ring-2 ring-destructive rounded-md p-1' : ''}`}>
+                  <div className={`flex gap-2 `}>
                     {[{ type: 'hatchback', icon: Car }, { type: 'sedan', icon: Car }, { type: 'suv', icon: Truck }].map(({ type, icon: Icon }) => (
                       <Button
                         key={type}
                         type="button"
                         variant={item.vehicle_type === type ? 'default' : 'outline'}
                         size="sm"
-                        className="flex-1 h-12 flex flex-col gap-1 rounded-full"
+                        className="flex-1 h-10 flex flex-row gap-2 rounded-full cursor-pointer"
                         onClick={() => updatePackageItem(index, 'vehicle_type', type)}
                       >
                         <Icon className="h-5 w-5" />
@@ -646,7 +902,7 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
                 
                 <div>
                   <Label className="text-xs">Package *</Label>
-                  <div className={errors[`package_${index}_package`] ? 'ring-2 ring-destructive rounded-md' : ''}>
+                  <div>
                     <Select
                       value={item.package_id}
                       onValueChange={(value) => updatePackageItem(index, 'package_id', value)}
@@ -769,8 +1025,10 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
         </Card>
       ) : (
         <div className="space-y-4 max-h-96 overflow-y-auto">
-          {addonItems.map((item, index) => (
-            <Card key={index} className="p-4">
+          {addonItems.map((item, index) => {
+            const hasError = errors[`addon_${index}_addon`];
+            return (
+            <Card key={index} className={`p-4`}>
               <div className="space-y-3">
                 <div className="flex justify-between items-start">
                   <span className="font-medium">Add-on {index + 1}</span>
@@ -784,24 +1042,33 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
                   </Button>
                 </div>
                 
+                {hasError && (
+                  <div className="flex items-center gap-2 text-destructive text-sm bg-destructive/10 p-2 rounded">
+                    <X className="h-4 w-4" />
+                    <span>Add-on selection is required</span>
+                  </div>
+                )}
+                
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <Label className="text-xs">Add-on Service *</Label>
-                    <Select
-                      value={item.addon_id}
-                      onValueChange={(value) => updateAddonItem(index, 'addon_id', value)}
-                    >
-                      <SelectTrigger className="h-8 text-sm">
-                        <SelectValue placeholder="Select add-on" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {addons.map((addon) => (
-                          <SelectItem key={addon.id} value={String(addon.id)}>
-                            {addon.name} - ₹{addon.unit_price || addon.price}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <div>
+                      <Select
+                        value={item.addon_id}
+                        onValueChange={(value) => updateAddonItem(index, 'addon_id', value)}
+                      >
+                        <SelectTrigger className="h-8 text-sm">
+                          <SelectValue placeholder="Select add-on" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {addons.map((addon) => (
+                            <SelectItem key={addon.id} value={String(addon.id)}>
+                              {addon.name} - ₹{addon.unit_price || addon.price}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
                   
                   <div>
@@ -874,7 +1141,8 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
                 </div>
               </div>
             </Card>
-          ))}
+          );
+        })}
         </div>
       )}
     </div>
@@ -888,7 +1156,7 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
       <div className="space-y-4">
         <div className="grid grid-cols-2 gap-4">
           <div className='flex gap-2'>
-            <div>
+            <div className='w-50'>
               <Label>Booking Date *</Label>
               <DatePicker
                 value={bookingDate}
@@ -1183,7 +1451,41 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
                       Next
                       <ChevronRight className="h-4 w-4 ml-1" />
                     </Button>
+                  ) : orderId ? (
+                    // Edit mode buttons
+                    <>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => handleSubmit()}
+                        disabled={loading}
+                      >
+                        {loading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                        Save
+                      </Button>
+                      {(orderStatus === 'draft' || orderStatus === 'tentative') && (
+                        <Button
+                          type="button"
+                          onClick={() => handleSubmit('confirmed')}
+                          disabled={loading}
+                        >
+                          {loading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                          Confirm Order
+                        </Button>
+                      )}
+                      {orderStatus !== 'draft' && orderStatus !== 'tentative' && (
+                        <Button
+                          type="button"
+                          onClick={() => handleSubmit()}
+                          disabled={loading}
+                        >
+                          {loading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                          Update Order
+                        </Button>
+                      )}
+                    </>
                   ) : (
+                    // Create mode buttons
                     <>
                       <Button
                         type="button"
@@ -1316,7 +1618,7 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
                   if (vehicleType && identifyDialog.index !== null) {
                     updatePackageItem(identifyDialog.index, 'brand', identifyBrand);
                     updatePackageItem(identifyDialog.index, 'model', identifyModel);
-                    updatePackageItem(identifyDialog.index, 'vehicle_type', vehicleType);
+                    updatePackageItem(identifyDialog.index, 'vehicle_type', vehicleType.toString().toLowerCase());
                     toast.success(`Vehicle identified as ${vehicleType}`);
                   }
                   setIdentifyDialog({ open: false, index: null });
@@ -1328,6 +1630,45 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
               </Button>
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Customer Form Dialog */}
+      <Dialog open={showCustomerForm} onOpenChange={setShowCustomerForm}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Add New Customer</DialogTitle>
+            <DialogDescription>
+              Fill in the customer details below. Map link will auto-fill location fields.
+            </DialogDescription>
+          </DialogHeader>
+          <CustomerForm
+            onSuccess={(newCustomer) => {
+              setShowCustomerForm(false);
+              // Auto-select the new customer
+              if (newCustomer && newCustomer.customer) {
+                const customer = newCustomer.customer;
+                setSelectedCustomer({
+                  id: customer.id,
+                  name: customer.name,
+                  phone: customer.phone,
+                  email: customer.email,
+                });
+                // Add to customers list
+                setCustomers(prev => [...prev, customer]);
+                // Pre-fill address
+                setAddress({
+                  area: customer.area || '',
+                  city: customer.city || '',
+                  district: customer.district || '',
+                  state: customer.state || '',
+                  map_link: customer.map_link || '',
+                });
+              }
+              toast.success('Customer added and selected');
+            }}
+            onCancel={() => setShowCustomerForm(false)}
+          />
         </DialogContent>
       </Dialog>
     </>

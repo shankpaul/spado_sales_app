@@ -134,6 +134,18 @@ const orderService = {
   },
 
   /**
+   * Submit order feedback
+   * @param {string} id - Order ID
+   * @param {Object} feedbackData - Feedback data
+   * @param {number} feedbackData.rating - Rating (1-5)
+   * @param {string} feedbackData.comment - Feedback comment
+   */
+  submitOrderFeedback: async (id, feedbackData) => {
+    const response = await apiClient.post(`/orders/${id}/feedback`, feedbackData);
+    return response.data;
+  },
+
+  /**
    * Helper: Get vehicle type from brand and model
    * @param {string} brand - Car brand
    * @param {string} model - Car model

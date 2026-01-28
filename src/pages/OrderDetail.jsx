@@ -66,8 +66,10 @@ import {
   ExternalLink,
   Copy,
   MoreVertical,
+  Star,
 } from 'lucide-react';
 import { format } from 'date-fns';
+import MapPreview from '@/components/MapPreview';
 
 /**
  * Order Detail Page
@@ -93,6 +95,26 @@ const OrderDetail = () => {
   const [cancelReason, setCancelReason] = useState('');
   const [customReason, setCustomReason] = useState('');
   const [cancelling, setCancelling] = useState(false);
+  
+  // Status change confirmation dialog
+  const [isStatusConfirmOpen, setIsStatusConfirmOpen] = useState(false);
+  const [pendingStatus, setPendingStatus] = useState(null);
+  const [changingStatus, setChangingStatus] = useState(false);
+  
+  // Reassign agent dialog state
+  const [isReassignDialogOpen, setIsReassignDialogOpen] = useState(false);
+  const [newAgentId, setNewAgentId] = useState(null);
+  const [reassigning, setReassigning] = useState(false);
+  
+  // Feedback dialog state
+  const [isFeedbackDialogOpen, setIsFeedbackDialogOpen] = useState(false);
+  const [feedbackRating, setFeedbackRating] = useState(5);
+  const [hoveredRating, setHoveredRating] = useState(0);
+  const [feedbackComment, setFeedbackComment] = useState('');
+  const [submittingFeedback, setSubmittingFeedback] = useState(false);
+  
+  // Feedback comments view dialog
+  const [isFeedbackViewOpen, setIsFeedbackViewOpen] = useState(false);
 
   // Fetch order details
   useEffect(() => {
@@ -148,14 +170,31 @@ const OrderDetail = () => {
 
   // Handle status change
   const handleStatusChange = async (newStatus) => {
+    // If changing to completed, show confirmation dialog
+    if (newStatus === 'completed') {
+      setPendingStatus(newStatus);
+      setIsStatusConfirmOpen(true);
+      return;
+    }
+    
+    // For in_progress, change directly
+    await performStatusChange(newStatus);
+  };
+
+  // Perform the actual status change
+  const performStatusChange = async (newStatus) => {
+    setChangingStatus(true);
     try {
       await orderService.updateOrderStatus(id, newStatus);
       toast.success('Status updated successfully');
       fetchOrderDetails();
       fetchTimeline();
+      setIsStatusConfirmOpen(false);
     } catch (error) {
       console.error('Error updating status:', error);
       toast.error('Failed to update status');
+    } finally {
+      setChangingStatus(false);
     }
   };
 
@@ -202,6 +241,15 @@ const OrderDetail = () => {
     }
   };
 
+  const formatTime = (dateTimeString) => {
+    if (!dateTimeString) return 'N/A';
+    try {
+      return format(new Date(dateTimeString), 'hh:mm a');
+    } catch {
+      return 'N/A';
+    }
+  };
+
   // Format currency
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat('en-IN', {
@@ -244,16 +292,28 @@ const OrderDetail = () => {
   };
 
   // Handle reassign agent
-  const handleReassignAgent = async (newAgentId) => {
+  const handleReassignAgent = (selectedAgentId) => {
+    setNewAgentId(selectedAgentId);
+    setIsReassignDialogOpen(true);
+  };
+
+  // Confirm reassign agent
+  const confirmReassignAgent = async () => {
+    if (!newAgentId) return;
+    
+    setReassigning(true);
     try {
       await orderService.reassignOrder(id, newAgentId);
       toast.success('Agent reassigned successfully');
+      setIsReassignDialogOpen(false);
       fetchOrderDetails();
       fetchTimeline();
       fetchReassignments();
     } catch (error) {
       console.error('Error reassigning agent:', error);
       toast.error('Failed to reassign agent');
+    } finally {
+      setReassigning(false);
     }
   };
 
@@ -267,6 +327,27 @@ const OrderDetail = () => {
     } catch (error) {
       console.error('Error updating note:', error);
       toast.error('Failed to update note');
+    }
+  };
+  
+  // Handle feedback submission
+  const handleSubmitFeedback = async () => {
+    setSubmittingFeedback(true);
+    try {
+      await orderService.submitOrderFeedback(id, {
+        rating: feedbackRating,
+        comments: feedbackComment
+      });
+      toast.success('Feedback submitted successfully');
+      setIsFeedbackDialogOpen(false);
+      setFeedbackRating(5);
+      setFeedbackComment('');
+      fetchOrderDetails();
+    } catch (error) {
+      console.error('Error submitting feedback:', error);
+      toast.error('Failed to submit feedback');
+    } finally {
+      setSubmittingFeedback(false);
     }
   };
 
@@ -330,10 +411,38 @@ const OrderDetail = () => {
                 <Badge variant={getBadgeVariant(order.status, 'order')} className="text-xs">
                   {getStatusLabel(order.status, ORDER_STATUSES)}
                 </Badge>
+
+                {/* Star Rating Display */}
+                {order.rating && (
+                  <div className="flex items-center gap-1">
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <Star
+                        key={star}
+                        className={`h-4 w-4 ${
+                          star <= order.rating
+                            ? 'fill-yellow-400 text-yellow-400'
+                            : 'text-gray-300'
+                        }`}
+                      />
+                    ))}
+                    <span className="text-sm text-muted-foreground ml-1">
+                      ({order.rating})
+                    </span>
+                    {order.feedback_comments && (
+                      <button
+                        onClick={() => setIsFeedbackViewOpen(true)}
+                        className="ml-1 text-blue-600 hover:text-blue-700 transition-colors"
+                        title="View feedback comments"
+                      >
+                        <MessageSquare className="h-4 w-4" />
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
-
-            <div className="hidden sm:flex items-center gap-3 text-sm">
+            {isEditable && 
+            <div className="flex items-center gap-3 text-sm">
              
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -348,6 +457,23 @@ const OrderDetail = () => {
                         <Edit className="h-4 w-4 mr-2" />
                         Edit Order
                       </DropdownMenuItem>
+                      
+                      {/* Change to In Progress - only if confirmed */}
+                      {order.status === 'confirmed' && (
+                        <DropdownMenuItem onClick={() => handleStatusChange('in_progress')}>
+                          <Clock className="h-4 w-4 mr-2" />
+                          Mark as In Progress
+                        </DropdownMenuItem>
+                      )}
+                      
+                      {/* Change to Completed - only if confirmed or in_progress */}
+                      {(order.status === 'confirmed' || order.status === 'in_progress') && (
+                        <DropdownMenuItem onClick={() => handleStatusChange('completed')}>
+                          <CheckCircle2 className="h-4 w-4 mr-2" />
+                          Mark as Completed
+                        </DropdownMenuItem>
+                      )}
+                      
                       <DropdownMenuItem 
                         onClick={() => setIsCancelDialogOpen(true)}
                         className="text-destructive focus:text-destructive"
@@ -360,6 +486,7 @@ const OrderDetail = () => {
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
+    }
           </div>
         </div>
       </div>
@@ -393,7 +520,7 @@ const OrderDetail = () => {
                   <span>{order.area || 'N/A'}, {order.city || 'N/A'}</span>
                 </div>
                 <span className="text-sm text-muted-foreground">
-                  Booking Date {formatDate(order.booking_date)} at {order.booking_time_from || 'N/A'}
+                  Booking Date {formatDate(order.booking_date)} at {formatTime(order.booking_time_from)} - {formatTime(order.booking_time_to)}
                 </span>
               </div>
 
@@ -449,6 +576,17 @@ const OrderDetail = () => {
                     <ChevronRight className="h-4 w-4 ml-2" />
                   </Button>
                 </>
+              )}
+              
+              {/* Feedback Button - show when order is completed and feedback not submitted */}
+              {order.status === 'completed' && !order.feedback_submitted_at && (
+                <Button
+                  onClick={() => setIsFeedbackDialogOpen(true)}
+                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
+                >
+                  <MessageSquare className="h-4 w-4 mr-2" />
+                  Add Feedback
+                </Button>
               )}
             </div>
 
@@ -562,9 +700,16 @@ const OrderDetail = () => {
                 <div className="pt-6 border-t">
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="font-semibold text-lg">Payment Details</h3>
-                    <Badge variant={getBadgeVariant(order.payment_status, 'payment')}>
-                      {getStatusLabel(order.payment_status, PAYMENT_STATUSES)}
-                    </Badge>
+                    <div className="flex items-center gap-2">
+                      {order.payment_method && (
+                        <Badge variant="outline" className="text-xs uppercase">
+                          {order.payment_method.replace('_', ' ')}
+                        </Badge>
+                      )}
+                      <Badge variant={getBadgeVariant(order.payment_status, 'payment')}>
+                        {getStatusLabel(order.payment_status, PAYMENT_STATUSES)}
+                      </Badge>
+                    </div>
                   </div>
                   
                   <div className="space-y-3 max-w-md ml-auto">
@@ -579,6 +724,15 @@ const OrderDetail = () => {
                       <div className="flex justify-between text-sm text-destructive">
                         <span>Discount</span>
                         <span>-{formatCurrency(order.discount)}</span>
+                      </div>
+                    )}
+
+                    {order.gst_amount > 0 && (
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">
+                          GST {order.gst_percentage ? `(${order.gst_percentage}%)` : ''}
+                        </span>
+                        <span className="font-medium">{formatCurrency(order.gst_amount)}</span>
                       </div>
                     )}
 
@@ -693,28 +847,34 @@ const OrderDetail = () => {
                   </div>
                 </div>
                 
-                {!['in_progress', 'completed', 'cancelled'].includes(order.status) && agents.length > 0 && (
-                  <div>
-                    <label className="text-xs font-medium text-muted-foreground mb-2 block">
-                      Reassign to
-                    </label>
-                    <Select
-                      value={order.assigned_agent?.id ? String(order.assigned_agent.id) : ''}
-                      onValueChange={handleReassignAgent}
-                    >
-                      <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Select agent" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {agents.map((agent) => (
-                          <SelectItem key={agent.id} value={String(agent.id)}>
-                            {agent.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
+                {(() => {
+                  const currentAgentId = order.assigned_to?.id;
+                  const availableAgents = agents.filter(agent => agent.id !== currentAgentId);
+                  const canReassign = !['in_progress', 'completed', 'cancelled'].includes(order.status) && availableAgents.length > 0;
+                  
+                  return canReassign && (
+                    <div>
+                      <label className="text-xs font-medium text-muted-foreground mb-2 block">
+                        Reassign to
+                      </label>
+                      <Select
+                        value=""
+                        onValueChange={handleReassignAgent}
+                      >
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder="Select agent" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {availableAgents.map((agent) => (
+                            <SelectItem key={agent.id} value={String(agent.id)}>
+                              {agent.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  );
+                })()}
               </div>
             </div>
 
@@ -727,7 +887,7 @@ const OrderDetail = () => {
                 </Button>
               </div>
               <div className="p-4">
-                <div className="flex items-center gap-3 mb-4">
+                <div className="flex items-center gap-3">
                   <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white font-semibold">
                     {order.customer?.name?.charAt(0).toUpperCase()}
                   </div>
@@ -749,21 +909,12 @@ const OrderDetail = () => {
                 </Button>
               </div>
               <div className="p-4">
-                {order.map_link ? (
-                  <div className="mb-4 rounded-lg overflow-hidden border">
-                    <iframe
-                      src={order.map_link.replace('/maps?', '/maps/embed?').replace('/maps/place/', '/maps/embed?pb=')}
-                      width="100%"
-                      height="200"
-                      style={{ border: 0 }}
-                      allowFullScreen=""
-                      loading="lazy"
-                      referrerPolicy="no-referrer-when-downgrade"
-                      className="w-full"
-                    />
+                {order.latitude && order.longitude ? (
+                  <div className="mb-4 rounded-sm overflow-hidden border">
+                    <MapPreview lat={order.latitude} lng={order.longitude} />
                   </div>
                 ) : (
-                  <div className="mb-4 rounded-lg overflow-hidden bg-gray-50 h-32 flex items-center justify-center border">
+                  <div className="mb-4 rounded-lg overflow-hidden bg-gray-50 h-[200px] flex items-center justify-center border">
                     <MapPin className="h-8 w-8 text-gray-400" />
                   </div>
                 )}
@@ -879,6 +1030,201 @@ const OrderDetail = () => {
           toast.success('Order updated successfully');
         }}
       />
+
+      {/* Agent Reassignment Confirmation Dialog */}
+      <AlertDialog open={isReassignDialogOpen} onOpenChange={setIsReassignDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Reassign Agent</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to reassign this order?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          
+          <div className="py-4">
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 text-sm">
+                <span className="text-muted-foreground">From:</span>
+                <span className="font-medium">{order?.assigned_to?.name || 'Unassigned'}</span>
+              </div>
+              <div className="flex items-center gap-2 text-sm">
+                <span className="text-muted-foreground">To:</span>
+                <span className="font-medium">
+                  {agents.find(agent => String(agent.id) === String(newAgentId))?.name || 'Unknown Agent'}
+                </span>
+              </div>
+            </div>
+          </div>
+          
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={reassigning}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmReassignAgent} disabled={reassigning}>
+              {reassigning && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Confirm Reassignment
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Status Change Confirmation Dialog */}
+      <AlertDialog open={isStatusConfirmOpen} onOpenChange={setIsStatusConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Mark Order as Completed</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to mark this order as completed? This action cannot be undone and will make the order non-editable.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          
+          <div className="py-4">
+            <div className="rounded-lg bg-yellow-50 border border-yellow-200 p-4">
+              <div className="flex gap-3">
+                <div className="flex-shrink-0">
+                  <XCircle className="h-5 w-5 text-yellow-600" />
+                </div>
+                <div className="text-sm text-yellow-800">
+                  <p className="font-medium mb-1">Important:</p>
+                  <ul className="list-disc list-inside space-y-1">
+                    <li>You will not be able to edit this order after completion</li>
+                    <li>This action cannot be reversed</li>
+                    <li>The order will be marked as finalized</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={changingStatus}>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={() => performStatusChange(pendingStatus)} 
+              disabled={changingStatus}
+              className="bg-green-600 hover:bg-green-700"
+            >
+              {changingStatus && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Yes, Mark as Completed
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Feedback Comments View Dialog */}
+      <AlertDialog open={isFeedbackViewOpen} onOpenChange={setIsFeedbackViewOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Customer Feedback</AlertDialogTitle>
+            <AlertDialogDescription>
+              Feedback submitted for this order
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          
+          <div className="space-y-4 py-4">
+            <div>
+              <label className="text-sm font-medium mb-2 block">Rating</label>
+              <div className="flex items-center gap-1">
+                {[1, 2, 3, 4, 5].map((star) => (
+                  <Star
+                    key={star}
+                    className={`h-6 w-6 ${
+                      star <= (order.rating || 0)
+                        ? 'fill-yellow-400 text-yellow-400'
+                        : 'text-gray-300'
+                    }`}
+                  />
+                ))}
+                <span className="text-sm text-muted-foreground ml-2">
+                  {order.rating} out of 5
+                </span>
+              </div>
+            </div>
+            
+            <div>
+              <label className="text-sm font-medium mb-2 block">Comments</label>
+              <div className="bg-gray-50 rounded-lg p-4 border text-sm">
+                {order.feedback_comments || 'No comments provided'}
+              </div>
+            </div>
+            
+            {order.feedback_submitted_at && (
+              <div className="text-xs text-muted-foreground">
+                Submitted on {formatDateTime(order.feedback_submitted_at)}
+              </div>
+            )}
+          </div>
+          
+          <AlertDialogFooter>
+            <AlertDialogAction onClick={() => setIsFeedbackViewOpen(false)}>
+              Close
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Feedback Dialog */}
+      <AlertDialog open={isFeedbackDialogOpen} onOpenChange={setIsFeedbackDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Submit Feedback</AlertDialogTitle>
+            <AlertDialogDescription>
+              Please share your experience with this service order.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          
+          <div className="space-y-4 py-4">
+            <div>
+              <label className="text-sm font-medium mb-3 block">Rating *</label>
+              <div 
+                className="flex gap-2 justify-center"
+                onMouseLeave={() => setHoveredRating(0)}
+              >
+                {[1, 2, 3, 4, 5].map((rating) => (
+                  <button
+                    key={rating}
+                    type="button"
+                    onClick={() => setFeedbackRating(rating)}
+                    onMouseEnter={() => setHoveredRating(rating)}
+                    className="transition-all hover:scale-110 focus:outline-none"
+                  >
+                    <Star
+                      className={`h-10 w-10 ${
+                        (hoveredRating > 0 ? hoveredRating : feedbackRating) >= rating
+                          ? 'fill-yellow-400 text-yellow-400'
+                          : 'text-gray-300'
+                      } transition-colors`}
+                    />
+                  </button>
+                ))}
+              </div>
+              <p className="text-xs text-muted-foreground mt-3 text-center">
+                Click to rate from 1 (Poor) to 5 (Excellent)
+              </p>
+            </div>
+            
+            <div>
+              <label className="text-sm font-medium mb-2 block">Feedback *</label>
+              <Textarea
+                value={feedbackComment}
+                onChange={(e) => setFeedbackComment(e.target.value)}
+                placeholder="Share your feedback about the service quality, agent, timeliness, etc..."
+                rows={4}
+                className="resize-none"
+              />
+            </div>
+          </div>
+          
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={submittingFeedback}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleSubmitFeedback}
+              disabled={submittingFeedback}
+              className="bg-blue-600 hover:bg-blue-700"
+            >
+              {submittingFeedback && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Submit Feedback
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Cancel Dialog */}
       <AlertDialog open={isCancelDialogOpen} onOpenChange={setIsCancelDialogOpen}>
