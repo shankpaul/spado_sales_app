@@ -13,11 +13,14 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000
 // Create axios instance
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 30000,
+  timeout: 60000, // Increased to 60 seconds
   headers: {
     'Content-Type': 'application/json',
     'Accept': 'application/json',
   },
+  // Retry configuration
+  retry: 2,
+  retryDelay: 1000,
 });
 
 // Flag to prevent multiple refresh attempts
@@ -58,12 +61,29 @@ apiClient.interceptors.response.use(
     return response;
   },
   async (error) => {
-    // Handle network errors (offline)
+    const config = error.config;
+    
+    // Handle network errors (offline or server not reachable)
     if (!error.response) {
+      // Retry logic for network errors
+      if (config && config.retry && config.__retryCount < config.retry) {
+        config.__retryCount = config.__retryCount || 0;
+        config.__retryCount += 1;
+        
+        // Wait before retrying
+        await new Promise(resolve => setTimeout(resolve, config.retryDelay || 1000));
+        
+        // Retry the request
+        return apiClient(config);
+      }
+      
+      // Show error after retries exhausted
       if (!navigator.onLine) {
         toast.error('You are offline. Please check your internet connection.');
+      } else if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
+        toast.error('Request timeout. Please try again.');
       } else {
-        toast.error('API endpoint is not reachable. Please try again later.');
+        toast.error('Cannot connect to server. Please check if the server is running.');
       }
       return Promise.reject(error);
     }

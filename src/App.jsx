@@ -11,6 +11,8 @@ const Login = lazy(() => import('./pages/Login'));
 const ForgotPassword = lazy(() => import('./pages/ForgotPassword'));
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 const Customers = lazy(() => import('./pages/Customers'));
+const Orders = lazy(() => import('./pages/Orders'));
+const OrderDetail = lazy(() => import('./pages/OrderDetail'));
 
 // Loading fallback component
 const LoadingFallback = () => (
@@ -71,14 +73,22 @@ function App() {
           />
 
           <Route
-            path="/bookings"
+            path="/orders"
             element={
               <ProtectedRoute allowedRoles={['admin', 'sales_executive']}>
                 <Layout>
-                  <div className="text-center py-12">
-                    <h2 className="text-2xl font-bold text-gray-900 mb-2">Bookings</h2>
-                    <p className="text-gray-600">Bookings management page coming soon...</p>
-                  </div>
+                  <Orders />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/orders/:id"
+            element={
+              <ProtectedRoute allowedRoles={['admin', 'sales_executive']}>
+                <Layout>
+                  <OrderDetail />
                 </Layout>
               </ProtectedRoute>
             }

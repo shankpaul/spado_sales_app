@@ -39,7 +39,9 @@ import {
   ChevronLeft,
   ChevronRight,
   MessageCircle,
+  ShoppingCart,
 } from 'lucide-react';
+import OrderWizard from '../components/OrderWizard';
 import { format } from 'date-fns';
 
 /**
@@ -60,6 +62,8 @@ const Customers = () => {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState(null);
+  const [isOrderWizardOpen, setIsOrderWizardOpen] = useState(false);
+  const [selectedCustomerForOrder, setSelectedCustomerForOrder] = useState(null);
   const [formData, setFormData] = useState({
     name: '',
     phone: '',
@@ -454,6 +458,17 @@ const Customers = () => {
                       <Button
                         variant="ghost"
                         size="icon"
+                        onClick={() => {
+                          setSelectedCustomerForOrder(customer.id);
+                          setIsOrderWizardOpen(true);
+                        }}
+                        title="Create Order"
+                      >
+                        <ShoppingCart className="h-4 w-4 text-primary" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
                         onClick={() => handleOpenForm(customer)}
                       >
                         <Edit2 className="h-4 w-4" />
@@ -685,6 +700,18 @@ const Customers = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Order Wizard */}
+      <OrderWizard
+        open={isOrderWizardOpen}
+        onOpenChange={setIsOrderWizardOpen}
+        customerId={selectedCustomerForOrder}
+        onSuccess={() => {
+          setIsOrderWizardOpen(false);
+          setSelectedCustomerForOrder(null);
+          toast.success('Order created successfully');
+        }}
+      />
     </div>
   );
 };

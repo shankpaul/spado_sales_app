@@ -73,7 +73,7 @@ const Layout = ({ children }) => {
     const roleBasedItems = {
       admin: [
         { name: 'Customers', href: '/customers', icon: Users },
-        { name: 'Bookings', href: '/bookings', icon: Calendar },
+        { name: 'Orders', href: '/orders', icon: Calendar },
         { name: 'Services', href: '/services', icon: Car },
         { name: 'Staff', href: '/staff', icon: UserCircle },
         { name: 'Reports', href: '/reports', icon: BarChart3 },
@@ -82,7 +82,7 @@ const Layout = ({ children }) => {
       ],
       sales_executive: [
         { name: 'Customers', href: '/customers', icon: Users },
-        { name: 'Bookings', href: '/bookings', icon: Calendar },
+        { name: 'Orders', href: '/orders', icon: Calendar },
         { name: 'Services', href: '/services', icon: Car },
         { name: 'My Sales', href: '/my-sales', icon: BarChart3 },
       ],
@@ -321,7 +321,7 @@ const Layout = ({ children }) => {
         </header>
 
         {/* Page Content */}
-        <main className="p-2 lg:p-4 mt-10 lg:mt-0">
+        <main className="p-2 pt-6 lg:p-4 mt-10 lg:mt-0">
             {children}
         </main>
       </div>
