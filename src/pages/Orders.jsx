@@ -361,13 +361,16 @@ const Orders = () => {
                     <TableHead>Payment</TableHead>
                     <TableHead>Amount</TableHead>
                     <TableHead>Agent</TableHead>
-                    <TableHead>Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {orders.map((order) => (
                     <TableRow key={order.id}>
-                      <TableCell className="font-medium">#{order.order_number}</TableCell>
+                      <TableCell className="font-medium hover:underline">
+                        <Link to={`/orders/${order.id}`}>
+                          #{order.order_number}
+                        </Link>
+                        </TableCell>
                       <TableCell>
                         <div>
                           <div className="font-medium">{order.customer_name}</div>
@@ -386,14 +389,8 @@ const Orders = () => {
                         </Badge>
                       </TableCell>
                       <TableCell className="font-medium">{formatCurrency(order.total_amount)}</TableCell>
-                      <TableCell>{order.assigned_agent_name || 'Unassigned'}</TableCell>
-                      <TableCell>
-                        <Link to={`/orders/${order.id}`}>
-                          <Button variant="ghost" size="sm">
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                        </Link>
-                      </TableCell>
+                      <TableCell>{order.assigned_agent_name || <Badge variant="destructive">Unassigned</Badge>}</TableCell>
+                     
                     </TableRow>
                   ))}
                 </TableBody>

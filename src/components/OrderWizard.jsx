@@ -54,6 +54,7 @@ import {
   Truck,
   Search,
   Phone,
+  PenIcon,
 } from 'lucide-react';
 
 /**
@@ -74,6 +75,8 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
   const [customerSearchLoading, setCustomerSearchLoading] = useState(false);
   const [showCustomerSuggestions, setShowCustomerSuggestions] = useState(false);
   const customerSearchRef = useRef(null);
+  const [editingCustomer, setEditingCustomer] = useState(false);
+  const [editCustomerData, setEditCustomerData] = useState({ phone: '', area: '', city: '' });
   
   // Data states
   const [customers, setCustomers] = useState([]);
@@ -96,6 +99,7 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
     state: '',
     map_link: '',
   });
+  const [customerPhone, setCustomerPhone] = useState(''); // Order-specific customer phone
   const [notes, setNotes] = useState('');
   const [orderStatus, setOrderStatus] = useState('');
   
@@ -208,6 +212,7 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
     setBookingTimeTo(data.bookingTimeTo || '');
     setSelectedAgent(data.selectedAgent || '');
     setAddress(data.address || { area: '', city: '', district: '', state: '', map_link: '' });
+    setCustomerPhone(data.customerPhone || '');
     setNotes(data.notes || '');
     toast.info('Draft order restored');
   };
@@ -226,6 +231,7 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
       bookingTimeFrom,
       bookingTimeTo,
       selectedAgent,
+      customerPhone,
       address,
       notes,
     };
@@ -318,6 +324,8 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
             phone: order.customer.phone,
             email: order.customer.email,
           });
+          // Set order-specific customer phone (might differ from customer profile)
+          setCustomerPhone(order.customer_phone || order.customer.phone || '');
           // Add to customers list for display
           setCustomers([{
             id: order.customer_id,
@@ -421,6 +429,7 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
     setBookingDate('');
     setBookingTimeFrom('');
     setBookingTimeTo('');
+    setCustomerPhone('');
     setSelectedAgent('');
     setAddress({ area: '', city: '', district: '', state: '', map_link: '' });
     setNotes('');
@@ -470,7 +479,6 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
       if (!bookingDate) newErrors.bookingDate = 'Required';
       if (!bookingTimeFrom) newErrors.bookingTimeFrom = 'Required';
       if (!bookingTimeTo) newErrors.bookingTimeTo = 'Required';
-      if (!selectedAgent) newErrors.agent = 'Required';
       if (!address.area) newErrors.area = 'Area is required';
       
       // Validate time range
@@ -628,6 +636,7 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
     try {
       const orderData = {
         customer_id: selectedCustomer.id,
+        customer_phone: customerPhone || selectedCustomer.phone, // Order-specific phone
         status: finalStatus,
         booking_date: bookingDate,
         booking_time_from: bookingTimeFrom,
@@ -734,6 +743,7 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
                       className="w-full px-4 py-3 text-left hover:bg-secondary transition-colors border-b last:border-b-0"
                       onClick={() => {
                         setSelectedCustomer(customer);
+                        setCustomerPhone(customer.phone || ''); // Initialize order-specific phone
                         setCustomerSearchTerm('');
                         setShowCustomerSuggestions(false);
                         setAddress({
@@ -768,7 +778,6 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
                   </p>
                   <Button
                     type="button"
-                    variant="outline"
                     size="sm"
                     onClick={() => {
                       setShowCustomerSuggestions(false);
@@ -792,24 +801,164 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
           <div className="flex justify-between items-start">
             <div className="space-y-2 text-sm flex-1">
               <div><strong>Name:</strong> {selectedCustomer.name}</div>
-              <div><strong>Phone:</strong> {selectedCustomer.phone}</div>
-              {selectedCustomer.area && <div><strong>Area:</strong> {selectedCustomer.area}</div>}
-              {selectedCustomer.city && <div><strong>City:</strong> {selectedCustomer.city}</div>}
+              
+              {editingCustomer ? (
+                <div className='grid grid-cols-2 gap-2 '>
+                  <div>
+                    <Label className="text-xs">Phone (Order-specific)</Label>
+                    <Input
+                      value={editCustomerData.phone}
+                      onChange={(e) => setEditCustomerData({ ...editCustomerData, phone: e.target.value })}
+                      placeholder="Phone number"
+                      className="h-8"
+                    />
+                  </div>
+                  <div className="flex gap-2 pt-5">
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={() => {
+                        setCustomerPhone(editCustomerData.phone);
+                        setAddress({
+                          ...address,
+                          area: editCustomerData.area || address.area,
+                          city: editCustomerData.city || address.city,
+                        });
+                        setEditingCustomer(false);
+                        saveDraft();
+                        toast.success('Order details updated');
+                      }}
+                    >
+                      <Check className="h-3 w-3 mr-1" />
+                      Save
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setEditingCustomer(false);
+                        setEditCustomerData({ phone: '', area: '', city: '' });
+                      }}
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <div>
+                    <strong>Phone:</strong> {customerPhone || selectedCustomer.phone}
+                    {customerPhone && customerPhone !== selectedCustomer.phone && (
+                      <span className="text-xs text-muted-foreground ml-2">(Order-specific)</span>
+                    )}
+                  </div>
+                </>
+              )}
             </div>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={() => {
-                setSelectedCustomer(null);
-                setCustomerSearchTerm('');
-              }}
-            >
-              <X className="h-4 w-4" />
-            </Button>
+            <div className="flex gap-1">
+              {!editingCustomer && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setEditCustomerData({
+                      phone: customerPhone || selectedCustomer.phone || '',
+                      area: address.area || selectedCustomer.area || '',
+                      city: address.city || selectedCustomer.city || '',
+                    });
+                    setEditingCustomer(true);
+                  }}
+                  title="Edit details"
+                >
+                  <PenIcon className="h-4 w-4" />
+                </Button>
+              )}
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setSelectedCustomer(null);
+                  setCustomerSearchTerm('');
+                  setEditingCustomer(false);
+                }}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
         </Card>
       )}
+
+      <div className="space-y-3">
+
+          <div>
+            <Label className="text-xs">Map Link</Label>
+            <Input
+              value={address.map_link}
+              onChange={(e) => {
+                setAddress({ ...address, map_link: e.target.value });
+                saveDraft();
+              }}
+              placeholder="Google Maps link"
+            />
+          </div>
+          
+          <div>
+            <Label className="text-xs">Area</Label>
+            <Input
+              value={address.area}
+              onChange={(e) => {
+                setAddress({ ...address, area: e.target.value });
+                saveDraft();
+              }}
+              placeholder="Area or locality"
+            />
+            {errors.area && <p className="text-sm text-destructive mt-1">{errors.area}</p>}
+          </div>
+          
+          {/* <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label className="text-xs">City</Label>
+              <Input
+                value={address.city}
+                onChange={(e) => {
+                  setAddress({ ...address, city: e.target.value });
+                  saveDraft();
+                }}
+                placeholder="City"
+              />
+            </div>
+            
+            <div>
+              <Label className="text-xs">District</Label>
+              <Input
+                value={address.district}
+                onChange={(e) => {
+                  setAddress({ ...address, district: e.target.value });
+                  saveDraft();
+                }}
+                placeholder="District"
+              />
+            </div>
+          </div>
+          
+          <div>
+            <Label className="text-xs">State</Label>
+            <Input
+              value={address.state}
+              onChange={(e) => {
+                setAddress({ ...address, state: e.target.value });
+                saveDraft();
+              }}
+              placeholder="State"
+            />
+          </div> */}
+          
+          
+        </div>
     </div>
   );
 
@@ -1154,189 +1303,119 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
     
     return (
       <div className="space-y-4">
-        <div className="grid grid-cols-2 gap-4">
-          <div className='flex gap-2'>
-            <div className='w-50'>
-              <Label>Booking Date *</Label>
-              <DatePicker
-                value={bookingDate}
-                onChange={(value) => {
-                  setBookingDate(value);
-                  saveDraft();
-                }}
-              />
-              {errors.bookingDate && <p className="text-sm text-destructive mt-1">{errors.bookingDate}</p>}
-            </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className='space-y-4'>
+            <div className='flex gap-2'>
+              <div className='w-50'>
+                <Label>Booking Date *</Label>
+                <DatePicker
+                  value={bookingDate}
+                  onChange={(value) => {
+                    setBookingDate(value);
+                    saveDraft();
+                  }}
+                />
+                {errors.bookingDate && <p className="text-sm text-destructive mt-1">{errors.bookingDate}</p>}
+              </div>
 
-            <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label>From Time *</Label>
-              <Select
-                value={bookingTimeFrom}
-                onValueChange={(value) => {
-                  setBookingTimeFrom(value);
-                  
-                  // Auto-calculate toTime (30 minutes later)
-                  if (value) {
-                    const [hours, minutes] = value.split(':').map(Number);
-                    const fromDate = new Date();
-                    fromDate.setHours(hours, minutes);
-                    fromDate.setMinutes(fromDate.getMinutes() + 30);
-                    const toHours = String(fromDate.getHours()).padStart(2, '0');
-                    const toMinutes = String(fromDate.getMinutes()).padStart(2, '0');
-                    setBookingTimeTo(`${toHours}:${toMinutes}`);
-                  }
-                  saveDraft();
-                }}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select time" />
-                </SelectTrigger>
-                <SelectContent>
-                  {generateTimeOptions().map((time) => (
-                    <SelectItem key={time.value} value={time.value}>
-                      {time.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {errors.bookingTimeFrom && <p className="text-sm text-destructive mt-1">{errors.bookingTimeFrom}</p>}
-            </div>
-            
-            <div>
-              <Label>To Time *</Label>
-              <Select
-                value={bookingTimeTo}
-                onValueChange={(value) => {
-                  setBookingTimeTo(value);
-                  saveDraft();
-                }}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select time" />
-                </SelectTrigger>
-                <SelectContent>
-                  {generateTimeOptions()
-                    .filter((time) => !bookingTimeFrom || time.value > bookingTimeFrom)
-                    .map((time) => (
+              <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>From Time *</Label>
+                <Select
+                  value={bookingTimeFrom}
+                  onValueChange={(value) => {
+                    setBookingTimeFrom(value);
+                    
+                    // Auto-calculate toTime (30 minutes later)
+                    if (value) {
+                      const [hours, minutes] = value.split(':').map(Number);
+                      const fromDate = new Date();
+                      fromDate.setHours(hours, minutes);
+                      fromDate.setMinutes(fromDate.getMinutes() + 30);
+                      const toHours = String(fromDate.getHours()).padStart(2, '0');
+                      const toMinutes = String(fromDate.getMinutes()).padStart(2, '0');
+                      setBookingTimeTo(`${toHours}:${toMinutes}`);
+                    }
+                    saveDraft();
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select time" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {generateTimeOptions().map((time) => (
                       <SelectItem key={time.value} value={time.value}>
                         {time.label}
                       </SelectItem>
                     ))}
+                  </SelectContent>
+                </Select>
+                {errors.bookingTimeFrom && <p className="text-sm text-destructive mt-1">{errors.bookingTimeFrom}</p>}
+              </div>
+              
+              <div>
+                <Label>To Time *</Label>
+                <Select
+                  value={bookingTimeTo}
+                  onValueChange={(value) => {
+                    setBookingTimeTo(value);
+                    saveDraft();
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select time" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {generateTimeOptions()
+                      .filter((time) => !bookingTimeFrom || time.value > bookingTimeFrom)
+                      .map((time) => (
+                        <SelectItem key={time.value} value={time.value}>
+                          {time.label}
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+                {errors.bookingTimeTo && <p className="text-sm text-destructive mt-1">{errors.bookingTimeTo}</p>}
+              </div>
+            </div>
+              
+            </div>
+          
+            <div>
+              <Label>Assign Agent (Optional)</Label>
+              <Select value={selectedAgent || "unassigned"} onValueChange={(value) => {
+                setSelectedAgent(value === "unassigned" ? "" : value);
+                saveDraft();
+              }}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Unassigned" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="unassigned">Unassigned</SelectItem>
+                  {agents.map((agent) => (
+                    <SelectItem key={agent.id} value={String(agent.id)}>
+                      {agent.name}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
-              {errors.bookingTimeTo && <p className="text-sm text-destructive mt-1">{errors.bookingTimeTo}</p>}
-            </div>
-          </div>
-            
-          </div>
-          
-          
-        
-        <div>
-          <Label>Assign Agent *</Label>
-          <Select value={selectedAgent} onValueChange={(value) => {
-            setSelectedAgent(value);
-            saveDraft();
-          }}>
-            <SelectTrigger>
-              <SelectValue placeholder="Select agent" />
-            </SelectTrigger>
-            <SelectContent>
-              {agents.map((agent) => (
-                <SelectItem key={agent.id} value={String(agent.id)}>
-                  {agent.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          {errors.agent && <p className="text-sm text-destructive mt-1">{errors.agent}</p>}
-        </div>
-        
-        <div className="space-y-3">
-
-          <div>
-            <Label className="text-xs">Map Link</Label>
-            <Input
-              value={address.map_link}
-              onChange={(e) => {
-                setAddress({ ...address, map_link: e.target.value });
-                saveDraft();
-              }}
-              placeholder="Google Maps link"
-            />
-          </div>
-          
-          <div>
-            <Label className="text-xs">Area</Label>
-            <Input
-              value={address.area}
-              onChange={(e) => {
-                setAddress({ ...address, area: e.target.value });
-                saveDraft();
-              }}
-              placeholder="Area or locality"
-            />
-            {errors.area && <p className="text-sm text-destructive mt-1">{errors.area}</p>}
-          </div>
-          
-          {/* <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label className="text-xs">City</Label>
-              <Input
-                value={address.city}
-                onChange={(e) => {
-                  setAddress({ ...address, city: e.target.value });
-                  saveDraft();
-                }}
-                placeholder="City"
-              />
             </div>
             
-            <div>
-              <Label className="text-xs">District</Label>
-              <Input
-                value={address.district}
+            <div className='flex-grow flex flex-col'>
+              <Label>Notes</Label>
+              <Textarea
+                value={notes}
                 onChange={(e) => {
-                  setAddress({ ...address, district: e.target.value });
+                  setNotes(e.target.value);
                   saveDraft();
                 }}
-                placeholder="District"
+                placeholder="Additional notes..."
+                className="flex-grow resize-none"
+                rows={8}
               />
             </div>
           </div>
-          
-          <div>
-            <Label className="text-xs">State</Label>
-            <Input
-              value={address.state}
-              onChange={(e) => {
-                setAddress({ ...address, state: e.target.value });
-                saveDraft();
-              }}
-              placeholder="State"
-            />
-          </div> */}
-          
-          
-        </div>
-        
-        <div>
-          <Label>Notes</Label>
-          <Textarea
-            value={notes}
-            onChange={(e) => {
-              setNotes(e.target.value);
-              saveDraft();
-            }}
-            placeholder="Additional notes..."
-            rows={3}
-          />
-        </div>
-
-        </div>
-        
-        <Card className="p-4 bg-secondary/50">
+          <Card className="p-4 bg-secondary/50">
           <div className="space-y-2 text-sm">
             <div className="flex justify-between">
               <span>Packages Total:</span>
@@ -1352,6 +1431,8 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
             </div>
           </div>
         </Card>
+        </div>
+        
       </div>
     );
   };
@@ -1412,7 +1493,7 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
             {renderStepIndicator()}
             
             {/* Step Content */}
-            <div className="min-h-[400px]">
+            <div className="min-h-[400px] pt-5">
               {renderStepContent()}
             </div>
             

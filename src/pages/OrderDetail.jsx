@@ -68,8 +68,8 @@ import {
   MoreVertical,
   Star,
 } from 'lucide-react';
-import { format } from 'date-fns';
 import MapPreview from '@/components/MapPreview';
+import { formatDate, formatDateTime, formatTime, formatCurrency } from '../lib/utilities';
 
 /**
  * Order Detail Page
@@ -222,43 +222,6 @@ const OrderDetail = () => {
     }
   };
 
-  // Format date/time
-  const formatDate = (dateString) => {
-    if (!dateString) return 'N/A';
-    try {
-      return format(new Date(dateString), 'MMM dd, yyyy');
-    } catch {
-      return 'Invalid date';
-    }
-  };
-
-  const formatDateTime = (dateString) => {
-    if (!dateString) return 'N/A';
-    try {
-      return format(new Date(dateString), 'MMM dd, yyyy hh:mm a');
-    } catch {
-      return 'Invalid date';
-    }
-  };
-
-  const formatTime = (dateTimeString) => {
-    if (!dateTimeString) return 'N/A';
-    try {
-      return format(new Date(dateTimeString), 'hh:mm a');
-    } catch {
-      return 'N/A';
-    }
-  };
-
-  // Format currency
-  const formatCurrency = (amount) => {
-    return new Intl.NumberFormat('en-IN', {
-      style: 'currency',
-      currency: 'INR',
-      minimumFractionDigits: 0,
-    }).format(amount || 0);
-  };
-
   // Calculate subtotal from packages and addons
   const calculateSubtotal = () => {
     const packagesTotal = order.packages?.reduce((sum, item) => {
@@ -303,8 +266,9 @@ const OrderDetail = () => {
     
     setReassigning(true);
     try {
-      await orderService.reassignOrder(id, newAgentId);
-      toast.success('Agent reassigned successfully');
+      const agentIdToSend = newAgentId === 'unassigned' ? null : newAgentId;
+      await orderService.reassignOrder(id, agentIdToSend);
+      toast.success(newAgentId === 'unassigned' ? 'Agent unassigned successfully' : 'Agent reassigned successfully');
       setIsReassignDialogOpen(false);
       fetchOrderDetails();
       fetchTimeline();
@@ -850,7 +814,7 @@ const OrderDetail = () => {
                 {(() => {
                   const currentAgentId = order.assigned_to?.id;
                   const availableAgents = agents.filter(agent => agent.id !== currentAgentId);
-                  const canReassign = !['in_progress', 'completed', 'cancelled'].includes(order.status) && availableAgents.length > 0;
+                  const canReassign = !['in_progress', 'completed', 'cancelled'].includes(order.status);
                   
                   return canReassign && (
                     <div>
@@ -865,6 +829,7 @@ const OrderDetail = () => {
                           <SelectValue placeholder="Select agent" />
                         </SelectTrigger>
                         <SelectContent>
+                          <SelectItem value="unassigned">Unassigned</SelectItem>
                           {availableAgents.map((agent) => (
                             <SelectItem key={agent.id} value={String(agent.id)}>
                               {agent.name}
@@ -1050,7 +1015,7 @@ const OrderDetail = () => {
               <div className="flex items-center gap-2 text-sm">
                 <span className="text-muted-foreground">To:</span>
                 <span className="font-medium">
-                  {agents.find(agent => String(agent.id) === String(newAgentId))?.name || 'Unknown Agent'}
+                  {newAgentId === 'unassigned' ? 'Unassigned' : agents.find(agent => String(agent.id) === String(newAgentId))?.name || 'Unknown Agent'}
                 </span>
               </div>
             </div>
