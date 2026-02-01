@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Card } from '../components/ui/card';
 import CustomerForm from '../components/CustomerForm';
+import CustomerDetails from '../components/CustomerDetails';
 import {
   Dialog,
   DialogContent,
@@ -35,6 +36,7 @@ import {
   ChevronRight,
   MessageCircle,
   ShoppingCart,
+  Eye,
 } from 'lucide-react';
 import OrderWizard from '../components/OrderWizard';
 import { format } from 'date-fns';
@@ -50,8 +52,15 @@ const Customers = () => {
   const [dateFilter, setDateFilter] = useState('all');
   const [customDays, setCustomDays] = useState('');
   const [page, setPage] = useState(1);
-  const [limit] = useState(10);
+  const [perPage] = useState(20);
   const [totalPages, setTotalPages] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  
+  // Refs for infinite scroll
+  const observerTarget = useRef(null);
+  const isLoadingMore = useRef(false);
   
   // Dialog states
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -60,13 +69,20 @@ const Customers = () => {
   const [isOrderWizardOpen, setIsOrderWizardOpen] = useState(false);
   const [selectedCustomerForOrder, setSelectedCustomerForOrder] = useState(null);
   
+  // Customer details dialog
+  const [isDetailsOpen, setIsDetailsOpen] = useState(false);
+  const [customerForDetails, setCustomerForDetails] = useState(null);
+  
   // Fetch customers
-  const fetchCustomers = async () => {
-    setLoading(true);
+  const fetchCustomers = async (pageNum = 1, append = false) => {
+    if (!append) {
+      setLoading(true);
+    }
+    
     try {
       const params = {
-        page,
-        limit,
+        page: pageNum,
+        per_page: perPage,
         search: searchTerm,
       };
 
@@ -80,20 +96,85 @@ const Customers = () => {
       }
 
       const response = await customerService.getAllCustomers(params);
-      setCustomers(response.customers || []);
+      const newCustomers = response.customers || [];
+      
+      if (append) {
+        setCustomers(prev => [...prev, ...newCustomers]);
+      } else {
+        setCustomers(newCustomers);
+      }
+      
       setTotalPages(response.pagination?.total_pages || 1);
+      setTotalCount(response.pagination?.total_count || 0);
+      setHasMore(pageNum < (response.pagination?.total_pages || 1));
     } catch (error) {
       console.error('Error fetching customers:', error);
       toast.error('Failed to load customers');
-      setCustomers([]);
+      if (!append) {
+        setCustomers([]);
+      }
     } finally {
       setLoading(false);
+      isLoadingMore.current = false;
     }
   };
 
+  // Handle window resize
   useEffect(() => {
-    fetchCustomers();
-  }, [page, searchTerm, dateFilter, customDays]);
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // Fetch customers on filter/search change
+  useEffect(() => {
+    setPage(1);
+    setCustomers([]);
+    fetchCustomers(1, false);
+  }, [searchTerm, dateFilter, customDays]);
+
+  // Fetch customers on page change (desktop pagination)
+  useEffect(() => {
+    if (!isMobile && page > 1) {
+      fetchCustomers(page, false);
+    }
+  }, [page]);
+
+  // Load more for mobile infinite scroll
+  const loadMore = useCallback(() => {
+    if (!isLoadingMore.current && hasMore && !loading) {
+      isLoadingMore.current = true;
+      const nextPage = Math.floor(customers.length / perPage) + 1;
+      fetchCustomers(nextPage, true);
+    }
+  }, [hasMore, loading, customers.length, perPage]);
+
+  // Intersection Observer for infinite scroll
+  useEffect(() => {
+    if (!isMobile) return;
+    
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          loadMore();
+        }
+      },
+      { threshold: 0.1 }
+    );
+
+    const currentTarget = observerTarget.current;
+    if (currentTarget) {
+      observer.observe(currentTarget);
+    }
+
+    return () => {
+      if (currentTarget) {
+        observer.unobserve(currentTarget);
+      }
+    };
+  }, [isMobile, loadMore]);
 
   // Open form for add/edit
   const handleOpenForm = (customer = null) => {
@@ -119,7 +200,12 @@ const Customers = () => {
   // Handle search
   const handleSearch = (e) => {
     setSearchTerm(e.target.value);
-    setPage(1); // Reset to first page
+  };
+  
+  // Open customer details dialog
+  const handleViewDetails = (customer) => {
+    setCustomerForDetails(customer);
+    setIsDetailsOpen(true);
   };
 
   // Format date
@@ -147,7 +233,6 @@ const Customers = () => {
       </div>
 
       {/* Filters */}
-      <Card className="p-4">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {/* Search */}
           <div className="relative">
@@ -163,10 +248,7 @@ const Customers = () => {
           {/* Date Filter */}
           <select
             value={dateFilter}
-            onChange={(e) => {
-              setDateFilter(e.target.value);
-              setPage(1);
-            }}
+            onChange={(e) => setDateFilter(e.target.value)}
             className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
           >
             <option value="all">All Customers</option>
@@ -183,15 +265,11 @@ const Customers = () => {
               type="number"
               placeholder="Enter days"
               value={customDays}
-              onChange={(e) => {
-                setCustomDays(e.target.value);
-                setPage(1);
-              }}
+              onChange={(e) => setCustomDays(e.target.value)}
               min="1"
             />
           )}
         </div>
-      </Card>
 
       {/* Customer List */}
       <Card>
@@ -211,7 +289,7 @@ const Customers = () => {
                 <thead className="border-b">
                   <tr className="text-left">
                     <th className="px-4 py-3 font-medium">Name</th>
-                    <th className="px-4 py-3 font-medium">Phone</th>
+                    {/* <th className="px-4 py-3 font-medium">Phone</th> */}
                     <th className="px-4 py-3 font-medium">Location</th>
                     <th className="px-4 py-3 font-medium">Last Booked</th>
                     <th className="px-4 py-3 font-medium">Actions</th>
@@ -222,18 +300,20 @@ const Customers = () => {
                     <tr key={customer.id} className="border-b last:border-0 hover:bg-muted/50">
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2">
-                          <span className="font-medium">{customer.name}</span>
-                          {customer.has_whatsapp && (
-                            <MessageCircle className="h-4 w-4 text-green-600" title="WhatsApp" />
-                          )}
+                          <button 
+                            onClick={() => handleViewDetails(customer)}
+                            className="font-medium hover:text-primary hover:underline cursor-pointer transition-colors"
+                          >
+                            {customer.name}
+                          </button>
                         </div>
                       </td>
-                      <td className="px-4 py-3">
+                      {/* <td className="px-4 py-3">
                         <div className="flex items-center gap-2">
                           <Phone className="h-4 w-4 text-muted-foreground" />
                           {customer.phone}
                         </div>
-                      </td>
+                      </td> */}
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2">
                           <MapPin className="h-4 w-4 text-muted-foreground" />
@@ -282,10 +362,12 @@ const Customers = () => {
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-1">
-                        <h3 className="font-medium">{customer.name}</h3>
-                        {customer.has_whatsapp && (
-                          <MessageCircle className="h-4 w-4 text-green-600" />
-                        )}
+                        <button
+                          onClick={() => handleViewDetails(customer)}
+                          className="font-medium hover:text-primary hover:underline cursor-pointer transition-colors"
+                        >
+                          {customer.name}
+                        </button>
                       </div>
                       <div className="flex items-center gap-2 text-sm text-muted-foreground">
                         <Phone className="h-3 w-3" />
@@ -293,6 +375,14 @@ const Customers = () => {
                       </div>
                     </div>
                     <div className="flex gap-1">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleViewDetails(customer)}
+                        title="View Details"
+                      >
+                        <Eye className="h-4 w-4 text-primary" />
+                      </Button>
                       <Button
                         variant="ghost"
                         size="icon"
@@ -338,9 +428,17 @@ const Customers = () => {
         )}
       </Card>
 
-      {/* Pagination */}
-      {totalPages > 1 && (
+      {/* Desktop Pagination */}
+      {!isMobile && totalPages > 1 && (
         <div className="flex items-center justify-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setPage(1)}
+            disabled={page === 1}
+          >
+            First
+          </Button>
           <Button
             variant="outline"
             size="icon"
@@ -349,9 +447,35 @@ const Customers = () => {
           >
             <ChevronLeft className="h-4 w-4" />
           </Button>
-          <span className="text-sm">
-            Page {page} of {totalPages}
-          </span>
+          
+          {/* Page numbers */}
+          <div className="flex items-center gap-1">
+            {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+              let pageNum;
+              if (totalPages <= 5) {
+                pageNum = i + 1;
+              } else if (page <= 3) {
+                pageNum = i + 1;
+              } else if (page >= totalPages - 2) {
+                pageNum = totalPages - 4 + i;
+              } else {
+                pageNum = page - 2 + i;
+              }
+              
+              return (
+                <Button
+                  key={pageNum}
+                  variant={page === pageNum ? 'default' : 'outline'}
+                  size="icon"
+                  onClick={() => setPage(pageNum)}
+                  className="w-10"
+                >
+                  {pageNum}
+                </Button>
+              );
+            })}
+          </div>
+          
           <Button
             variant="outline"
             size="icon"
@@ -360,6 +484,30 @@ const Customers = () => {
           >
             <ChevronRight className="h-4 w-4" />
           </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setPage(totalPages)}
+            disabled={page === totalPages}
+          >
+            Last
+          </Button>
+        </div>
+      )}
+
+      {/* Mobile Infinite Scroll Trigger */}
+      {isMobile && hasMore && (
+        <div ref={observerTarget} className="flex items-center justify-center py-4">
+          {isLoadingMore.current && (
+            <Loader2 className="h-6 w-6 animate-spin text-primary" />
+          )}
+        </div>
+      )}
+
+      {/* Results Info */}
+      {!loading && customers.length > 0 && (
+        <div className="text-center text-sm text-muted-foreground">
+          Showing {customers.length} of {totalCount} customers
         </div>
       )}
 
@@ -414,6 +562,13 @@ const Customers = () => {
           setSelectedCustomerForOrder(null);
           toast.success('Order created successfully');
         }}
+      />
+      
+      {/* Customer Details Dialog */}
+      <CustomerDetails
+        customer={customerForDetails}
+        open={isDetailsOpen}
+        onOpenChange={setIsDetailsOpen}
       />
     </div>
   );

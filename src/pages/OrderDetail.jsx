@@ -3,6 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { Button } from '../components/ui/button';
 import { Card } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
+import { Skeleton } from '../components/ui/skeleton';
 import CustomerContact from '../components/CustomerContact';
 import {
   Select,
@@ -67,6 +68,7 @@ import {
   Copy,
   MoreVertical,
   Star,
+  Calendar1Icon,
 } from 'lucide-react';
 import MapPreview from '@/components/MapPreview';
 import { formatDate, formatDateTime, formatTime, formatCurrency } from '../lib/utilities';
@@ -75,8 +77,10 @@ import { formatDate, formatDateTime, formatTime, formatCurrency } from '../lib/u
  * Order Detail Page
  * Shows comprehensive order information with tabs for overview, items, timeline, reassignments
  */
-const OrderDetail = () => {
-  const { id } = useParams();
+const OrderDetail = ({ orderId, onClose, onUpdate }) => {
+  // Use orderId prop instead of route params, but keep useParams as fallback for direct route access
+  const routeParams = useParams();
+  const id = orderId || routeParams.id;
   const navigate = useNavigate();
   
   const [order, setOrder] = useState(null);
@@ -190,6 +194,7 @@ const OrderDetail = () => {
       fetchOrderDetails();
       fetchTimeline();
       setIsStatusConfirmOpen(false);
+      if (onUpdate) onUpdate();
     } catch (error) {
       console.error('Error updating status:', error);
       toast.error('Failed to update status');
@@ -323,8 +328,113 @@ const OrderDetail = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      <div className="min-h-screen bg-white">
+        {/* Header Skeleton */}
+        <div className="border-b sticky top-0 z-10 bg-white">
+          <div className="px-4 sm:px-6">
+            <div className="flex items-center justify-between h-16">
+              <div className="flex items-center gap-4">
+                <Skeleton className="h-10 w-10 rounded-full" />
+                <div className="flex items-center gap-3">
+                  <Skeleton className="h-7 w-32" />
+                  <Skeleton className="h-5 w-20" />
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <Skeleton className="h-9 w-24" />
+                <Skeleton className="h-9 w-9" />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Main Content Skeleton */}
+        <div className="px-4 sm:px-6 py-6">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Left Column */}
+            <div className="lg:col-span-2 space-y-6">
+              {/* Meta Info */}
+              <div className="flex justify-between items-center">
+                <Skeleton className="h-4 w-48" />
+                <Skeleton className="h-4 w-32" />
+              </div>
+
+              {/* Tabs Skeleton */}
+              <div className="space-y-4">
+                <div className="flex gap-2 border-b">
+                  <Skeleton className="h-10 w-24" />
+                  <Skeleton className="h-10 w-24" />
+                  <Skeleton className="h-10 w-24" />
+                  <Skeleton className="h-10 w-32" />
+                </div>
+                
+                {/* Content Area */}
+                <div className="space-y-4">
+                  <Skeleton className="h-48 w-full" />
+                  <Skeleton className="h-32 w-full" />
+                  <Skeleton className="h-24 w-full" />
+                </div>
+              </div>
+            </div>
+
+            {/* Right Column */}
+            <div className="space-y-6">
+              {/* Customer Info Card */}
+              <div className="border rounded-lg p-4 space-y-4">
+                <Skeleton className="h-6 w-32" />
+                <div className="space-y-3">
+                  <div className="flex items-center gap-3">
+                    <Skeleton className="h-10 w-10 rounded-full" />
+                    <div className="flex-1 space-y-2">
+                      <Skeleton className="h-4 w-32" />
+                      <Skeleton className="h-3 w-24" />
+                    </div>
+                  </div>
+                  <Skeleton className="h-10 w-full" />
+                  <Skeleton className="h-10 w-full" />
+                </div>
+              </div>
+
+              {/* Order Summary Card */}
+              <div className="border rounded-lg p-4 space-y-4">
+                <Skeleton className="h-6 w-32" />
+                <div className="space-y-2">
+                  <div className="flex justify-between">
+                    <Skeleton className="h-4 w-20" />
+                    <Skeleton className="h-4 w-16" />
+                  </div>
+                  <div className="flex justify-between">
+                    <Skeleton className="h-4 w-24" />
+                    <Skeleton className="h-4 w-16" />
+                  </div>
+                  <div className="flex justify-between">
+                    <Skeleton className="h-4 w-20" />
+                    <Skeleton className="h-4 w-16" />
+                  </div>
+                  <div className="border-t pt-2 mt-2">
+                    <div className="flex justify-between">
+                      <Skeleton className="h-5 w-16" />
+                      <Skeleton className="h-5 w-20" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Agent Card */}
+              <div className="border rounded-lg p-4 space-y-4">
+                <Skeleton className="h-6 w-32" />
+                <div className="flex items-center gap-3">
+                  <Skeleton className="h-10 w-10 rounded-full" />
+                  <div className="flex-1 space-y-2">
+                    <Skeleton className="h-4 w-24" />
+                    <Skeleton className="h-3 w-20" />
+                  </div>
+                </div>
+                <Skeleton className="h-10 w-full" />
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     );
   }
@@ -358,13 +468,13 @@ const OrderDetail = () => {
     <div className="min-h-screen bg-white">
       {/* Header */}
       <div className="border-b sticky top-0 z-10 bg-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="px-4 sm:px-6">
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center gap-4">
               <Button
                 variant="ghost"
                 size="icon"
-                onClick={() => navigate('/orders')}
+                onClick={() => onClose ? onClose() : navigate(-1)}
                 className="rounded-full"
               >
                 <ArrowLeft className="h-5 w-5" />
@@ -456,7 +566,7 @@ const OrderDetail = () => {
       </div>
 
       {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      <div className="px-4 sm:px-6 py-6">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Left Column - Main Content */}
           <div className="lg:col-span-2 space-y-6">
@@ -480,11 +590,10 @@ const OrderDetail = () => {
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2 text-sm">
                   <MapPin className="h-4 w-4 text-muted-foreground" />
-                  <span className="font-medium">Service at</span>
                   <span>{order.area || 'N/A'}, {order.city || 'N/A'}</span>
                 </div>
-                <span className="text-sm text-muted-foreground">
-                  Booking Date {formatDate(order.booking_date)} at {formatTime(order.booking_time_from)} - {formatTime(order.booking_time_to)}
+                <span className="text-sm text-muted-foreground flex gap-2 items-center">
+                  <Calendar1Icon size={16} strokeWidth={1.5} /> {formatDate(order.booking_date)} at {formatTime(order.booking_time_from)} - {formatTime(order.booking_time_to)}
                 </span>
               </div>
 
@@ -993,6 +1102,7 @@ const OrderDetail = () => {
           fetchOrderDetails();
           fetchTimeline();
           toast.success('Order updated successfully');
+          if (onUpdate) onUpdate();
         }}
       />
 
