@@ -74,6 +74,7 @@ const Layout = ({ children }) => {
       admin: [
         { name: 'Customers', href: '/customers', icon: Users },
         { name: 'Orders', href: '/orders', icon: Calendar },
+        { name: 'Subscriptions', href: '/subscriptions', icon: Calendar },
         { name: 'Services', href: '/services', icon: Car },
         { name: 'Staff', href: '/staff', icon: UserCircle },
         { name: 'Reports', href: '/reports', icon: BarChart3 },
@@ -83,6 +84,7 @@ const Layout = ({ children }) => {
       sales_executive: [
         { name: 'Customers', href: '/customers', icon: Users },
         { name: 'Orders', href: '/orders', icon: Calendar },
+        { name: 'Subscriptions', href: '/subscriptions', icon: Calendar },
         { name: 'Services', href: '/services', icon: Car },
         { name: 'My Sales', href: '/my-sales', icon: BarChart3 },
       ],

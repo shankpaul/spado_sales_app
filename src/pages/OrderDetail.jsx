@@ -69,6 +69,7 @@ import {
   MoreVertical,
   Star,
   Calendar1Icon,
+  Repeat,
 } from 'lucide-react';
 import MapPreview from '@/components/MapPreview';
 import { formatDate, formatDateTime, formatTime, formatCurrency } from '../lib/utilities';
@@ -82,7 +83,7 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
   const routeParams = useParams();
   const id = orderId || routeParams.id;
   const navigate = useNavigate();
-  
+
   const [order, setOrder] = useState(null);
   const [loading, setLoading] = useState(true);
   const [timeline, setTimeline] = useState([]);
@@ -90,33 +91,33 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
   const [agents, setAgents] = useState([]);
   const [editingNote, setEditingNote] = useState(false);
   const [noteText, setNoteText] = useState('');
-  
+
   // Edit wizard state
   const [isWizardOpen, setIsWizardOpen] = useState(false);
-  
+
   // Cancel dialog state
   const [isCancelDialogOpen, setIsCancelDialogOpen] = useState(false);
   const [cancelReason, setCancelReason] = useState('');
   const [customReason, setCustomReason] = useState('');
   const [cancelling, setCancelling] = useState(false);
-  
+
   // Status change confirmation dialog
   const [isStatusConfirmOpen, setIsStatusConfirmOpen] = useState(false);
   const [pendingStatus, setPendingStatus] = useState(null);
   const [changingStatus, setChangingStatus] = useState(false);
-  
+
   // Reassign agent dialog state
   const [isReassignDialogOpen, setIsReassignDialogOpen] = useState(false);
   const [newAgentId, setNewAgentId] = useState(null);
   const [reassigning, setReassigning] = useState(false);
-  
+
   // Feedback dialog state
   const [isFeedbackDialogOpen, setIsFeedbackDialogOpen] = useState(false);
   const [feedbackRating, setFeedbackRating] = useState(5);
   const [hoveredRating, setHoveredRating] = useState(0);
   const [feedbackComment, setFeedbackComment] = useState('');
   const [submittingFeedback, setSubmittingFeedback] = useState(false);
-  
+
   // Feedback comments view dialog
   const [isFeedbackViewOpen, setIsFeedbackViewOpen] = useState(false);
 
@@ -180,7 +181,7 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
       setIsStatusConfirmOpen(true);
       return;
     }
-    
+
     // For in_progress, change directly
     await performStatusChange(newStatus);
   };
@@ -206,12 +207,12 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
   // Handle cancel
   const handleCancelOrder = async () => {
     const reason = cancelReason === 'Other' ? customReason : cancelReason;
-    
+
     if (!reason) {
       toast.error('Please provide a cancellation reason');
       return;
     }
-    
+
     setCancelling(true);
     try {
       await orderService.cancelOrder(id, reason);
@@ -246,7 +247,7 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
       statusValue,
       type === 'order' ? ORDER_STATUSES : PAYMENT_STATUSES
     );
-    
+
     const variantMap = {
       gray: 'secondary',
       blue: 'default',
@@ -255,7 +256,7 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
       yellow: 'warning',
       purple: 'outline',
     };
-    
+
     return variantMap[color] || 'default';
   };
 
@@ -268,7 +269,7 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
   // Confirm reassign agent
   const confirmReassignAgent = async () => {
     if (!newAgentId) return;
-    
+
     setReassigning(true);
     try {
       const agentIdToSend = newAgentId === 'unassigned' ? null : newAgentId;
@@ -298,7 +299,7 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
       toast.error('Failed to update note');
     }
   };
-  
+
   // Handle feedback submission
   const handleSubmitFeedback = async () => {
     setSubmittingFeedback(true);
@@ -367,7 +368,7 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
                   <Skeleton className="h-10 w-24" />
                   <Skeleton className="h-10 w-32" />
                 </div>
-                
+
                 {/* Content Area */}
                 <div className="space-y-4">
                   <Skeleton className="h-48 w-full" />
@@ -479,12 +480,23 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
               >
                 <ArrowLeft className="h-5 w-5" />
               </Button>
-              
+
               <div className="flex items-center gap-3">
                 <h1 className="text-xl sm:text-2xl font-semibold">Order-{order.order_number}</h1>
                 <Badge variant={getBadgeVariant(order.status, 'order')} className="text-xs">
                   {getStatusLabel(order.status, ORDER_STATUSES)}
                 </Badge>
+
+                {order.subscription_id && (
+                  <Badge
+                    variant="secondary"
+                    className="flex items-center gap-1 cursor-pointer hover:bg-secondary/80"
+                    onClick={() => navigate(`/subscriptions/${order.subscription_id}`)}
+                  >
+                    <Repeat className="h-3 w-3" />
+                    Subscription
+                  </Badge>
+                )}
 
                 {/* Star Rating Display */}
                 {order.rating && (
@@ -492,11 +504,10 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
                     {[1, 2, 3, 4, 5].map((star) => (
                       <Star
                         key={star}
-                        className={`h-4 w-4 ${
-                          star <= order.rating
+                        className={`h-4 w-4 ${star <= order.rating
                             ? 'fill-yellow-400 text-yellow-400'
                             : 'text-gray-300'
-                        }`}
+                          }`}
                       />
                     ))}
                     <span className="text-sm text-muted-foreground ml-1">
@@ -515,52 +526,52 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
                 )}
               </div>
             </div>
-            {isEditable && 
-            <div className="flex items-center gap-3 text-sm">
-             
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon">
-                    <MoreVertical className="h-4 w-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  {isEditable && (
-                    <>
-                      <DropdownMenuItem onClick={() => setIsWizardOpen(true)}>
-                        <Edit className="h-4 w-4 mr-2" />
-                        Edit Order
-                      </DropdownMenuItem>
-                      
-                      {/* Change to In Progress - only if confirmed */}
-                      {order.status === 'confirmed' && (
-                        <DropdownMenuItem onClick={() => handleStatusChange('in_progress')}>
-                          <Clock className="h-4 w-4 mr-2" />
-                          Mark as In Progress
+            {isEditable &&
+              <div className="flex items-center gap-3 text-sm">
+
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="icon">
+                      <MoreVertical className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    {isEditable && (
+                      <>
+                        <DropdownMenuItem onClick={() => setIsWizardOpen(true)}>
+                          <Edit className="h-4 w-4 mr-2" />
+                          Edit Order
                         </DropdownMenuItem>
-                      )}
-                      
-                      {/* Change to Completed - only if confirmed or in_progress */}
-                      {(order.status === 'confirmed' || order.status === 'in_progress') && (
-                        <DropdownMenuItem onClick={() => handleStatusChange('completed')}>
-                          <CheckCircle2 className="h-4 w-4 mr-2" />
-                          Mark as Completed
+
+                        {/* Change to In Progress - only if confirmed */}
+                        {order.status === 'confirmed' && (
+                          <DropdownMenuItem onClick={() => handleStatusChange('in_progress')}>
+                            <Clock className="h-4 w-4 mr-2" />
+                            Mark as In Progress
+                          </DropdownMenuItem>
+                        )}
+
+                        {/* Change to Completed - only if confirmed or in_progress */}
+                        {(order.status === 'confirmed' || order.status === 'in_progress') && (
+                          <DropdownMenuItem onClick={() => handleStatusChange('completed')}>
+                            <CheckCircle2 className="h-4 w-4 mr-2" />
+                            Mark as Completed
+                          </DropdownMenuItem>
+                        )}
+
+                        <DropdownMenuItem
+                          onClick={() => setIsCancelDialogOpen(true)}
+                          className="text-destructive focus:text-destructive"
+                        >
+                          <Ban className="h-4 w-4 mr-2" />
+                          Cancel Order
                         </DropdownMenuItem>
-                      )}
-                      
-                      <DropdownMenuItem 
-                        onClick={() => setIsCancelDialogOpen(true)}
-                        className="text-destructive focus:text-destructive"
-                      >
-                        <Ban className="h-4 w-4 mr-2" />
-                        Cancel Order
-                      </DropdownMenuItem>
-                    </>
-                  )}
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-    }
+                      </>
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            }
           </div>
         </div>
       </div>
@@ -606,23 +617,21 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
                   const isCompleted = index < currentStatusIndex;
                   const isActive = index === currentStatusIndex;
                   const isCancelled = order.status === 'cancelled';
-                  
+
                   return (
                     <div key={stage} className="flex-1">
                       <div className="flex flex-col items-center">
-                        <div className={`text-xs mb-1 ${
-                          isActive && !isCancelled ? 'font-semibold text-foreground' : 
-                          isCompleted && !isCancelled ? 'font-medium text-foreground' : 
-                          'text-muted-foreground'
-                        }`}>
+                        <div className={`text-xs mb-1 ${isActive && !isCancelled ? 'font-semibold text-foreground' :
+                            isCompleted && !isCancelled ? 'font-medium text-foreground' :
+                              'text-muted-foreground'
+                          }`}>
                           {stage}
                         </div>
-                        <div className={`w-full h-1 rounded-full ${
-                          isCancelled ? 'bg-red-200' :
-                          isActive ? 'bg-foreground' : 
-                          isCompleted ? 'bg-green-500' : 
-                          'bg-gray-200'
-                        }`} />
+                        <div className={`w-full h-1 rounded-full ${isCancelled ? 'bg-red-200' :
+                            isActive ? 'bg-foreground' :
+                              isCompleted ? 'bg-green-500' :
+                                'bg-gray-200'
+                          }`} />
                       </div>
                     </div>
                   );
@@ -650,7 +659,7 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
                   </Button>
                 </>
               )}
-              
+
               {/* Feedback Button - show when order is completed and feedback not submitted */}
               {order.status === 'completed' && !order.feedback_submitted_at && (
                 <Button
@@ -748,7 +757,7 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
                     <div className="space-y-4">
                       {order.addons.map((item, index) => (
                         <div key={index} className="flex gap-4 border-b last:border-0">
-                          
+
                           <div className="flex-1 min-w-0">
                             <h4 className="font-medium mb-2">{item.addon_name}</h4>
                             <div className="text-sm ">
@@ -784,7 +793,7 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
                       </Badge>
                     </div>
                   </div>
-                  
+
                   <div className="space-y-3 max-w-md ml-auto">
                     <div className="flex justify-between text-sm">
                       <span className="text-muted-foreground">
@@ -824,11 +833,10 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
                     timeline.map((event, index) => (
                       <div key={index} className="flex gap-4">
                         <div className="flex flex-col items-center">
-                          <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${
-                            event.type === 'created' || event.type === 'status_changed'
+                          <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${event.type === 'created' || event.type === 'status_changed'
                               ? 'bg-primary text-primary-foreground'
                               : 'bg-gray-100 text-gray-600'
-                          }`}>
+                            }`}>
                             {event.type === 'status_changed' ? (
                               <CheckCircle2 className="h-5 w-5" />
                             ) : event.type === 'cancelled' ? (
@@ -898,7 +906,7 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
 
           {/* Right Column - Sidebar */}
           <div className="space-y-6">
-             {/* Assigned Agent */}
+            {/* Assigned Agent */}
             <div className="border rounded-lg">
               <div className="p-4 border-b">
                 <h3 className="font-semibold">Assigned Agent</h3>
@@ -919,12 +927,12 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
                     )}
                   </div>
                 </div>
-                
+
                 {(() => {
                   const currentAgentId = order.assigned_to?.id;
                   const availableAgents = agents.filter(agent => agent.id !== currentAgentId);
                   const canReassign = !['in_progress', 'completed', 'cancelled'].includes(order.status);
-                  
+
                   return canReassign && (
                     <div>
                       <label className="text-xs font-medium text-muted-foreground mb-2 block">
@@ -975,79 +983,79 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
               </div>
 
               {/* Service Address */}
-            <div>
-              <div className="p-4 border-b flex items-center justify-between">
-                <h3 className="font-semibold">Service Address</h3>
-                <Button variant="ghost" size="icon" className="h-8 w-8">
-                  <Edit className="h-4 w-4" />
-                </Button>
-              </div>
-              <div className="p-4">
-                {order.latitude && order.longitude ? (
-                  <div className="mb-4 rounded-sm overflow-hidden border">
-                    <MapPreview lat={order.latitude} lng={order.longitude} />
-                  </div>
-                ) : (
-                  <div className="mb-4 rounded-lg overflow-hidden bg-gray-50 h-[200px] flex items-center justify-center border">
-                    <MapPin className="h-8 w-8 text-gray-400" />
-                  </div>
-                )}
-                <div className="space-y-1 text-sm">
-                  <div className='flex justify-between items-center'>
-                    {order.customer?.name && (
-                      <div className="font-medium">{order.customer.name}</div>
-                    )}
-                  
-                    {order.map_link && (
-                      <a
-                        href={order.map_link}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-primary text-sm underline flex items-center gap-1  inline-flex"
-                      >
-                        View on Map <ExternalLink className="h-3 w-3" />
-                      </a>
-                    )}
-                  </div>
-                  {order.full_address ? (
-                    <div>{order.full_address}</div>
+              <div>
+                <div className="p-4 border-b flex items-center justify-between">
+                  <h3 className="font-semibold">Service Address</h3>
+                  <Button variant="ghost" size="icon" className="h-8 w-8">
+                    <Edit className="h-4 w-4" />
+                  </Button>
+                </div>
+                <div className="p-4">
+                  {order.latitude && order.longitude ? (
+                    <div className="mb-4 rounded-sm overflow-hidden border">
+                      <MapPreview lat={order.latitude} lng={order.longitude} />
+                    </div>
                   ) : (
-                    <div className="text-muted-foreground">No address provided</div>
+                    <div className="mb-4 rounded-lg overflow-hidden bg-gray-50 h-[200px] flex items-center justify-center border">
+                      <MapPin className="h-8 w-8 text-gray-400" />
+                    </div>
+                  )}
+                  <div className="space-y-1 text-sm">
+                    <div className='flex justify-between items-center'>
+                      {order.customer?.name && (
+                        <div className="font-medium">{order.customer.name}</div>
+                      )}
+
+                      {order.map_link && (
+                        <a
+                          href={order.map_link}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-primary text-sm underline flex items-center gap-1  inline-flex"
+                        >
+                          View on Map <ExternalLink className="h-3 w-3" />
+                        </a>
+                      )}
+                    </div>
+                    {order.full_address ? (
+                      <div>{order.full_address}</div>
+                    ) : (
+                      <div className="text-muted-foreground">No address provided</div>
+                    )}
+                  </div>
+
+                </div>
+              </div>
+
+              {/* Contact Information */}
+              <div>
+                <div className="p-4 border-b flex items-center justify-between">
+                  <h3 className="font-semibold">Contact Information</h3>
+                  <Button variant="ghost" size="icon" className="h-8 w-8">
+                    <Edit className="h-4 w-4" />
+                  </Button>
+                </div>
+                <div className="p-4 space-y-2">
+                  {order.customer?.email && (
+                    <Badge
+                      variant="secondary"
+                      className="justify-between bg-blue-50 text-blue-700 hover:bg-blue-100 cursor-pointer h-auto py-2 px-3 font-normal group"
+                      onClick={() => copyToClipboard(order.customer.email)}
+                    >
+                      <span>{order.customer.email}</span>
+                      <Copy className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+                    </Badge>
+                  )}
+                  {order.customer?.phone && (
+                    <CustomerContact
+                      phone={order.customer.phone}
+                      customerName={order.customer.name}
+                    />
                   )}
                 </div>
-                
               </div>
             </div>
 
-            {/* Contact Information */}
-            <div>
-              <div className="p-4 border-b flex items-center justify-between">
-                <h3 className="font-semibold">Contact Information</h3>
-                <Button variant="ghost" size="icon" className="h-8 w-8">
-                  <Edit className="h-4 w-4" />
-                </Button>
-              </div>
-              <div className="p-4 space-y-2">
-                {order.customer?.email && (
-                  <Badge
-                    variant="secondary"
-                    className="justify-between bg-blue-50 text-blue-700 hover:bg-blue-100 cursor-pointer h-auto py-2 px-3 font-normal group"
-                    onClick={() => copyToClipboard(order.customer.email)}
-                  >
-                    <span>{order.customer.email}</span>
-                    <Copy className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity" />
-                  </Badge>
-                )}
-                {order.customer?.phone && (
-                  <CustomerContact 
-                    phone={order.customer.phone}
-                    customerName={order.customer.name}
-                  />
-                )}
-              </div>
-            </div>
-            </div>
-            
             {/* Order Note */}
             <div className="border rounded-lg">
               <div className="p-4 border-b flex items-center justify-between">
@@ -1087,7 +1095,7 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
                 )}
               </div>
             </div>
-           
+
           </div>
         </div>
       </div>
@@ -1115,7 +1123,7 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
               Are you sure you want to reassign this order?
             </AlertDialogDescription>
           </AlertDialogHeader>
-          
+
           <div className="py-4">
             <div className="space-y-3">
               <div className="flex items-center gap-2 text-sm">
@@ -1130,7 +1138,7 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
               </div>
             </div>
           </div>
-          
+
           <AlertDialogFooter>
             <AlertDialogCancel disabled={reassigning}>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={confirmReassignAgent} disabled={reassigning}>
@@ -1150,7 +1158,7 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
               Are you sure you want to mark this order as completed? This action cannot be undone and will make the order non-editable.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          
+
           <div className="py-4">
             <div className="rounded-lg bg-yellow-50 border border-yellow-200 p-4">
               <div className="flex gap-3">
@@ -1168,11 +1176,11 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
               </div>
             </div>
           </div>
-          
+
           <AlertDialogFooter>
             <AlertDialogCancel disabled={changingStatus}>Cancel</AlertDialogCancel>
-            <AlertDialogAction 
-              onClick={() => performStatusChange(pendingStatus)} 
+            <AlertDialogAction
+              onClick={() => performStatusChange(pendingStatus)}
               disabled={changingStatus}
               className="bg-green-600 hover:bg-green-700"
             >
@@ -1192,7 +1200,7 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
               Feedback submitted for this order
             </AlertDialogDescription>
           </AlertDialogHeader>
-          
+
           <div className="space-y-4 py-4">
             <div>
               <label className="text-sm font-medium mb-2 block">Rating</label>
@@ -1200,11 +1208,10 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
                 {[1, 2, 3, 4, 5].map((star) => (
                   <Star
                     key={star}
-                    className={`h-6 w-6 ${
-                      star <= (order.rating || 0)
+                    className={`h-6 w-6 ${star <= (order.rating || 0)
                         ? 'fill-yellow-400 text-yellow-400'
                         : 'text-gray-300'
-                    }`}
+                      }`}
                   />
                 ))}
                 <span className="text-sm text-muted-foreground ml-2">
@@ -1212,21 +1219,21 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
                 </span>
               </div>
             </div>
-            
+
             <div>
               <label className="text-sm font-medium mb-2 block">Comments</label>
               <div className="bg-gray-50 rounded-lg p-4 border text-sm">
                 {order.feedback_comments || 'No comments provided'}
               </div>
             </div>
-            
+
             {order.feedback_submitted_at && (
               <div className="text-xs text-muted-foreground">
                 Submitted on {formatDateTime(order.feedback_submitted_at)}
               </div>
             )}
           </div>
-          
+
           <AlertDialogFooter>
             <AlertDialogAction onClick={() => setIsFeedbackViewOpen(false)}>
               Close
@@ -1244,11 +1251,11 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
               Please share your experience with this service order.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          
+
           <div className="space-y-4 py-4">
             <div>
               <label className="text-sm font-medium mb-3 block">Rating *</label>
-              <div 
+              <div
                 className="flex gap-2 justify-center"
                 onMouseLeave={() => setHoveredRating(0)}
               >
@@ -1261,11 +1268,10 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
                     className="transition-all hover:scale-110 focus:outline-none"
                   >
                     <Star
-                      className={`h-10 w-10 ${
-                        (hoveredRating > 0 ? hoveredRating : feedbackRating) >= rating
+                      className={`h-10 w-10 ${(hoveredRating > 0 ? hoveredRating : feedbackRating) >= rating
                           ? 'fill-yellow-400 text-yellow-400'
                           : 'text-gray-300'
-                      } transition-colors`}
+                        } transition-colors`}
                     />
                   </button>
                 ))}
@@ -1274,7 +1280,7 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
                 Click to rate from 1 (Poor) to 5 (Excellent)
               </p>
             </div>
-            
+
             <div>
               <label className="text-sm font-medium mb-2 block">Feedback *</label>
               <Textarea
@@ -1286,7 +1292,7 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
               />
             </div>
           </div>
-          
+
           <AlertDialogFooter>
             <AlertDialogCancel disabled={submittingFeedback}>Cancel</AlertDialogCancel>
             <AlertDialogAction
@@ -1310,7 +1316,7 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
               Please select a reason for cancelling this order. This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          
+
           <div className="space-y-4 py-4">
             <div>
               <label className="text-sm font-medium">Cancellation Reason *</label>
@@ -1327,7 +1333,7 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
                 </SelectContent>
               </Select>
             </div>
-            
+
             {cancelReason === 'Other' && (
               <div>
                 <label className="text-sm font-medium">Please specify *</label>
@@ -1340,7 +1346,7 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
               </div>
             )}
           </div>
-          
+
           <AlertDialogFooter>
             <AlertDialogCancel disabled={cancelling}>Cancel</AlertDialogCancel>
             <AlertDialogAction

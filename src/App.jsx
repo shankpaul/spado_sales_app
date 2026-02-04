@@ -13,6 +13,8 @@ const Dashboard = lazy(() => import('./pages/Dashboard'));
 const Customers = lazy(() => import('./pages/Customers'));
 const Orders = lazy(() => import('./pages/Orders'));
 const OrderDetail = lazy(() => import('./pages/OrderDetail'));
+const Subscriptions = lazy(() => import('./pages/Subscriptions'));
+const SubscriptionDetail = lazy(() => import('./pages/SubscriptionDetail'));
 
 // Loading fallback component
 const LoadingFallback = () => (
@@ -89,6 +91,28 @@ function App() {
               <ProtectedRoute allowedRoles={['admin', 'sales_executive']}>
                 <Layout>
                   <OrderDetail />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/subscriptions"
+            element={
+              <ProtectedRoute allowedRoles={['admin', 'sales_executive']}>
+                <Layout>
+                  <Subscriptions />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/subscriptions/:id"
+            element={
+              <ProtectedRoute allowedRoles={['admin', 'sales_executive']}>
+                <Layout>
+                  <SubscriptionDetail />
                 </Layout>
               </ProtectedRoute>
             }

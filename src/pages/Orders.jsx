@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Card } from '../components/ui/card';
@@ -42,6 +42,7 @@ import {
   Eye,
   Filter,
   X,
+  Repeat,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import {
@@ -58,6 +59,7 @@ import {
  * Manages order list with search, filters, pagination
  */
 const Orders = () => {
+  const navigate = useNavigate();
   // Load persisted state from localStorage
   const loadPersistedState = () => {
     try {
@@ -77,7 +79,7 @@ const Orders = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [agents, setAgents] = useState([]);
-  
+
   // Filter states
   const [searchQuery, setSearchQuery] = useState(persistedState?.searchQuery || '');
   const [searchInput, setSearchInput] = useState(persistedState?.searchQuery || '');
@@ -86,43 +88,43 @@ const Orders = () => {
   const [dateFrom, setDateFrom] = useState(persistedState?.dateFrom || '');
   const [dateTo, setDateTo] = useState(persistedState?.dateTo || '');
   const [agentId, setAgentId] = useState(persistedState?.agentId || 'all');
-  
+
   // Temporary filter states (for sheet)
   const [tempStatus, setTempStatus] = useState(persistedState?.status || 'all');
   const [tempPaymentStatus, setTempPaymentStatus] = useState(persistedState?.paymentStatus || 'all');
   const [tempDateFrom, setTempDateFrom] = useState(persistedState?.dateFrom || '');
   const [tempDateTo, setTempDateTo] = useState(persistedState?.dateTo || '');
   const [tempAgentId, setTempAgentId] = useState(persistedState?.agentId || 'all');
-  
+
   // Pagination states
   const [page, setPage] = useState(persistedState?.page || 1);
   const [perPage] = useState(10);
   const [totalPages, setTotalPages] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
-  
+
   // Infinite scroll states (for mobile)
   const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const observerTarget = useRef(null);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
-  
+
   // Wizard and filter sheet states
   const [isWizardOpen, setIsWizardOpen] = useState(false);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
-  
+
   // Track if this is the first mount to prevent resetting page from localStorage
   const isFirstMount = useRef(true);
   const hasInitiallyFetched = useRef(false);
-  
+
   // Track selected order for detail view
   const [searchParams, setSearchParams] = useSearchParams();
   const selectedOrderId = searchParams.get('orderId');
-  
+
   // Handle opening order detail
   const handleOpenOrderDetail = (orderId) => {
     setSearchParams({ orderId: orderId.toString() });
   };
-  
+
   // Handle closing order detail
   const handleCloseOrderDetail = () => {
     setSearchParams({});
@@ -153,7 +155,7 @@ const Orders = () => {
         setOrders([]);
       }
     };
-    
+
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, [isMobile]);
@@ -197,7 +199,7 @@ const Orders = () => {
 
       const response = await orderService.getAllOrders(params);
       const newOrders = response.orders || [];
-      
+
       if (isMobile && !resetList) {
         // Append for infinite scroll
         setOrders(prev => [...prev, ...newOrders]);
@@ -205,7 +207,7 @@ const Orders = () => {
         // Replace for desktop pagination
         setOrders(newOrders);
       }
-      
+
       setTotalPages(response.pagination?.total_pages || 1);
       setTotalItems(response.pagination?.total_count || 0);
       setHasMore(page < (response.pagination?.total_pages || 1));
@@ -229,12 +231,12 @@ const Orders = () => {
     if (isFirstMount.current) {
       isFirstMount.current = false;
       hasInitiallyFetched.current = true;
-      
+
       // Always fetch on mount - use persisted filters but get fresh data
       fetchOrders(true);
       return;
     }
-    
+
     // Reset to page 1 and clear orders when filters change (but not page)
     setPage(1);
     setOrders([]);
@@ -262,17 +264,17 @@ const Orders = () => {
   // Setup intersection observer for infinite scroll
   useEffect(() => {
     if (!isMobile) return; // Only for mobile
-    
+
     const element = observerTarget.current;
     const option = {
       root: null,
       rootMargin: '20px',
       threshold: 0
     };
-    
+
     const observer = new IntersectionObserver(handleObserver, option);
     if (element) observer.observe(element);
-    
+
     return () => {
       if (element) observer.unobserve(element);
     };
@@ -280,11 +282,11 @@ const Orders = () => {
 
   // Check if any filters are applied
   const hasActiveFilters = () => {
-    return status !== 'all' || 
-           paymentStatus !== 'all' || 
-           dateFrom !== '' || 
-           dateTo !== '' || 
-           agentId !== 'all';
+    return status !== 'all' ||
+      paymentStatus !== 'all' ||
+      dateFrom !== '' ||
+      dateTo !== '' ||
+      agentId !== 'all';
   };
 
   // Get active filter count
@@ -393,7 +395,7 @@ const Orders = () => {
       statusValue,
       type === 'order' ? ORDER_STATUSES : PAYMENT_STATUSES
     );
-    
+
     const variantMap = {
       gray: 'secondary',
       blue: 'default',
@@ -402,7 +404,7 @@ const Orders = () => {
       yellow: 'warning',
       purple: 'outline',
     };
-    
+
     return variantMap[color] || 'secondary';
   };
 
@@ -428,167 +430,167 @@ const Orders = () => {
       </div>
 
       {/* Search and Filters */}
-        <div className="flex flex-col sm:flex-row gap-4">
-          {/* Single Search Field */}
-          <div className="relative flex-1 flex gap-2">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search by order number or customer phone..."
-                value={searchInput}
-                onChange={(e) => setSearchInput(e.target.value)}
-                onKeyPress={handleSearchKeyPress}
-                className="pl-10 pr-10"
-              />
-              {searchInput && (
-                <button
-                  onClick={clearSearch}
-                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                  type="button"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              )}
-            </div>
-            <Button onClick={handleSearch} variant="default" className="shrink-0">
-              <Search className="h-4 w-4 mr-2" />
-              Search
-            </Button>
-          </div>
-
-          {/* Filter Button */}
-          <Sheet open={isFilterOpen} onOpenChange={handleFilterOpen}>
-            <SheetTrigger asChild>
-              <Button 
-                variant={hasActiveFilters() ? "default" : "outline"} 
-                className="w-full sm:w-auto relative"
+      <div className="flex flex-col sm:flex-row gap-4">
+        {/* Single Search Field */}
+        <div className="relative flex-1 flex gap-2">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search by order number or customer phone..."
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              onKeyPress={handleSearchKeyPress}
+              className="pl-10 pr-10"
+            />
+            {searchInput && (
+              <button
+                onClick={clearSearch}
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                type="button"
               >
-                <Filter className="h-4 w-4 mr-2" />
-                Filters
-                {hasActiveFilters() && (
-                  <Badge 
-                    variant="secondary" 
-                    className="ml-2 bg-white text-primary px-1.5 py-0 text-xs h-5 min-w-[20px]"
-                  >
-                    {getActiveFilterCount()}
-                  </Badge>
-                )}
-              </Button>
-            </SheetTrigger>
-            <SheetContent side={isMobile ? "bottom" : "right"}>
-              <SheetHeader>
-                <SheetTitle>Filter Orders</SheetTitle>
-                <SheetDescription>
-                  Apply filters to narrow down your order list
-                </SheetDescription>
-              </SheetHeader>
-              <div className="grid gap-4 py-4">
-                {/* Status Filter */}
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Order Status</label>
-                  <Select value={tempStatus} onValueChange={setTempStatus}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="All Statuses" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Statuses</SelectItem>
-                      {ORDER_STATUSES.map((s) => (
-                        <SelectItem key={s.value} value={s.value}>
-                          {s.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {/* Payment Status Filter */}
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Payment Status</label>
-                  <Select value={tempPaymentStatus} onValueChange={setTempPaymentStatus}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="All Payment Status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Payment Status</SelectItem>
-                      {PAYMENT_STATUSES.map((s) => (
-                        <SelectItem key={s.value} value={s.value}>
-                          {s.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {/* Date Range */}
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Date From</label>
-                    <Input
-                      type="date"
-                      value={tempDateFrom}
-                      onChange={(e) => setTempDateFrom(e.target.value)}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Date To</label>
-                    <Input
-                      type="date"
-                      value={tempDateTo}
-                      onChange={(e) => setTempDateTo(e.target.value)}
-                    />
-                  </div>
-                </div>
-
-                {/* Agent Filter */}
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Assigned Agent</label>
-                  <Select value={tempAgentId} onValueChange={setTempAgentId}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="All Agents" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Agents</SelectItem>
-                      {agents && agents.map((agent) => (
-                        <SelectItem key={agent.id} value={String(agent.id)}>
-                          {agent.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <div className="flex flex-col gap-2 pt-4 border-t">
-                <Button onClick={applyFilters} className="w-full">
-                  Apply Filters
-                </Button>
-                <Button variant="outline" onClick={clearFilters} className="w-full">
-                  Clear All
-                </Button>
-              </div>
-            </SheetContent>
-          </Sheet>
+                <X className="h-4 w-4" />
+              </button>
+            )}
+          </div>
+          <Button onClick={handleSearch} variant="default" className="shrink-0">
+            <Search className="h-4 w-4 mr-2" />
+            Search
+          </Button>
         </div>
 
-        {/* Active Filters Summary */}
-        {hasActiveFilters() && (
-          <div className="mt-4 flex flex-wrap items-center gap-2">
-            <span className="text-sm text-muted-foreground">Active filters:</span>
-            {getFilterSummary().map((filter, index) => (
-              <Badge key={index} variant="secondary" className="gap-1">
-                {filter}
-              </Badge>
-            ))}
+        {/* Filter Button */}
+        <Sheet open={isFilterOpen} onOpenChange={handleFilterOpen}>
+          <SheetTrigger asChild>
             <Button
-              variant="ghost"
-              size="sm"
-              onClick={clearFilters}
-              className="h-6 px-2 text-xs"
+              variant={hasActiveFilters() ? "default" : "outline"}
+              className="w-full sm:w-auto relative"
             >
-              <X className="h-3 w-3 mr-1" />
-              Clear all
+              <Filter className="h-4 w-4 mr-2" />
+              Filters
+              {hasActiveFilters() && (
+                <Badge
+                  variant="secondary"
+                  className="ml-2 bg-white text-primary px-1.5 py-0 text-xs h-5 min-w-[20px]"
+                >
+                  {getActiveFilterCount()}
+                </Badge>
+              )}
             </Button>
-          </div>
-        )}
+          </SheetTrigger>
+          <SheetContent side={isMobile ? "bottom" : "right"}>
+            <SheetHeader>
+              <SheetTitle>Filter Orders</SheetTitle>
+              <SheetDescription>
+                Apply filters to narrow down your order list
+              </SheetDescription>
+            </SheetHeader>
+            <div className="grid gap-4 py-4">
+              {/* Status Filter */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Order Status</label>
+                <Select value={tempStatus} onValueChange={setTempStatus}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="All Statuses" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Statuses</SelectItem>
+                    {ORDER_STATUSES.map((s) => (
+                      <SelectItem key={s.value} value={s.value}>
+                        {s.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Payment Status Filter */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Payment Status</label>
+                <Select value={tempPaymentStatus} onValueChange={setTempPaymentStatus}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="All Payment Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Payment Status</SelectItem>
+                    {PAYMENT_STATUSES.map((s) => (
+                      <SelectItem key={s.value} value={s.value}>
+                        {s.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Date Range */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Date From</label>
+                  <Input
+                    type="date"
+                    value={tempDateFrom}
+                    onChange={(e) => setTempDateFrom(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Date To</label>
+                  <Input
+                    type="date"
+                    value={tempDateTo}
+                    onChange={(e) => setTempDateTo(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              {/* Agent Filter */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Assigned Agent</label>
+                <Select value={tempAgentId} onValueChange={setTempAgentId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="All Agents" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Agents</SelectItem>
+                    {agents && agents.map((agent) => (
+                      <SelectItem key={agent.id} value={String(agent.id)}>
+                        {agent.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="flex flex-col gap-2 pt-4 border-t">
+              <Button onClick={applyFilters} className="w-full">
+                Apply Filters
+              </Button>
+              <Button variant="outline" onClick={clearFilters} className="w-full">
+                Clear All
+              </Button>
+            </div>
+          </SheetContent>
+        </Sheet>
+      </div>
+
+      {/* Active Filters Summary */}
+      {hasActiveFilters() && (
+        <div className="mt-4 flex flex-wrap items-center gap-2">
+          <span className="text-sm text-muted-foreground">Active filters:</span>
+          {getFilterSummary().map((filter, index) => (
+            <Badge key={index} variant="secondary" className="gap-1">
+              {filter}
+            </Badge>
+          ))}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={clearFilters}
+            className="h-6 px-2 text-xs"
+          >
+            <X className="h-3 w-3 mr-1" />
+            Clear all
+          </Button>
+        </div>
+      )}
 
       {/* Orders List */}
       <Card className="p-4">
@@ -624,7 +626,22 @@ const Orders = () => {
                   <div className="space-y-3">
                     <div className="flex items-start justify-between">
                       <div>
-                        <div className="font-semibold text-lg">#{order.order_number}</div>
+                        <div className="flex items-center gap-2">
+                          <div className="font-semibold text-lg">#{order.order_number}</div>
+                          {order.subscription_id && (
+                            <Badge
+                              variant="secondary"
+                              className="text-[10px] px-1.5 h-5 flex items-center gap-1 cursor-pointer hover:bg-secondary/80"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                navigate(`/subscriptions/${order.subscription_id}`);
+                              }}
+                            >
+                              <Repeat className="h-3 w-3" />
+                              Sub
+                            </Badge>
+                          )}
+                        </div>
                         <div className="text-sm text-muted-foreground">{order.customer_name}</div>
                       </div>
                       <div className="flex gap-2">
@@ -656,9 +673,9 @@ const Orders = () => {
                       )}
                     </div>
 
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
+                    <Button
+                      variant="outline"
+                      size="sm"
                       className="w-full"
                       onClick={() => handleOpenOrderDetail(order.id)}
                     >
@@ -668,14 +685,14 @@ const Orders = () => {
                   </div>
                 </Card>
               ))}
-              
+
               {/* Infinite scroll loader */}
               {hasMore && (
                 <div ref={observerTarget} className="flex justify-center py-4">
                   {loadingMore && <Loader2 className="h-6 w-6 animate-spin text-primary" />}
                 </div>
               )}
-              
+
               {/* End of list message */}
               {!hasMore && orders.length > 0 && (
                 <div className="text-center py-4 text-sm text-muted-foreground">
@@ -701,16 +718,16 @@ const Orders = () => {
                 <TableBody>
                   {orders.map((order) => (
                     <TableRow key={order.id}>
-                      <TableCell 
+                      <TableCell
                         className="font-medium hover:underline cursor-pointer text-primary"
                         onClick={() => handleOpenOrderDetail(order.id)}
                       >
                         #{order.order_number}
                       </TableCell>
                       <TableCell>
-                        <div>
+                        <div className="flex flex-col">
                           <div className="font-medium">{order.customer_name}</div>
-                          <div className="text-sm text-muted-foreground">{order.customer_phone}</div>
+
                         </div>
                       </TableCell>
                       <TableCell>{formatDate(order.booking_date)}</TableCell>
@@ -724,9 +741,21 @@ const Orders = () => {
                           {getStatusLabel(order.payment_status, PAYMENT_STATUSES)}
                         </Badge>
                       </TableCell>
-                      <TableCell className="font-medium">{formatCurrency(order.total_amount)}</TableCell>
+                      <TableCell className="font-medium flex items-center gap-2">{formatCurrency(order.total_amount)} {order.subscription_id && (
+                        <Badge
+                          variant="secondary"
+                          className="w-fit mt-1 text-[10px] px-1.5 h-5 flex items-center gap-1 cursor-pointer hover:bg-secondary"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigate(`/subscriptions/${order.subscription_id}`);
+                          }}
+                        >
+                          <Repeat className="h-3 w-3" />
+                          Sub
+                        </Badge>
+                      )}</TableCell>
                       <TableCell>{order.assigned_agent_name || <Badge variant="destructive">Unassigned</Badge>}</TableCell>
-                     
+
                     </TableRow>
                   ))}
                 </TableBody>
@@ -751,7 +780,7 @@ const Orders = () => {
             >
               <ChevronLeft className="h-4 w-4" />
             </Button>
-            
+
             {/* Page numbers */}
             <div className="flex gap-1">
               {/* First page */}
@@ -768,7 +797,7 @@ const Orders = () => {
                   {page > 4 && <span className="px-2 flex items-center text-muted-foreground">...</span>}
                 </>
               )}
-              
+
               {/* Pages around current */}
               {Array.from({ length: totalPages }, (_, i) => i + 1)
                 .filter(p => p === page || p === page - 1 || p === page + 1 || p === page - 2 || p === page + 2)
@@ -785,7 +814,7 @@ const Orders = () => {
                     {p}
                   </Button>
                 ))}
-              
+
               {/* Last page */}
               {page < totalPages - 2 && (
                 <>
@@ -801,7 +830,7 @@ const Orders = () => {
                 </>
               )}
             </div>
-            
+
             <Button
               variant="outline"
               size="sm"
@@ -820,13 +849,13 @@ const Orders = () => {
         onOpenChange={setIsWizardOpen}
         onSuccess={handleWizardSuccess}
       />
-      
+
       {/* Order Detail Sheet for Desktop */}
       <Sheet open={!!selectedOrderId} onOpenChange={(open) => !open && handleCloseOrderDetail()}>
         <SheetContent side="right" className="w-full sm:max-w-6xl p-0 overflow-y-auto">
           {selectedOrderId && (
-            <OrderDetail 
-              orderId={selectedOrderId} 
+            <OrderDetail
+              orderId={selectedOrderId}
               onClose={handleCloseOrderDetail}
               onUpdate={() => {
                 // Refresh the current page after order update
