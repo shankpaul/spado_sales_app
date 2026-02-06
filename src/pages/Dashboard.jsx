@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Skeleton } from '../components/ui/skeleton';
+import { Badge2 } from '../components/ui/badge2';
 import {
   Sheet,
   SheetContent,
@@ -465,13 +466,9 @@ const BookingItem = ({ order, onClick }) => {
           <button className="text-base font-bold text-gray-900 hover:text-primary-600 transition-colors">
             #{order.order_number}
           </button>
-          <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${
-            order.status === 'confirmed' 
-              ? 'bg-blue-50 text-blue-700 border border-blue-200' 
-              : 'bg-amber-50 text-amber-700 border border-amber-200'
-          }`}>
+          <Badge2 variant={order.status === 'confirmed' ? 'info' : 'warning'}>
             {order.status === 'confirmed' ? 'Confirmed' : 'In Progress'}
-          </span>
+          </Badge2>
         </div>
         <div className="text-right">
           <span className="text-base font-bold text-primary-600">{formatCurrency(order.total_amount)}</span>
@@ -492,7 +489,15 @@ const BookingItem = ({ order, onClick }) => {
         <div className="flex items-center gap-1.5 text-gray-600">
           <MapPin className="text-gray-400" strokeWidth={1.5} size={14} />
           <span className="font-medium">{order.area || 'N/A'}</span>
+         {order.assigned_agent_name ? 
+                        <div className="flex items-center gap-2">
+                          <LetterAvatar name={order.assigned_agent_name} size="xs" />
+                          <div className="font-medium">{order.assigned_agent_name}</div>
+                        </div>:
+                        <Badge2 variant="destructive">Unassigned</Badge2>
+                        }
         </div>
+        
         <div className="flex items-center gap-1.5 text-gray-600">
           <Clock10 className="text-gray-400" strokeWidth={1.5} size={14} />
           <span className="font-medium">

@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from './ui/dialog';
 import { Button } from './ui/button';
+import { Checkbox } from './ui/checkbox';
+import { RadioGroup, RadioGroupItem } from './ui/radio-group';
 import CustomerContact from './CustomerContact';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
@@ -301,7 +303,7 @@ const SubscriptionWizard = ({ open, onOpenChange, onSuccess, customerId = null, 
   const calculateTotalWashes = () => {
     return packageItems.reduce((sum, item) => {
       const pkg = packages.find(p => String(p.id) === String(item.package_id));
-      return sum + (pkg?.max_washes_per_month || 0) * item.quantity;
+      return sum + (pkg?.max_washes_per_month || 0) * monthsDuration;
     }, 0);
   };
 
@@ -421,7 +423,7 @@ const SubscriptionWizard = ({ open, onOpenChange, onSuccess, customerId = null, 
       ...packageItems,
       {
         package_id: '',
-        quantity: monthsDuration,
+        quantity: 1,
         unit_price: 0,
         price: 0,
         vehicle_type: vehicleType,
@@ -453,7 +455,7 @@ const SubscriptionWizard = ({ open, onOpenChange, onSuccess, customerId = null, 
     // Calculate price with discount
     if (['quantity', 'unit_price', 'discount_value', 'discount_type', 'package_id'].includes(field)) {
       const item = updated[index];
-      const subtotal = item.quantity * item.unit_price;
+      const subtotal = monthsDuration * item.unit_price;
       let discount = 0;
 
       if (item.discount_type === DISCOUNT_TYPES.PERCENTAGE) {
@@ -489,7 +491,7 @@ const SubscriptionWizard = ({ open, onOpenChange, onSuccess, customerId = null, 
 
         return {
           ...item,
-          quantity: monthsDuration,
+          quantity: 1,
           discount: discount,
           price: Math.max(0, subtotal - discount),
         };
@@ -511,6 +513,8 @@ const SubscriptionWizard = ({ open, onOpenChange, onSuccess, customerId = null, 
         discount: 0,
         discount_type: DISCOUNT_TYPES.FIXED,
         discount_value: 0,
+        application_type: 'all_washes',
+        applicable_wash_numbers: [],
       },
     ]);
   };
@@ -531,10 +535,23 @@ const SubscriptionWizard = ({ open, onOpenChange, onSuccess, customerId = null, 
       }
     }
 
-    // Calculate price with discount
-    if (['quantity', 'unit_price', 'discount_value', 'discount_type', 'addon_id'].includes(field)) {
+    // Handle application type change
+    if (field === 'application_type') {
+      const totalWashes = calculateTotalWashes();
+      if (value === 'all_washes') {
+        // Select all wash numbers
+        updated[index].applicable_wash_numbers = Array.from({ length: totalWashes }, (_, i) => i + 1);
+      } else {
+        // Clear selections for manual entry
+        updated[index].applicable_wash_numbers = [];
+      }
+    }
+
+    // Calculate price with discount based on selected wash count
+    if (['unit_price', 'discount_value', 'discount_type', 'addon_id', 'application_type', 'applicable_wash_numbers'].includes(field)) {
       const item = updated[index];
-      const subtotal = item.quantity * item.unit_price;
+      const selectedWashCount = item.applicable_wash_numbers?.length || 0;
+      const subtotal = item.unit_price * selectedWashCount;
       let discount = 0;
 
       if (item.discount_type === DISCOUNT_TYPES.PERCENTAGE) {
@@ -592,8 +609,19 @@ const SubscriptionWizard = ({ open, onOpenChange, onSuccess, customerId = null, 
   };
 
   const validateStep3 = () => {
-    // Addons are optional
-    return true;
+    const newErrors = {};
+    
+    // Validate addons if any exist
+    addonItems.forEach((item, index) => {
+      if (item.addon_id && item.application_type === 'specific_washes') {
+        if (!item.applicable_wash_numbers || item.applicable_wash_numbers.length === 0) {
+          newErrors[`addon_wash_${index}`] = 'Please select at least one wash for this addon';
+        }
+      }
+    });
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
   };
 
   const validateStep4 = () => {
@@ -683,13 +711,14 @@ const SubscriptionWizard = ({ open, onOpenChange, onSuccess, customerId = null, 
   const calculateTotals = () => {
     const packageTotal = packageItems.reduce((sum, item) => sum + (item.price || 0), 0);
     const addonTotal = addonItems.reduce((sum, item) => sum + (item.price || 0), 0);
-    // Package prices already include quantity (monthsDuration), so no need to multiply again
-    const subscriptionTotal = packageTotal + (addonTotal * monthsDuration);
+    // Package prices already include quantity (monthsDuration)
+    // Addon prices already include selected wash count, no multiplication needed
+    const subscriptionTotal = packageTotal + addonTotal;
 
     return {
       packages: packageTotal,
       addons: addonTotal,
-      perMonth: (packageTotal / monthsDuration) + addonTotal,
+      perMonth: (packageTotal / monthsDuration) + (addonTotal / monthsDuration),
       total: subscriptionTotal,
     };
   };
@@ -718,14 +747,16 @@ const SubscriptionWizard = ({ open, onOpenChange, onSuccess, customerId = null, 
           discount_value: item.discount_value,
           notes: item.notes || null,
         })),
+        
         addons: addonItems.map(item => ({
           addon_id: item.addon_id,
-          quantity: item.quantity,
+          quantity: 1, // Always 1, pricing based on wash count instead
           unit_price: item.unit_price,
-          price: item.price,
+          price: item.price, // Already calculated: unit_price × wash_count - discount
           discount: item.discount,
           discount_type: item.discount_type,
           discount_value: item.discount_value,
+          applicable_wash_numbers: item.applicable_wash_numbers || [], // Array of wash numbers [1, 2, 3, ...]
         })),
         washing_schedules: washingSchedules,
         payment_amount: paymentAmount ? parseFloat(paymentAmount) : 0,
@@ -1089,7 +1120,7 @@ const SubscriptionWizard = ({ open, onOpenChange, onSuccess, customerId = null, 
                         </div>
 
                         <div className='text-right'>
-                          <Label className="text-sm">Total Per Month</Label>
+                          <Label className="text-sm">For {monthsDuration} month{monthsDuration > 1 ? 's' : ''}</Label>
                           <h2 className="h-8 text-2xl font-bold">
                             {`₹${item.price.toFixed(2)}`}
                           </h2>
@@ -1139,9 +1170,9 @@ const SubscriptionWizard = ({ open, onOpenChange, onSuccess, customerId = null, 
                         </Button>
                       </div>
 
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="col-span-2">
-                          <Label>Add-on</Label>
+                      <div className="space-y-4">
+                        <div>
+                          <Label>Add-on *</Label>
                           <Select
                             value={item.addon_id}
                             onValueChange={(value) => updateAddonItem(index, 'addon_id', value)}
@@ -1159,66 +1190,113 @@ const SubscriptionWizard = ({ open, onOpenChange, onSuccess, customerId = null, 
                           </Select>
                         </div>
 
+                        {/* Application Type Selection */}
                         <div>
-                          <Label>Quantity</Label>
-                          <div className="flex items-center gap-2">
-                            <Button
-                              type="button"
-                              className="rounded-full aspect-square"
-                              size="icon"
-                              onClick={() => updateAddonItem(index, 'quantity', Math.max(1, item.quantity - 1))}
-                            >
-                              <Minus className="h-4 w-4" />
-                            </Button>
-                            <Input
-                              type="number"
-                              min="1"
-                              disabled="true"
-                              value={item.quantity}
-                              onChange={(e) => updateAddonItem(index, 'quantity', parseInt(e.target.value) || 1)}
-                              className="text-center"
-                            />
-                            <Button
-                              type="button"
-                              className="rounded-full aspect-square"
-                              size="icon"
-                              onClick={() => updateAddonItem(index, 'quantity', item.quantity + 1)}
-                            >
-                              <Plus className="h-4 w-4" />
-                            </Button>
-                          </div>
+                          <Label className="mb-2 block">Apply To *</Label>
+                          <RadioGroup
+                            value={item.application_type}
+                            onValueChange={(value) => updateAddonItem(index, 'application_type', value)}
+                            className="flex gap-4"
+                          >
+                            <div className="flex items-center gap-2">
+                              <RadioGroupItem value="all_washes" id={`all_washes_${index}`} />
+                              <Label htmlFor={`all_washes_${index}`} className="text-sm cursor-pointer">
+                                All Washes ({calculateTotalWashes()} washes)
+                              </Label>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <RadioGroupItem value="specific_washes" id={`specific_washes_${index}`} />
+                              <Label htmlFor={`specific_washes_${index}`} className="text-sm cursor-pointer">
+                                Specific Washes
+                              </Label>
+                            </div>
+                          </RadioGroup>
                         </div>
 
-                        <div>
-                          <Label className="text-xs">Discount</Label>
-                          <div className="flex gap-1">
-                            <Input
-                              type="number"
-                              min="0"
-                              value={item.discount}
-                              onChange={(e) => updateAddonItem(index, 'discount', parseFloat(e.target.value) || 0)}
-                              className="h-8 text-sm"
-                            />
-                            <Select
-                              value={item.discount_type}
-                              onValueChange={(value) => updateAddonItem(index, 'discount_type', value)}
-                            >
-                              <SelectTrigger className="h-8 w-16 text-xs">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value={DISCOUNT_TYPES.FIXED}>₹</SelectItem>
-                                <SelectItem value={DISCOUNT_TYPES.PERCENTAGE}>%</SelectItem>
-                              </SelectContent>
-                            </Select>
+                        {/* Wash Number Selection (for specific_washes) */}
+                        {item.application_type === 'specific_washes' && (
+                          <div className="border rounded-lg p-3 bg-muted/30">
+                            <Label className=" mb-2 block">Select Wash Numbers</Label>
+                            <div className="space-y-3 max-h-48 overflow-y-auto">
+                              {(() => {
+                                const totalWashes = calculateTotalWashes();
+                                const washesPerMonth = Math.ceil(totalWashes / monthsDuration);
+                                const months = [];
+                                
+                                for (let month = 0; month < monthsDuration; month++) {
+                                  const monthStart = month * washesPerMonth + 1;
+                                  const monthEnd = Math.min((month + 1) * washesPerMonth, totalWashes);
+                                  const monthWashes = [];
+                                  
+                                  for (let wash = monthStart; wash <= monthEnd; wash++) {
+                                    monthWashes.push(wash);
+                                  }
+                                  
+                                  months.push(
+                                    <div key={month} className="space-y-1">
+                                      <p className="text-xs font-medium text-muted-foreground">Month {month + 1}</p>
+                                      <div className="flex flex-wrap gap-2">
+                                        {monthWashes.map(washNum => (
+                                          <label key={washNum} className="flex items-center gap-1 cursor-pointer">
+                                            <Checkbox
+                                              checked={item.applicable_wash_numbers?.includes(washNum)}
+                                              onCheckedChange={(checked) => {
+                                                const current = item.applicable_wash_numbers || [];
+                                                const updated = checked
+                                                  ? [...current, washNum].sort((a, b) => a - b)
+                                                  : current.filter(w => w !== washNum);
+                                                updateAddonItem(index, 'applicable_wash_numbers', updated);
+                                              }}
+                                            />
+                                            <span>#{washNum}</span>
+                                          </label>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  );
+                                }
+                                
+                                return months;
+                              })()}
+                            </div>
+                            {errors[`addon_wash_${index}`] && (
+                              <p className="text-xs text-destructive mt-2">{errors[`addon_wash_${index}`]}</p>
+                            )}
                           </div>
-                        </div>
+                        )}
 
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <Label className="text-xs">Discount</Label>
+                            <div className="flex gap-1">
+                              <Input
+                                type="number"
+                                min="0"
+                                value={item.discount_value}
+                                onChange={(e) => updateAddonItem(index, 'discount_value', parseFloat(e.target.value) || 0)}
+                                className="h-8 text-sm"
+                              />
+                              <Select
+                                value={item.discount_type}
+                                onValueChange={(value) => updateAddonItem(index, 'discount_type', value)}
+                              >
+                                <SelectTrigger className="h-8 w-16 text-xs">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value={DISCOUNT_TYPES.FIXED}>₹</SelectItem>
+                                  <SelectItem value={DISCOUNT_TYPES.PERCENTAGE}>%</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          </div>
 
-                        <div className="col-span-2">
-                          <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
-                            <span className="font-medium">Total per Month:</span>
-                            <span className="text-lg font-bold">₹{item.price || 0}</span>
+                          <div className="text-right">
+                            <Label className="text-xs">Total Price</Label>
+                            <p className="text-2xl font-bold">₹{item.price?.toFixed(2) || '0.00'}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {item.applicable_wash_numbers?.length || 0} wash{(item.applicable_wash_numbers?.length || 0) !== 1 ? 'es' : ''}
+                            </p>
                           </div>
                         </div>
                       </div>
@@ -1548,19 +1626,38 @@ const SubscriptionWizard = ({ open, onOpenChange, onSuccess, customerId = null, 
 
                   <div className="border-t pt-3 mt-3">
                     <div className="flex justify-between text-sm">
-                      <span>Packages (per month):</span>
+                      <span>Packages</span>
                       <span>₹{totals.packages}</span>
                     </div>
-                    <div className="flex justify-between text-sm">
-                      <span>Add-ons (per month):</span>
-                      <span>₹{totals.addons}</span>
-                    </div>
-                    <div className="flex justify-between font-medium mt-2">
-                      <span>Monthly Total:</span>
-                      <span>₹{totals.perMonth}</span>
-                    </div>
+                    
+                    {addonItems.length > 0 && (
+                      <div className="mt-2 space-y-1">
+                        <div className="flex justify-between text-sm font-medium">
+                          <span>Add-ons</span>
+                          <span>₹{totals.addons}</span>
+                        </div>
+                        {addonItems.map((addon, idx) => {
+                          const addonDetails = addons.find(a => String(a.id) === String(addon.addon_id));
+                          const washCount = addon.applicable_wash_numbers?.length || 0;
+                          return (
+                            <div key={idx} className="flex justify-between text-xs text-muted-foreground pl-4">
+                              <span>
+                                {addonDetails?.name || `Addon ${idx + 1}`}
+                                {addon.application_type === 'all_washes' ? (
+                                  <span className="ml-1">(All {washCount} washes)</span>
+                                ) : (
+                                  <span className="ml-1">(Wash #{addon.applicable_wash_numbers?.join(', #') || 'None'})</span>
+                                )}
+                              </span>
+                              <span>₹{addon.price?.toFixed(2) || '0.00'}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                    
                     <div className="flex justify-between text-lg font-bold mt-2 text-primary">
-                      <span>Total Amount ({monthsDuration} months):</span>
+                      <span>Total Amount <span className='text-sm text-muted-foreground'>(For {monthsDuration} month{monthsDuration > 1 ? 's' : ''})</span></span>
                       <span>₹{totals.total}</span>
                     </div>
                   </div>

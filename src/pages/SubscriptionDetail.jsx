@@ -66,6 +66,7 @@ import {
   Eye,
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
+import CustomerContact from '@/components/CustomerContact';
 
 /**
  * Subscription Detail Page
@@ -254,12 +255,14 @@ const SubscriptionDetail = () => {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => navigate('/subscriptions')}>
+          <Button variant="ghost" size="icon"
+          className="rounded-full"
+           onClick={() => navigate('/subscriptions')}>
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div>
             <h1 className="text-2xl font-bold">Subscription Details</h1>
-            <p className="text-sm text-muted-foreground">ID: {subscription.id}</p>
+            {/* <p className="text-sm text-muted-foreground">ID: {subscription.id}</p> */}
           </div>
         </div>
 
@@ -316,7 +319,12 @@ const SubscriptionDetail = () => {
                 <Phone className="h-4 w-4 text-muted-foreground" />
                 <div>
                   <p className="text-sm text-muted-foreground">Phone</p>
-                  <p className="font-medium">{subscription.customer?.phone}</p>
+                  {subscription.customer?.phone && (
+                    <CustomerContact
+                      phone={subscription.customer.phone}
+                      customerName={subscription.customer.name}
+                    />
+                  )}
                 </div>
               </div>
               <div className="flex items-center gap-3">
@@ -392,11 +400,11 @@ const SubscriptionDetail = () => {
           </Card>
 
           {/* Addons */}
-          {subscription.addons?.length > 0 && (
+          {subscription.subscription_addons?.length > 0 && (
             <Card className="p-6">
               <h2 className="text-lg font-semibold mb-4">Add-ons</h2>
               <div className="space-y-3">
-                {subscription.addons.map((addon, index) => (
+                {subscription.subscription_addons.map((addon, index) => (
                   <div key={index} className="flex items-center justify-between p-3 bg-muted rounded-lg">
                     <div>
                       <p className="font-medium">{addon.addon_name || `Add-on ${index + 1}`}</p>
@@ -470,8 +478,8 @@ const SubscriptionDetail = () => {
         {/* Sidebar */}
         <div className="space-y-6">
           {/* Payment Summary */}
-          <Card className="p-6">
-            <div className="flex items-center justify-between mb-4">
+          <Card>
+            <div className="flex items-center justify-between p-4 border-b">
               <h2 className="text-lg font-semibold">Payment Summary</h2>
               {canUpdatePayment && (
                 <Button size="sm" variant="outline" onClick={() => setIsPaymentDialogOpen(true)}>
@@ -481,7 +489,7 @@ const SubscriptionDetail = () => {
               )}
             </div>
 
-            <div className="space-y-3">
+            <div className="space-y-3 p-4">
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Per Month:</span>
                 <span className="font-medium">{formatCurrency(totalAmount)}</span>
@@ -521,80 +529,81 @@ const SubscriptionDetail = () => {
                 </div>
               )}
             </div>
-          </Card>
 
-          {/* Quick Stats */}
-          <Card className="p-6">
-            <h2 className="text-lg font-semibold mb-4">Statistics</h2>
-            <div className="space-y-3">
-              <div className="flex justify-between">
-                <span className="text-sm text-muted-foreground">Total Washes:</span>
-                <span className="font-medium">{subscription.washing_schedules?.length || 0}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-sm text-muted-foreground">Completed:</span>
-                <span className="font-medium text-green-600">
-                  {orders.filter(o => o.status === 'completed').length}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-sm text-muted-foreground">Pending:</span>
-                <span className="font-medium text-orange-600">
-                  {(subscription.washing_schedules?.length || 0) - orders.length}
-                </span>
+
+            {/* Quick Stats */}
+            <div className="">
+              <h2 className="text-lg font-semibold p-4 border-b">Statistics</h2>
+              <div className="space-y-3 p-4">
+                <div className="flex justify-between">
+                  <span className="text-sm text-muted-foreground">Total Washes:</span>
+                  <span className="font-medium">{subscription.washing_schedules?.length || 0}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-sm text-muted-foreground">Completed:</span>
+                  <span className="font-medium text-green-600">
+                    {orders.filter(o => o.status === 'completed').length}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-sm text-muted-foreground">Pending:</span>
+                  <span className="font-medium text-orange-600">
+                    {(subscription.washing_schedules?.length || 0) - orders.length}
+                  </span>
+                </div>
               </div>
             </div>
-          </Card>
 
-          {/* Washing Schedules */}
-          <Card className="p-6">
-            <h2 className="text-lg font-semibold mb-4">
-              Washing Schedules ({subscription.washing_schedules?.length || 0})
-            </h2>
-            <div className="space-y-2 max-h-96 overflow-y-auto">
-              {subscription.washing_schedules?.map((schedule, index) => {
-                const order = orders.find(o => o.booking_date === schedule.date);
+            {/* Washing Schedules */}
+            <div className=''>
+              <h2 className="text-lg font-semibold p-4 border-b">
+                Washing Schedules ({subscription.washing_schedules?.length || 0})
+              </h2>
+              <div className="space-y-2 max-h-96 overflow-y-auto p-4">
+                {subscription.washing_schedules?.map((schedule, index) => {
+                  const order = orders.find(o => o.booking_date === schedule.date);
 
-                return (
-                  <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center flex-shrink-0">
-                        <span className="font-bold text-sm text-primary">{index + 1}</span>
+                  return (
+                    <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center flex-shrink-0">
+                          <span className="font-bold text-sm text-primary">{index + 1}</span>
+                        </div>
+                        <div>
+                          <p className="font-semibold text-sm">{formatDate(schedule.date)}</p>
+                          <p className="text-sm text-muted-foreground">
+                            {schedule.time_from} - {schedule.time_to}
+                          </p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="font-medium">{formatDate(schedule.date)}</p>
-                        <p className="text-sm text-muted-foreground">
-                          {schedule.time_from} - {schedule.time_to}
-                        </p>
+                      <div className="flex items-center gap-2">
+                        {order ? (
+                          <>
+                            {order.status === 'cancelled' ? (
+                              <Badge variant="destructive">
+                                <XCircle className="h-3 w-3 mr-1" />
+                                Cancelled
+                              </Badge>
+                            ) : order.status === 'completed' ? (
+                              <Badge variant="secondary">
+                                <CheckCircle className="h-3 w-3 mr-1" />
+                                Completed
+                              </Badge>
+                            ) : (
+                              <Badge className="bg-yellow-500 hover:bg-yellow-600 text-white border-transparent">
+                                <Clock className="h-3 w-3 mr-1" />
+                                Scheduled
+                              </Badge>
+                            )}
+                          </>
+                        ) : (
+                          <Badge variant="outline">Pending</Badge>
+                        )}
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      {order ? (
-                        <>
-                          {order.status === 'cancelled' ? (
-                            <Badge variant="destructive">
-                              <XCircle className="h-3 w-3 mr-1" />
-                              Cancelled
-                            </Badge>
-                          ) : order.status === 'completed' ? (
-                            <Badge variant="secondary">
-                              <CheckCircle className="h-3 w-3 mr-1" />
-                              Completed
-                            </Badge>
-                          ) : (
-                            <Badge className="bg-yellow-500 hover:bg-yellow-600 text-white border-transparent">
-                              <Clock className="h-3 w-3 mr-1" />
-                              Scheduled
-                            </Badge>
-                          )}
-                        </>
-                      ) : (
-                        <Badge variant="outline">Pending</Badge>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
             </div>
           </Card>
         </div>

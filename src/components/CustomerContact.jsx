@@ -42,7 +42,7 @@ const CustomerContact = ({
     <>
       <Badge
         variant={variant}
-        className={`justify-between bg-blue-50 text-blue-700 hover:bg-blue-100 cursor-pointer h-auto py-2 px-3 font-normal group ${className}`}
+        className={`justify-between bg-blue-50 text-blue-700 hover:bg-blue-100 cursor-pointer h-auto py-2 px-3 flex gap-2 font-normal group ${className}`}
         onClick={() => setIsContactDialogOpen(true)}
       >
         <span>{phone}</span>

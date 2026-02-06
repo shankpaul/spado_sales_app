@@ -3,6 +3,7 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Card } from '../components/ui/card';
+import LetterAvatar from '../components/LetterAvatar';
 import {
   Select,
   SelectContent,
@@ -10,7 +11,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '../components/ui/select';
-import { Badge } from '../components/ui/badge';
 import {
   Table,
   TableBody,
@@ -53,6 +53,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from '../components/ui/sheet';
+import { Badge2 } from '@/components/ui/badge2';
 
 /**
  * Orders Page Component
@@ -389,7 +390,7 @@ const Orders = () => {
     }).format(amount || 0);
   };
 
-  // Get badge variant for status
+  // Get Badge2 variant for status
   const getBadgeVariant = (statusValue, type = 'order') => {
     const color = getStatusColor(
       statusValue,
@@ -468,12 +469,12 @@ const Orders = () => {
               <Filter className="h-4 w-4 mr-2" />
               Filters
               {hasActiveFilters() && (
-                <Badge
+                <Badge2
                   variant="secondary"
                   className="ml-2 bg-white text-primary px-1.5 py-0 text-xs h-5 min-w-[20px]"
                 >
                   {getActiveFilterCount()}
-                </Badge>
+                </Badge2>
               )}
             </Button>
           </SheetTrigger>
@@ -576,9 +577,9 @@ const Orders = () => {
         <div className="mt-4 flex flex-wrap items-center gap-2">
           <span className="text-sm text-muted-foreground">Active filters:</span>
           {getFilterSummary().map((filter, index) => (
-            <Badge key={index} variant="secondary" className="gap-1">
+            <Badge2 key={index} variant="secondary" className="gap-1">
               {filter}
-            </Badge>
+            </Badge2>
           ))}
           <Button
             variant="ghost"
@@ -624,12 +625,14 @@ const Orders = () => {
               {orders.map((order) => (
                 <Card key={order.id} className="p-4">
                   <div className="space-y-3">
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <div className="font-semibold text-lg">#{order.order_number}</div>
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-start gap-2 flex-1 min-w-0">
+                        <LetterAvatar name={order.customer_name} size="md" className="mt-0.5" />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <div className="font-semibold text-lg">#{order.order_number}</div>
                           {order.subscription_id && (
-                            <Badge
+                            <Badge2
                               variant="secondary"
                               className="text-[10px] px-1.5 h-5 flex items-center gap-1 cursor-pointer hover:bg-secondary/80"
                               onClick={(e) => {
@@ -639,15 +642,16 @@ const Orders = () => {
                             >
                               <Repeat className="h-3 w-3" />
                               Sub
-                            </Badge>
+                            </Badge2>
                           )}
+                          </div>
+                          <div className="text-sm text-muted-foreground">{order.customer_name}</div>
                         </div>
-                        <div className="text-sm text-muted-foreground">{order.customer_name}</div>
                       </div>
-                      <div className="flex gap-2">
-                        <Badge variant={getBadgeVariant(order.status, 'order')}>
+                      <div className="flex gap-2 flex-shrink-0">
+                        <Badge2 variant={getBadgeVariant(order.status, 'order')}>
                           {getStatusLabel(order.status, ORDER_STATUSES)}
-                        </Badge>
+                        </Badge2>
                       </div>
                     </div>
 
@@ -661,9 +665,9 @@ const Orders = () => {
                       </div>
                       <div className="flex items-center gap-2">
                         <span className="text-muted-foreground">Payment:</span>
-                        <Badge variant={getBadgeVariant(order.payment_status, 'payment')}>
+                        <Badge2 variant={getBadgeVariant(order.payment_status, 'payment')}>
                           {getStatusLabel(order.payment_status, PAYMENT_STATUSES)}
-                        </Badge>
+                        </Badge2>
                       </div>
                       {order.assigned_agent && (
                         <div className="flex items-center gap-2 text-muted-foreground">
@@ -708,6 +712,7 @@ const Orders = () => {
                   <TableRow>
                     <TableHead>Order #</TableHead>
                     <TableHead>Customer</TableHead>
+                    <TableHead>Area</TableHead>
                     <TableHead>Booking Date</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Payment</TableHead>
@@ -725,24 +730,29 @@ const Orders = () => {
                         #{order.order_number}
                       </TableCell>
                       <TableCell>
+                        <div className="flex items-center gap-2">
+                          <LetterAvatar name={order.customer_name} size="xs" />
+                          <div className="font-medium capitalize">{order.customer_name}</div>
+                        </div>
+                      </TableCell>
+                      <TableCell>
                         <div className="flex flex-col">
-                          <div className="font-medium">{order.customer_name}</div>
-
+                          <div className="font-medium capitalize">{order.area}</div>
                         </div>
                       </TableCell>
                       <TableCell>{formatDate(order.booking_date)}</TableCell>
                       <TableCell>
-                        <Badge variant={getBadgeVariant(order.status, 'order')}>
+                        <Badge2 variant={getBadgeVariant(order.status, 'order')}>
                           {getStatusLabel(order.status, ORDER_STATUSES)}
-                        </Badge>
+                        </Badge2>
                       </TableCell>
                       <TableCell>
-                        <Badge variant={getBadgeVariant(order.payment_status, 'payment')}>
+                        <Badge2 variant={getBadgeVariant(order.payment_status, 'payment')}>
                           {getStatusLabel(order.payment_status, PAYMENT_STATUSES)}
-                        </Badge>
+                        </Badge2>
                       </TableCell>
                       <TableCell className="font-medium flex items-center gap-2">{formatCurrency(order.total_amount)} {order.subscription_id && (
-                        <Badge
+                        <Badge2
                           variant="secondary"
                           className="w-fit mt-1 text-[10px] px-1.5 h-5 flex items-center gap-1 cursor-pointer hover:bg-secondary"
                           onClick={(e) => {
@@ -752,10 +762,17 @@ const Orders = () => {
                         >
                           <Repeat className="h-3 w-3" />
                           Sub
-                        </Badge>
+                        </Badge2>
                       )}</TableCell>
-                      <TableCell>{order.assigned_agent_name || <Badge variant="destructive">Unassigned</Badge>}</TableCell>
-
+                      <TableCell>
+                        {order.assigned_agent_name ? 
+                        <div className="flex items-center gap-2">
+                          <LetterAvatar name={order.assigned_agent_name} size="xs" />
+                          <div className="font-medium">{order.assigned_agent_name}</div>
+                        </div>:
+                        <Badge2 variant="destructive">Unassigned</Badge2>
+                        }
+                        </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>

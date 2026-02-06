@@ -45,6 +45,8 @@ import {
   Pause,
   Play,
   X as XIcon,
+  Car,
+  Truck,
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 
@@ -67,10 +69,20 @@ const Subscriptions = () => {
   const [hasMore, setHasMore] = useState(true);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
 
-  // Filter states
+  // Filter states (active filters)
   const [statusFilter, setStatusFilter] = useState('');
   const [paymentStatusFilter, setPaymentStatusFilter] = useState('');
+  const [vehicleTypeFilter, setVehicleTypeFilter] = useState('');
+  const [startDateFrom, setStartDateFrom] = useState('');
+  const [startDateTo, setStartDateTo] = useState('');
   const [isFilterOpen, setIsFilterOpen] = useState(false);
+
+  // Temporary filter states (for filter sheet)
+  const [tempStatusFilter, setTempStatusFilter] = useState('');
+  const [tempPaymentStatusFilter, setTempPaymentStatusFilter] = useState('');
+  const [tempVehicleTypeFilter, setTempVehicleTypeFilter] = useState('');
+  const [tempStartDateFrom, setTempStartDateFrom] = useState('');
+  const [tempStartDateTo, setTempStartDateTo] = useState('');
 
   // Wizard state
   const [isWizardOpen, setIsWizardOpen] = useState(false);
@@ -95,9 +107,27 @@ const Subscriptions = () => {
       try {
         const saved = localStorage.getItem('subscriptionsFilters');
         if (saved) {
-          const { status, paymentStatus, search } = JSON.parse(saved);
-          if (status) setStatusFilter(status);
-          if (paymentStatus) setPaymentStatusFilter(paymentStatus);
+          const { status, paymentStatus, vehicleType, dateFrom, dateTo, search } = JSON.parse(saved);
+          if (status) {
+            setStatusFilter(status);
+            setTempStatusFilter(status);
+          }
+          if (paymentStatus) {
+            setPaymentStatusFilter(paymentStatus);
+            setTempPaymentStatusFilter(paymentStatus);
+          }
+          if (vehicleType) {
+            setVehicleTypeFilter(vehicleType);
+            setTempVehicleTypeFilter(vehicleType);
+          }
+          if (dateFrom) {
+            setStartDateFrom(dateFrom);
+            setTempStartDateFrom(dateFrom);
+          }
+          if (dateTo) {
+            setStartDateTo(dateTo);
+            setTempStartDateTo(dateTo);
+          }
           if (search) setSearchTerm(search);
         }
       } catch (error) {
@@ -107,22 +137,36 @@ const Subscriptions = () => {
     loadPersistedState();
   }, []);
 
+  // Sync temp filters when sheet opens
+  useEffect(() => {
+    if (isFilterOpen) {
+      setTempStatusFilter(statusFilter);
+      setTempPaymentStatusFilter(paymentStatusFilter);
+      setTempVehicleTypeFilter(vehicleTypeFilter);
+      setTempStartDateFrom(startDateFrom);
+      setTempStartDateTo(startDateTo);
+    }
+  }, [isFilterOpen, statusFilter, paymentStatusFilter, vehicleTypeFilter, startDateFrom, startDateTo]);
+
   // Save filters to localStorage
   useEffect(() => {
     const filters = {
       status: statusFilter,
       paymentStatus: paymentStatusFilter,
+      vehicleType: vehicleTypeFilter,
+      dateFrom: startDateFrom,
+      dateTo: startDateTo,
       search: searchTerm,
     };
     localStorage.setItem('subscriptionsFilters', JSON.stringify(filters));
-  }, [statusFilter, paymentStatusFilter, searchTerm]);
+  }, [statusFilter, paymentStatusFilter, vehicleTypeFilter, startDateFrom, startDateTo, searchTerm]);
 
   // Fetch subscriptions on filter/search change
   useEffect(() => {
     setPage(1);
     setSubscriptions([]);
     fetchSubscriptions(1, false);
-  }, [searchTerm, statusFilter, paymentStatusFilter]);
+  }, [searchTerm, statusFilter, paymentStatusFilter, vehicleTypeFilter, startDateFrom, startDateTo]);
 
   // Fetch subscriptions on page change (desktop pagination)
   useEffect(() => {
@@ -180,6 +224,9 @@ const Subscriptions = () => {
 
       if (statusFilter) params.status = statusFilter;
       if (paymentStatusFilter) params.payment_status = paymentStatusFilter;
+      if (vehicleTypeFilter) params.vehicle_type = vehicleTypeFilter;
+      if (startDateFrom) params.start_date_from = startDateFrom;
+      if (startDateTo) params.start_date_to = startDateTo;
 
       const response = await subscriptionService.getAllSubscriptions(params);
       const newSubscriptions = response.subscriptions || [];
@@ -212,17 +259,23 @@ const Subscriptions = () => {
 
   // Clear all filters
   const clearFilters = () => {
-    setStatusFilter('');
-    setPaymentStatusFilter('');
-    setSearchTerm('');
+    setTempStatusFilter('');
+    setTempPaymentStatusFilter('');
+    setTempVehicleTypeFilter('');
+    setTempStartDateFrom('');
+    setTempStartDateTo('');
   };
 
-  // Apply filters (close sheet)
+  // Apply filters (close sheet and fetch from API)
   const applyFilters = () => {
+    // Apply temp filters to active filters
+    setStatusFilter(tempStatusFilter);
+    setPaymentStatusFilter(tempPaymentStatusFilter);
+    setVehicleTypeFilter(tempVehicleTypeFilter);
+    setStartDateFrom(tempStartDateFrom);
+    setStartDateTo(tempStartDateTo);
     setIsFilterOpen(false);
-    setPage(1);
-    setSubscriptions([]);
-    fetchSubscriptions(1, false);
+    // Fetch will be triggered by useEffect watching filter changes
   };
 
   // Handle create subscription
@@ -280,7 +333,7 @@ const Subscriptions = () => {
   };
 
   // Active filter count
-  const activeFilterCount = [statusFilter, paymentStatusFilter].filter(Boolean).length;
+  const activeFilterCount = [statusFilter, paymentStatusFilter, vehicleTypeFilter, startDateFrom, startDateTo].filter(Boolean).length;
 
   return (
     <div className="p-4 md:p-6 space-y-6">
@@ -345,6 +398,33 @@ const Subscriptions = () => {
               Payment: {getStatusLabel(paymentStatusFilter, SUBSCRIPTION_PAYMENT_STATUSES)}
               <button
                 onClick={() => setPaymentStatusFilter('')}
+                className="ml-1 hover:bg-muted rounded-full"
+              >
+                <XIcon className="h-3 w-3" />
+              </button>
+            </Badge>
+          )}
+          {vehicleTypeFilter && (
+            <Badge variant="secondary" className="gap-1">
+              Vehicle: {vehicleTypeFilter.charAt(0).toUpperCase() + vehicleTypeFilter.slice(1)}
+              <button
+                onClick={() => setVehicleTypeFilter('')}
+                className="ml-1 hover:bg-muted rounded-full"
+              >
+                <XIcon className="h-3 w-3" />
+              </button>
+            </Badge>
+          )}
+          {(startDateFrom || startDateTo) && (
+            <Badge variant="secondary" className="gap-1">
+              Date: {startDateFrom && formatDate(startDateFrom)}
+              {startDateFrom && startDateTo && ' - '}
+              {startDateTo && formatDate(startDateTo)}
+              <button
+                onClick={() => {
+                  setStartDateFrom('');
+                  setStartDateTo('');
+                }}
                 className="ml-1 hover:bg-muted rounded-full"
               >
                 <XIcon className="h-3 w-3" />
@@ -665,12 +745,12 @@ const Subscriptions = () => {
             {/* Status Filter */}
             <div>
               <label className="text-sm font-medium mb-2 block">Subscription Status</label>
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <Select value={tempStatusFilter || undefined} onValueChange={(value) => setTempStatusFilter(value === 'all' ? '' : value)}>
                 <SelectTrigger>
                   <SelectValue placeholder="All statuses" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All statuses</SelectItem>
+                  <SelectItem value="all">All statuses</SelectItem>
                   {SUBSCRIPTION_STATUSES.map((status) => (
                     <SelectItem key={status.value} value={status.value}>
                       {status.label}
@@ -683,12 +763,12 @@ const Subscriptions = () => {
             {/* Payment Status Filter */}
             <div>
               <label className="text-sm font-medium mb-2 block">Payment Status</label>
-              <Select value={paymentStatusFilter} onValueChange={setPaymentStatusFilter}>
+              <Select value={tempPaymentStatusFilter || undefined} onValueChange={(value) => setTempPaymentStatusFilter(value === 'all' ? '' : value)}>
                 <SelectTrigger>
                   <SelectValue placeholder="All payment statuses" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All payment statuses</SelectItem>
+                  <SelectItem value="all">All payment statuses</SelectItem>
                   {SUBSCRIPTION_PAYMENT_STATUSES.map((status) => (
                     <SelectItem key={status.value} value={status.value}>
                       {status.label}
@@ -696,6 +776,62 @@ const Subscriptions = () => {
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+
+            {/* Vehicle Type Filter */}
+            <div>
+              <label className="text-sm font-medium mb-2 block">Vehicle Type</label>
+              <Select value={tempVehicleTypeFilter || undefined} onValueChange={(value) => setTempVehicleTypeFilter(value === 'all' ? '' : value)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="All vehicle types" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All vehicle types</SelectItem>
+                  <SelectItem value="hatchback">
+                    <div className="flex items-center gap-2">
+                      <Car className="h-4 w-4" />
+                      Hatchback
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="sedan">
+                    <div className="flex items-center gap-2">
+                      <Car className="h-4 w-4" />
+                      Sedan
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="suv">
+                    <div className="flex items-center gap-2">
+                      <Truck className="h-4 w-4" />
+                      SUV
+                    </div>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Start Date Range Filter */}
+            <div className="space-y-3">
+              <label className="text-sm font-medium block">Start Date Range</label>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs text-muted-foreground mb-1 block">From</label>
+                  <Input
+                    type="date"
+                    value={tempStartDateFrom}
+                    onChange={(e) => setTempStartDateFrom(e.target.value)}
+                    max={tempStartDateTo || undefined}
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-muted-foreground mb-1 block">To</label>
+                  <Input
+                    type="date"
+                    value={tempStartDateTo}
+                    onChange={(e) => setTempStartDateTo(e.target.value)}
+                    min={tempStartDateFrom || undefined}
+                  />
+                </div>
+              </div>
             </div>
 
             {/* Action Buttons */}

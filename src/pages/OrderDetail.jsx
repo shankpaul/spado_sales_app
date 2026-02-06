@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { Button } from '../components/ui/button';
 import { Card } from '../components/ui/card';
-import { Badge } from '../components/ui/badge';
 import { Skeleton } from '../components/ui/skeleton';
 import CustomerContact from '../components/CustomerContact';
 import {
@@ -73,6 +72,7 @@ import {
 } from 'lucide-react';
 import MapPreview from '@/components/MapPreview';
 import { formatDate, formatDateTime, formatTime, formatCurrency } from '../lib/utilities';
+import { Badge2 } from '@/components/ui/badge2';
 
 /**
  * Order Detail Page
@@ -241,7 +241,7 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
     return packagesTotal + addonsTotal;
   };
 
-  // Get badge variant
+  // Get Badge2 variant
   const getBadgeVariant = (statusValue, type = 'order') => {
     const color = getStatusColor(
       statusValue,
@@ -483,19 +483,19 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
 
               <div className="flex items-center gap-3">
                 <h1 className="text-xl sm:text-2xl font-semibold">Order-{order.order_number}</h1>
-                <Badge variant={getBadgeVariant(order.status, 'order')} className="text-xs">
+                <Badge2 variant={getBadgeVariant(order.status, 'order')} className="text-xs">
                   {getStatusLabel(order.status, ORDER_STATUSES)}
-                </Badge>
+                </Badge2>
 
                 {order.subscription_id && (
-                  <Badge
+                  <Badge2
                     variant="secondary"
                     className="flex items-center gap-1 cursor-pointer hover:bg-secondary/80"
                     onClick={() => navigate(`/subscriptions/${order.subscription_id}`)}
                   >
                     <Repeat className="h-3 w-3" />
                     Subscription
-                  </Badge>
+                  </Badge2>
                 )}
 
                 {/* Star Rating Display */}
@@ -591,6 +591,17 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
                   <>
                     <span>•</span>
                     <span>Purchased via <span className="font-medium text-foreground">{order.source}</span></span>
+                  </>
+                )}
+                {order.subscription_id && (
+                  <>
+                    <span>•</span>
+                    <span>Purchased via <button
+                      onClick={() => navigate(`/subscriptions/${order.subscription_id}`)}
+                      className="font-medium text-primary hover:underline cursor-pointer"
+                    >
+                      Monthly Subscription
+                    </button></span>
                   </>
                 )}
               </div>
@@ -701,7 +712,7 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
                 <div>
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="font-semibold text-lg">Service Packages</h3>
-                    <Badge variant="outline" className="text-xs">{order.packages?.length || 0} items</Badge>
+                    <Badge2 variant="outline" className="text-xs">{order.packages?.length || 0} items</Badge2>
                   </div>
                   <div className="space-y-4">
                     {order.packages && order.packages.length > 0 ? (
@@ -752,7 +763,7 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
                   <div>
                     <div className="flex items-center justify-between mb-2">
                       <h3 className="font-semibold text-lg">Add-on Services</h3>
-                      <Badge variant="outline" className="text-xs">{order.addons.length} items</Badge>
+                      <Badge2 variant="outline" className="text-xs">{order.addons.length} items</Badge2>
                     </div>
                     <div className="space-y-4">
                       {order.addons.map((item, index) => (
@@ -784,13 +795,13 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
                     <h3 className="font-semibold text-lg">Payment Details</h3>
                     <div className="flex items-center gap-2">
                       {order.payment_method && (
-                        <Badge variant="outline" className="text-xs uppercase">
+                        <Badge2 variant="outline" className="text-xs uppercase">
                           {order.payment_method.replace('_', ' ')}
-                        </Badge>
+                        </Badge2>
                       )}
-                      <Badge variant={getBadgeVariant(order.payment_status, 'payment')}>
+                      <Badge2 variant={getBadgeVariant(order.payment_status, 'payment')}>
                         {getStatusLabel(order.payment_status, PAYMENT_STATUSES)}
-                      </Badge>
+                      </Badge2>
                     </div>
                   </div>
 
@@ -1037,14 +1048,14 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
                 </div>
                 <div className="p-4 space-y-2">
                   {order.customer?.email && (
-                    <Badge
+                    <Badge2
                       variant="secondary"
                       className="justify-between bg-blue-50 text-blue-700 hover:bg-blue-100 cursor-pointer h-auto py-2 px-3 font-normal group"
                       onClick={() => copyToClipboard(order.customer.email)}
                     >
                       <span>{order.customer.email}</span>
                       <Copy className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity" />
-                    </Badge>
+                    </Badge2>
                   )}
                   {order.customer?.phone && (
                     <CustomerContact
