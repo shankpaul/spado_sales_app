@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Button } from '../components/ui/button';
 import { Card } from '../components/ui/card';
-import { Badge } from '../components/ui/badge';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import {
@@ -19,6 +18,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from '../components/ui/select';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '../components/ui/dropdown-menu';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -64,9 +69,12 @@ import {
   Clock,
   CheckCircle,
   Eye,
+  MoreVertical,
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import CustomerContact from '@/components/CustomerContact';
+import { Badge2 } from '@/components/ui/badge2';
+import { cn } from '@/lib/utils';
 
 /**
  * Subscription Detail Page
@@ -251,474 +259,526 @@ const SubscriptionDetail = () => {
   const balance = subscriptionTotal - (subscription.payment_amount || 0);
 
   return (
-    <div className="p-4 md:p-6 space-y-6">
+    <div className="min-h-screen bg-white">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon"
-          className="rounded-full"
-           onClick={() => navigate('/subscriptions')}>
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-          <div>
-            <h1 className="text-2xl font-bold">Subscription Details</h1>
-            {/* <p className="text-sm text-muted-foreground">ID: {subscription.id}</p> */}
+      <div className="border-b sticky top-0 z-30 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/60">
+        <div className="px-4 md:px-6">
+          <div className="flex flex-col py-2 sm:h-16 justify-center">
+            {/* Top Row: Navigation and Actions */}
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3 overflow-hidden">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => navigate(-1)}
+                  className="rounded-full flex-shrink-0"
+                >
+                  <ArrowLeft className="h-5 w-5" />
+                </Button>
+                <h1 className="text-xl font-semibold truncate">Subscription</h1>
+              </div>
+
+              <div className="flex items-center gap-2">
+                {(subscription.status === 'active' || subscription.status === 'paused') && (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="icon" className="rounded-full">
+                        <MoreVertical className="h-5 w-5" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={handlePauseResume}>
+                        {subscription.status === 'active' ? (
+                          <>
+                            <Pause className="h-4 w-4 mr-2" />
+                            Pause Subscription
+                          </>
+                        ) : (
+                          <>
+                            <Play className="h-4 w-4 mr-2" />
+                            Resume Subscription
+                          </>
+                        )}
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => setIsCancelDialogOpen(true)}
+                        className="text-destructive focus:text-destructive"
+                      >
+                        <XCircle className="h-4 w-4 mr-2" />
+                        Cancel Subscription
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                )}
+              </div>
+            </div>
+
+            {/* Bottom Row: Badges */}
+            <div className="flex items-center gap-2 mt-1 sm:mt-0 px-1 sm:px-0 flex-wrap sm:ml-12">
+              <Badge2 variant={getBadgeVariant(subscription.status)} className="text-[10px] sm:text-xs h-5 px-2">
+                {getStatusLabel(subscription.status, SUBSCRIPTION_STATUSES)}
+              </Badge2>
+              <Badge2 variant={getBadgeVariant(subscription.payment_status, 'payment')} className="text-[10px] sm:text-xs h-5 px-2">
+                {getStatusLabel(subscription.payment_status, SUBSCRIPTION_PAYMENT_STATUSES)}
+              </Badge2>
+            </div>
           </div>
         </div>
+      </div>
 
-        <div className="flex items-center gap-2">
+      <div className="p-4 md:p-6 space-y-6">
+        {/* Prominent Action Buttons for Mobile */}
+        <div className="flex flex-col sm:flex-row gap-3">
           {(subscription.status === 'active' || subscription.status === 'paused') && (
             <>
-              <Button variant="outline" onClick={handlePauseResume}>
+              <Button
+                variant="outline"
+                onClick={handlePauseResume}
+                className="flex-1"
+              >
                 {subscription.status === 'active' ? (
                   <>
                     <Pause className="h-4 w-4 mr-2" />
-                    Pause
+                    Pause Subscription
                   </>
                 ) : (
                   <>
                     <Play className="h-4 w-4 mr-2" />
-                    Resume
+                    Resume Subscription
                   </>
                 )}
               </Button>
-              <Button variant="destructive" onClick={() => setIsCancelDialogOpen(true)}>
+              <Button
+                variant="destructive"
+                onClick={() => setIsCancelDialogOpen(true)}
+                className="flex-1"
+              >
                 <XCircle className="h-4 w-4 mr-2" />
-                Cancel
+                Cancel Subscription
               </Button>
             </>
           )}
         </div>
-      </div>
 
-      {/* Status Badges */}
-      <div className="flex flex-wrap gap-2">
-        <Badge variant={getBadgeVariant(subscription.status)} className="text-sm">
-          {getStatusLabel(subscription.status, SUBSCRIPTION_STATUSES)}
-        </Badge>
-        <Badge variant={getBadgeVariant(subscription.payment_status, 'payment')} className="text-sm">
-          Payment: {getStatusLabel(subscription.payment_status, SUBSCRIPTION_PAYMENT_STATUSES)}
-        </Badge>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* Main Content */}
-        <div className="md:col-span-2 space-y-6">
-          {/* Customer Information */}
-          <Card className="p-6">
-            <h2 className="text-lg font-semibold mb-4">Customer Information</h2>
-            <div className="space-y-3">
-              <div className="flex items-center gap-3">
-                <User className="h-4 w-4 text-muted-foreground" />
-                <div>
-                  <p className="text-sm text-muted-foreground">Name</p>
-                  <p className="font-medium">{subscription.customer?.name}</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-3">
-                <Phone className="h-4 w-4 text-muted-foreground" />
-                <div>
-                  <p className="text-sm text-muted-foreground">Phone</p>
-                  {subscription.customer?.phone && (
-                    <CustomerContact
-                      phone={subscription.customer.phone}
-                      customerName={subscription.customer.name}
-                    />
-                  )}
-                </div>
-              </div>
-              <div className="flex items-center gap-3">
-                <MapPin className="h-4 w-4 text-muted-foreground" />
-                <div>
-                  <p className="text-sm text-muted-foreground">Service Location</p>
-                  <p className="font-medium">{subscription.area}</p>
-                  {subscription.map_url && (
-                    <a
-                      href={subscription.map_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-xs text-primary hover:underline"
-                    >
-                      View on Map
-                    </a>
-                  )}
-                </div>
-              </div>
-            </div>
-          </Card>
-
-          {/* Subscription Details */}
-          <Card className="p-6">
-            <h2 className="text-lg font-semibold mb-4">Subscription Details</h2>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <p className="text-sm text-muted-foreground">Vehicle Type</p>
-                <p className="font-medium capitalize">{subscription.vehicle_type}</p>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Duration</p>
-                <p className="font-medium">{subscription.months_duration} month(s)</p>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Start Date</p>
-                <p className="font-medium">{formatDate(subscription.start_date)}</p>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">End Date</p>
-                <p className="font-medium">
-                  {formatDate(new Date(new Date(subscription.start_date).setMonth(
-                    new Date(subscription.start_date).getMonth() + subscription.months_duration
-                  )))}
-                </p>
-              </div>
-            </div>
-          </Card>
-
-          {/* Packages */}
-          <Card className="p-6">
-            <h2 className="text-lg font-semibold mb-4">Packages</h2>
-            <div className="space-y-3">
-              {subscription.subscription_packages?.map((pkg, index) => (
-                <div key={index} className="flex items-center justify-between p-3 bg-muted rounded-lg">
-                  <div className="flex items-center gap-3">
-                    <Package className="h-4 w-4 text-muted-foreground" />
-                    <div>
-                      <p className="font-medium">{pkg.package.name || `Package ${index + 1}`}</p>
-                      <p className="text-sm text-muted-foreground">
-                        Qty: {pkg.quantity} × {formatCurrency(pkg.unit_price)}
-                        {pkg.discount_value > 0 && ` - ${formatCurrency(pkg.discount_value)} discount`}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <p className="font-semibold">{formatCurrency(pkg.price)}</p>
-                    <p className="text-xs text-muted-foreground">per month</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </Card>
-
-          {/* Addons */}
-          {subscription.subscription_addons?.length > 0 && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {/* Main Content */}
+          <div className="md:col-span-2 space-y-6">
+            {/* Customer Information */}
             <Card className="p-6">
-              <h2 className="text-lg font-semibold mb-4">Add-ons</h2>
+              <h2 className="text-lg font-semibold mb-4">Customer Information</h2>
               <div className="space-y-3">
-                {subscription.subscription_addons.map((addon, index) => (
+                <div className="flex items-center gap-3">
+                  <User className="h-4 w-4 text-muted-foreground" />
+                  <div>
+                    <p className="text-sm text-muted-foreground">Name</p>
+                    <p className="font-medium">{subscription.customer?.name}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <Phone className="h-4 w-4 text-muted-foreground" />
+                  <div>
+                    <p className="text-sm text-muted-foreground">Phone</p>
+                    {subscription.customer?.phone && (
+                      <CustomerContact
+                        phone={subscription.customer.phone}
+                        customerName={subscription.customer.name}
+                      />
+                    )}
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <MapPin className="h-4 w-4 text-muted-foreground" />
+                  <div>
+                    <p className="text-sm text-muted-foreground">Service Location</p>
+                    <p className="font-medium">{subscription.area}</p>
+                    {subscription.map_url && (
+                      <a
+                        href={subscription.map_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-primary hover:underline"
+                      >
+                        View on Map
+                      </a>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </Card>
+
+            {/* Subscription Details */}
+            <Card className="p-6">
+              <h2 className="text-lg font-semibold mb-4">Subscription Details</h2>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-sm text-muted-foreground">Vehicle Type</p>
+                  <p className="font-medium capitalize">{subscription.vehicle_type}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Duration</p>
+                  <p className="font-medium">{subscription.months_duration} month(s)</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Start Date</p>
+                  <p className="font-medium">{formatDate(subscription.start_date)}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">End Date</p>
+                  <p className="font-medium">
+                    {formatDate(new Date(new Date(subscription.start_date).setMonth(
+                      new Date(subscription.start_date).getMonth() + subscription.months_duration
+                    )))}
+                  </p>
+                </div>
+              </div>
+            </Card>
+
+            {/* Packages */}
+            <Card className="p-6">
+              <h2 className="text-lg font-semibold mb-4">Packages</h2>
+              <div className="space-y-3">
+                {subscription.subscription_packages?.map((pkg, index) => (
                   <div key={index} className="flex items-center justify-between p-3 bg-muted rounded-lg">
-                    <div>
-                      <p className="font-medium">{addon.addon_name || `Add-on ${index + 1}`}</p>
-                      <p className="text-sm text-muted-foreground">
-                        Qty: {addon.quantity} × {formatCurrency(addon.unit_price)}
-                      </p>
+                    <div className="flex items-center gap-3">
+                      <Package className="h-4 w-4 text-muted-foreground" />
+                      <div>
+                        <p className="font-medium">{pkg.package.name || `Package ${index + 1}`}</p>
+                        <p className="text-sm text-muted-foreground">
+                          Qty: {pkg.quantity} × {formatCurrency(pkg.unit_price)}
+                          {pkg.discount_value > 0 && ` - ${formatCurrency(pkg.discount_value)} discount`}
+                        </p>
+                      </div>
                     </div>
-                    <p className="font-semibold">{formatCurrency(addon.price)}</p>
+                    <div className="text-right">
+                      <p className="font-semibold">{formatCurrency(pkg.price)}</p>
+                      <p className="text-xs text-muted-foreground">per month</p>
+                    </div>
                   </div>
                 ))}
               </div>
             </Card>
-          )}
 
-
-
-          {/* Notes */}
-          {subscription.notes && (
-            <Card className="p-6">
-              <h2 className="text-lg font-semibold mb-2">Notes</h2>
-              <p className="text-muted-foreground">{subscription.notes}</p>
-            </Card>
-          )}
-
-          {/* Order History */}
-          <Card className="p-6">
-            <h2 className="text-lg font-semibold mb-4">
-              Order History ({orders.length})
-            </h2>
-            {orders.length > 0 ? (
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Order #</TableHead>
-                      <TableHead>Date</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Assigned To</TableHead>
-
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {orders.map((order) => (
-                      <TableRow key={order.id}>
-                        <TableCell
-                          className="font-medium hover:underline cursor-pointer text-primary"
-                          onClick={() => navigate(`/orders?orderId=${order.id}`)}
-                        >
-                          #{order.order_number}
-                        </TableCell>
-                        <TableCell>{formatDate(order.booking_date)}</TableCell>
-                        <TableCell>
-                          <Badge variant={getBadgeVariant(order.status, 'order')}>
-                            {getStatusLabel(order.status, ORDER_STATUSES)}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>{order.assigned_agent_name || <Badge variant="destructive">Unassigned</Badge>}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            ) : (
-              <div className="text-center py-6 text-muted-foreground">
-                No orders generated yet.
-              </div>
-            )}
-          </Card>
-        </div>
-
-        {/* Sidebar */}
-        <div className="space-y-6">
-          {/* Payment Summary */}
-          <Card>
-            <div className="flex items-center justify-between p-4 border-b">
-              <h2 className="text-lg font-semibold">Payment Summary</h2>
-              {canUpdatePayment && (
-                <Button size="sm" variant="outline" onClick={() => setIsPaymentDialogOpen(true)}>
-                  <Edit className="h-3 w-3 mr-1" />
-                  Update
-                </Button>
-              )}
-            </div>
-
-            <div className="space-y-3 p-4">
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Per Month:</span>
-                <span className="font-medium">{formatCurrency(totalAmount)}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Duration:</span>
-                <span className="font-medium">{subscription.months_duration} month(s)</span>
-              </div>
-              <div className="border-t pt-3">
-                <div className="flex justify-between font-semibold">
-                  <span>Total Amount:</span>
-                  <span>{formatCurrency(subscriptionTotal)}</span>
-                </div>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Amount Paid:</span>
-                <span className="font-medium text-green-600">
-                  {formatCurrency(subscription.payment_amount)}
-                </span>
-              </div>
-              {balance > 0 && (
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Balance:</span>
-                  <span className="font-medium text-orange-600">{formatCurrency(balance)}</span>
-                </div>
-              )}
-              {subscription.payment_date && (
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Last Payment:</span>
-                  <span className="font-medium">{formatDate(subscription.payment_date)}</span>
-                </div>
-              )}
-              {subscription.payment_method && (
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Method:</span>
-                  <span className="font-medium capitalize">{subscription.payment_method}</span>
-                </div>
-              )}
-            </div>
-
-
-            {/* Quick Stats */}
-            <div className="">
-              <h2 className="text-lg font-semibold p-4 border-b">Statistics</h2>
-              <div className="space-y-3 p-4">
-                <div className="flex justify-between">
-                  <span className="text-sm text-muted-foreground">Total Washes:</span>
-                  <span className="font-medium">{subscription.washing_schedules?.length || 0}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-sm text-muted-foreground">Completed:</span>
-                  <span className="font-medium text-green-600">
-                    {orders.filter(o => o.status === 'completed').length}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-sm text-muted-foreground">Pending:</span>
-                  <span className="font-medium text-orange-600">
-                    {(subscription.washing_schedules?.length || 0) - orders.length}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* Washing Schedules */}
-            <div className=''>
-              <h2 className="text-lg font-semibold p-4 border-b">
-                Washing Schedules ({subscription.washing_schedules?.length || 0})
-              </h2>
-              <div className="space-y-2 max-h-96 overflow-y-auto p-4">
-                {subscription.washing_schedules?.map((schedule, index) => {
-                  const order = orders.find(o => o.booking_date === schedule.date);
-
-                  return (
-                    <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center flex-shrink-0">
-                          <span className="font-bold text-sm text-primary">{index + 1}</span>
-                        </div>
-                        <div>
-                          <p className="font-semibold text-sm">{formatDate(schedule.date)}</p>
-                          <p className="text-sm text-muted-foreground">
-                            {schedule.time_from} - {schedule.time_to}
-                          </p>
-                        </div>
+            {/* Addons */}
+            {subscription.subscription_addons?.length > 0 && (
+              <Card className="p-6">
+                <h2 className="text-lg font-semibold mb-4">Add-ons</h2>
+                <div className="space-y-3">
+                  {subscription.subscription_addons.map((addon, index) => (
+                    <div key={index} className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                      <div>
+                        <p className="font-medium">{addon.addon_name || `Add-on ${index + 1}`}</p>
+                        <p className="text-sm text-muted-foreground">
+                          Qty: {addon.quantity} × {formatCurrency(addon.unit_price)}
+                        </p>
                       </div>
-                      <div className="flex items-center gap-2">
-                        {order ? (
-                          <>
-                            {order.status === 'cancelled' ? (
-                              <Badge variant="destructive">
-                                <XCircle className="h-3 w-3 mr-1" />
-                                Cancelled
-                              </Badge>
-                            ) : order.status === 'completed' ? (
-                              <Badge variant="secondary">
-                                <CheckCircle className="h-3 w-3 mr-1" />
-                                Completed
-                              </Badge>
-                            ) : (
-                              <Badge className="bg-yellow-500 hover:bg-yellow-600 text-white border-transparent">
-                                <Clock className="h-3 w-3 mr-1" />
-                                Scheduled
-                              </Badge>
-                            )}
-                          </>
-                        ) : (
-                          <Badge variant="outline">Pending</Badge>
-                        )}
-                      </div>
+                      <p className="font-semibold">{formatCurrency(addon.price)}</p>
                     </div>
-                  );
-                })}
+                  ))}
+                </div>
+              </Card>
+            )}
+
+
+
+            {/* Notes */}
+            {subscription.notes && (
+              <Card className="p-6">
+                <h2 className="text-lg font-semibold mb-2">Notes</h2>
+                <p className="text-muted-foreground">{subscription.notes}</p>
+              </Card>
+            )}
+
+            {/* Order History */}
+            <Card className="p-6">
+              <h2 className="text-lg font-semibold mb-4">
+                Order History ({orders.length})
+              </h2>
+              {orders.length > 0 ? (
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Order #</TableHead>
+                        <TableHead>Date</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Assigned To</TableHead>
+
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {orders.map((order) => (
+                        <TableRow key={order.id}>
+                          <TableCell
+                            className="font-medium hover:underline cursor-pointer text-primary"
+                            onClick={() => navigate(`/orders?orderId=${order.id}`)}
+                          >
+                            #{order.order_number}
+                          </TableCell>
+                          <TableCell>{formatDate(order.booking_date)}</TableCell>
+                          <TableCell>
+                            <Badge2 variant={getBadgeVariant(order.status, 'order')}>
+                              {getStatusLabel(order.status, ORDER_STATUSES)}
+                            </Badge2>
+                          </TableCell>
+                          <TableCell>{order.assigned_agent_name || <Badge2 variant="destructive">Unassigned</Badge2>}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              ) : (
+                <div className="text-center py-6 text-muted-foreground">
+                  No orders generated yet.
+                </div>
+              )}
+            </Card>
+          </div>
+
+          {/* Sidebar */}
+          <div className="space-y-6">
+            {/* Payment Summary */}
+            <Card>
+              <div className="flex items-center justify-between p-4 border-b">
+                <h2 className="text-lg font-semibold">Payment Summary</h2>
+                {canUpdatePayment && (
+                  <Button size="sm" variant="outline" onClick={() => setIsPaymentDialogOpen(true)}>
+                    <Edit className="h-3 w-3 mr-1" />
+                    Update
+                  </Button>
+                )}
               </div>
-            </div>
-          </Card>
+
+              <div className="space-y-3 p-4">
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Per Month:</span>
+                  <span className="font-medium">{formatCurrency(totalAmount)}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Duration:</span>
+                  <span className="font-medium">{subscription.months_duration} month(s)</span>
+                </div>
+                <div className="border-t pt-3">
+                  <div className="flex justify-between font-semibold">
+                    <span>Total Amount:</span>
+                    <span>{formatCurrency(subscriptionTotal)}</span>
+                  </div>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Amount Paid:</span>
+                  <span className="font-medium text-green-600">
+                    {formatCurrency(subscription.payment_amount)}
+                  </span>
+                </div>
+                {balance > 0 && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Balance:</span>
+                    <span className="font-medium text-orange-600">{formatCurrency(balance)}</span>
+                  </div>
+                )}
+                {subscription.payment_date && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Last Payment:</span>
+                    <span className="font-medium">{formatDate(subscription.payment_date)}</span>
+                  </div>
+                )}
+                {subscription.payment_method && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Method:</span>
+                    <span className="font-medium capitalize">{subscription.payment_method}</span>
+                  </div>
+                )}
+              </div>
+
+
+              {/* Quick Stats */}
+              <div className="">
+                <h2 className="text-lg font-semibold p-4 border-b">Statistics</h2>
+                <div className="space-y-3 p-4">
+                  <div className="flex justify-between">
+                    <span className="text-sm text-muted-foreground">Total Washes:</span>
+                    <span className="font-medium">{subscription.washing_schedules?.length || 0}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-sm text-muted-foreground">Completed:</span>
+                    <span className="font-medium text-green-600">
+                      {orders.filter(o => o.status === 'completed').length}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-sm text-muted-foreground">Pending:</span>
+                    <span className="font-medium text-orange-600">
+                      {(subscription.washing_schedules?.length || 0) - orders.length}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Washing Schedules */}
+              <div className=''>
+                <h2 className="text-lg font-semibold p-4 border-b">
+                  Washing Schedules ({subscription.washing_schedules?.length || 0})
+                </h2>
+                <div className="space-y-2 max-h-96 overflow-y-auto p-4">
+                  {subscription.washing_schedules?.map((schedule, index) => {
+                    const order = orders.find(o => o.booking_date === schedule.date);
+
+                    return (
+                      <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center flex-shrink-0">
+                            <span className="font-bold text-sm text-primary">{index + 1}</span>
+                          </div>
+                          <div>
+                            <p className="font-semibold text-sm">{formatDate(schedule.date)}</p>
+                            <p className="text-sm text-muted-foreground">
+                              {schedule.time_from} - {schedule.time_to}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {order ? (
+                            <>
+                              {order.status === 'cancelled' ? (
+                                <Badge2 variant="destructive">
+                                  <XCircle className="h-3 w-3 mr-1" />
+                                  Cancelled
+                                </Badge2>
+                              ) : order.status === 'completed' ? (
+                                <Badge2 variant="secondary">
+                                  <CheckCircle className="h-3 w-3 mr-1" />
+                                  Completed
+                                </Badge2>
+                              ) : (
+                                <Badge2 className="bg-yellow-500 hover:bg-yellow-600 text-white border-transparent">
+                                  <Clock className="h-3 w-3 mr-1" />
+                                  Scheduled
+                                </Badge2>
+                              )}
+                            </>
+                          ) : (
+                            <Badge2 variant="outline">Pending</Badge2>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </Card>
+          </div>
         </div>
-      </div>
 
-      {/* Update Payment Dialog */}
-      <Dialog open={isPaymentDialogOpen} onOpenChange={setIsPaymentDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Update Payment</DialogTitle>
-            <DialogDescription>
-              Record a new payment for this subscription
-            </DialogDescription>
-          </DialogHeader>
+        {/* Update Payment Dialog */}
+        <Dialog open={isPaymentDialogOpen} onOpenChange={setIsPaymentDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Update Payment</DialogTitle>
+              <DialogDescription>
+                Record a new payment for this subscription
+              </DialogDescription>
+            </DialogHeader>
 
-          <div className="space-y-4 mt-4">
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <Label htmlFor="paymentAmount">Payment Amount *</Label>
+            <div className="space-y-4 mt-4">
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <Label htmlFor="paymentAmount">Payment Amount *</Label>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="xs"
+                    className="h-6 text-xs px-2"
+                    onClick={() => setPaymentAmount(Math.max(0, balance).toString())}
+                  >
+                    Max: {formatCurrency(balance)}
+                  </Button>
+                </div>
+                <Input
+                  id="paymentAmount"
+                  type="number"
+                  min="0"
+                  max={balance}
+                  value={paymentAmount}
+                  onChange={(e) => {
+                    const val = parseFloat(e.target.value);
+                    if (val > balance) {
+                      setPaymentAmount(balance.toString());
+                      toast.error(`Amount cannot exceed balance of ${formatCurrency(balance)}`);
+                    } else {
+                      setPaymentAmount(e.target.value);
+                    }
+                  }}
+                  placeholder="Enter amount"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="paymentDate">Payment Date</Label>
+                <DatePicker
+                  date={paymentDate ? new Date(paymentDate) : null}
+                  onDateChange={(date) => setPaymentDate(date ? format(date, 'yyyy-MM-dd') : '')}
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="paymentMethod">Payment Method *</Label>
+                <Select value={paymentMethod} onValueChange={setPaymentMethod}>
+                  <SelectTrigger id="paymentMethod">
+                    <SelectValue placeholder="Select method" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {PAYMENT_METHODS.map((method) => (
+                      <SelectItem key={method.value} value={method.value}>
+                        {method.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-4">
                 <Button
-                  type="button"
-                  variant="ghost"
-                  size="xs"
-                  className="h-6 text-xs px-2"
-                  onClick={() => setPaymentAmount(Math.max(0, balance).toString())}
+                  variant="outline"
+                  onClick={() => setIsPaymentDialogOpen(false)}
+                  disabled={paymentLoading}
                 >
-                  Max: {formatCurrency(balance)}
+                  Cancel
+                </Button>
+                <Button onClick={handleUpdatePayment} disabled={paymentLoading}>
+                  {paymentLoading ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Updating...
+                    </>
+                  ) : (
+                    'Update Payment'
+                  )}
                 </Button>
               </div>
-              <Input
-                id="paymentAmount"
-                type="number"
-                min="0"
-                max={balance}
-                value={paymentAmount}
-                onChange={(e) => {
-                  const val = parseFloat(e.target.value);
-                  if (val > balance) {
-                    setPaymentAmount(balance.toString());
-                    toast.error(`Amount cannot exceed balance of ${formatCurrency(balance)}`);
-                  } else {
-                    setPaymentAmount(e.target.value);
-                  }
-                }}
-                placeholder="Enter amount"
-              />
             </div>
+          </DialogContent>
+        </Dialog>
 
-            <div>
-              <Label htmlFor="paymentDate">Payment Date</Label>
-              <DatePicker
-                date={paymentDate ? new Date(paymentDate) : null}
-                onDateChange={(date) => setPaymentDate(date ? format(date, 'yyyy-MM-dd') : '')}
-              />
-            </div>
-
-            <div>
-              <Label htmlFor="paymentMethod">Payment Method *</Label>
-              <Select value={paymentMethod} onValueChange={setPaymentMethod}>
-                <SelectTrigger id="paymentMethod">
-                  <SelectValue placeholder="Select method" />
-                </SelectTrigger>
-                <SelectContent>
-                  {PAYMENT_METHODS.map((method) => (
-                    <SelectItem key={method.value} value={method.value}>
-                      {method.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="flex justify-end gap-2 pt-4">
-              <Button
-                variant="outline"
-                onClick={() => setIsPaymentDialogOpen(false)}
-                disabled={paymentLoading}
+        {/* Cancel Confirmation Dialog */}
+        <AlertDialog open={isCancelDialogOpen} onOpenChange={setIsCancelDialogOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Cancel Subscription?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This will cancel the subscription and all pending orders. This action cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleCancelSubscription}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               >
-                Cancel
-              </Button>
-              <Button onClick={handleUpdatePayment} disabled={paymentLoading}>
-                {paymentLoading ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Updating...
-                  </>
-                ) : (
-                  'Update Payment'
-                )}
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Cancel Confirmation Dialog */}
-      <AlertDialog open={isCancelDialogOpen} onOpenChange={setIsCancelDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Cancel Subscription?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This will cancel the subscription and all pending orders. This action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleCancelSubscription}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              Yes, Cancel Subscription
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+                Yes, Cancel Subscription
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </div>
     </div>
   );
 };

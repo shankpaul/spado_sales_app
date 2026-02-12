@@ -11,20 +11,38 @@ import OrderDetail from './OrderDetail';
 import useAuthStore from '../store/authStore';
 import orderService from '../services/orderService';
 import { format, isToday, parseISO } from 'date-fns';
-import { 
-  Users, 
-  DollarSign, 
-  Calendar, 
+import {
+  Users,
+  DollarSign,
+  Calendar,
   TrendingUp,
   Car,
   ClipboardList,
   UserCheck,
   BarChart3,
   User,
-  CircleUser,
   MapPin,
-  Clock10
+  Clock10,
+  Bell,
+  Search,
+  ArrowRight,
+  ChevronRight,
+  Repeat,
+  Plus,
+  Loader2,
+  X
 } from 'lucide-react';
+import {
+  ORDER_STATUSES,
+  PAYMENT_STATUSES,
+  getStatusLabel,
+  getStatusColor,
+} from '../lib/constants';
+import LetterAvatar from '../components/LetterAvatar';
+import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
+import { toast } from 'sonner';
+import { formatTime } from '@/lib/utilities';
 
 /**
  * Dashboard Page Component
@@ -36,18 +54,19 @@ import {
 const Dashboard = () => {
   const { user } = useAuthStore();
   const [isLoading, setIsLoading] = useState(true);
-  const [todayOrders, setTodayOrders] = useState([]);
+  const [upcomingOrders, setUpcomingOrders] = useState([]);
+  const [completedOrders, setCompletedOrders] = useState([]);
   const [loadingOrders, setLoadingOrders] = useState(true);
-  
+
   // Track selected order for detail view
   const [searchParams, setSearchParams] = useSearchParams();
   const selectedOrderId = searchParams.get('orderId');
-  
+
   // Handle opening order detail
   const handleOpenOrderDetail = (orderId) => {
     setSearchParams({ orderId: orderId.toString() });
   };
-  
+
   // Handle closing order detail
   const handleCloseOrderDetail = () => {
     setSearchParams({});
@@ -71,18 +90,27 @@ const Dashboard = () => {
         const response = await orderService.getAllOrders({
           date_from: today,
           date_to: today,
-          per_page: 50
+          per_page: 100 // Increased per_page to ensure we get all today's orders
         });
-        
-        // Filter for confirmed or in_progress orders
-        const upcomingOrders = (response.orders || []).filter(
+
+        const allTodayOrders = response.orders || [];
+
+        // Filter for confirmed or in_progress orders (Upcoming)
+        const upcoming = allTodayOrders.filter(
           order => order.status === 'confirmed' || order.status === 'in_progress'
         );
-        
-        setTodayOrders(upcomingOrders);
+
+        // Filter for completed orders
+        const completed = allTodayOrders.filter(
+          order => order.status === 'completed'
+        );
+
+        setUpcomingOrders(upcoming);
+        setCompletedOrders(completed);
       } catch (error) {
         console.error('Error fetching today orders:', error);
-        setTodayOrders([]);
+        setUpcomingOrders([]);
+        setCompletedOrders([]);
       } finally {
         setLoadingOrders(false);
       }
@@ -91,10 +119,12 @@ const Dashboard = () => {
     fetchTodayOrders();
   }, []);
 
+
+
   // Admin Dashboard
   const AdminDashboard = () => (
     <div className="space-y-6">
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 md:gap-4 lg:grid-cols-4">
         <StatCard
           title="Total Revenue"
           value="$12,458"
@@ -173,7 +203,8 @@ const Dashboard = () => {
   // Sales Executive Dashboard
   const SalesExecutiveDashboard = () => (
     <div className="space-y-6">
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      {/* this feature will enabled later */}
+      {/* <div className="grid grid-cols-2 gap-3 md:gap-4 lg:grid-cols-4">
         <StatCard
           title="My Sales Today"
           value="$2,450"
@@ -202,65 +233,78 @@ const Dashboard = () => {
           icon={<Car className="h-4 w-4 text-primary-600" />}
           isLoading={isLoading}
         />
+      </div> */}
+
+      <div className="border-none flex flex-col gap-4">
+        <div className="text-lg flex items-center justify-between">
+          <span className="font-semibold text-xl text-gray-900 flex items-center gap-2">
+            Upcoming Orders
+            <span className="text-sm font-medium text-muted-foreground bg-gray-100 px-2 py-0.5 rounded-full">{upcomingOrders.length}</span>
+          </span>
+        </div>
+        <div>
+          {loadingOrders ? (
+            <div className="space-y-3">
+              <Skeleton className="h-20 w-full rounded-2xl" />
+              <Skeleton className="h-20 w-full rounded-2xl" />
+            </div>
+          ) : upcomingOrders.length > 0 ? (
+            <div className="space-y-3 max-h-96 overflow-y-auto pr-1">
+              {upcomingOrders.map((order) => (
+                <BookingItem
+                  key={order.id}
+                  order={order}
+                  onClick={() => handleOpenOrderDetail(order.id)}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-10 bg-white rounded-2xl border border-dashed border-gray-200">
+              <Calendar className="h-10 w-10 mx-auto mb-3 text-gray-300" />
+              <p className="text-muted-foreground font-medium">No upcoming orders for today</p>
+            </div>
+          )}
+        </div>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg flex items-center justify-between">
-              <span>Today's Upcoming Orders</span>
-              <span className="text-sm font-normal text-gray-500">({todayOrders.length})</span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {loadingOrders ? (
-              <div className="space-y-3">
-                <Skeleton className="h-20 w-full" />
-                <Skeleton className="h-20 w-full" />
-              </div>
-            ) : todayOrders.length > 0 ? (
-              <div className="space-y-3 max-h-96 overflow-y-auto">
-                {todayOrders.map((order) => (
-                  <BookingItem 
-                    key={order.id} 
-                    order={order}
-                    onClick={() => handleOpenOrderDetail(order.id)}
-                  />
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-8 text-gray-500">
-                <Calendar className="h-12 w-12 mx-auto mb-2 text-gray-400" />
-                <p>No upcoming orders for today</p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Sales Performance</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {isLoading ? (
-              <Skeleton className="h-40 w-full" />
-            ) : (
-              <div className="space-y-4">
-                <PerformanceBar label="This Week" value={85} />
-                <PerformanceBar label="This Month" value={72} />
-                <PerformanceBar label="This Quarter" value={68} />
-              </div>
-            )}
-          </CardContent>
-        </Card>
+      <div className="border-none flex flex-col gap-4">
+        <div className="text-lg flex items-center justify-between">
+          <span className="font-semibold text-xl text-gray-900 flex items-center gap-2">
+            Completed Today
+            <span className="text-sm font-medium text-green-600 bg-green-50 px-2 py-0.5 rounded-full">{completedOrders.length}</span>
+          </span>
+        </div>
+        <div>
+          {loadingOrders ? (
+            <div className="space-y-3">
+              <Skeleton className="h-20 w-full rounded-2xl" />
+              <Skeleton className="h-20 w-full rounded-2xl" />
+            </div>
+          ) : completedOrders.length > 0 ? (
+            <div className="space-y-3 max-h-96 overflow-y-auto pr-1">
+              {completedOrders.map((order) => (
+                <BookingItem
+                  key={order.id}
+                  order={order}
+                  onClick={() => handleOpenOrderDetail(order.id)}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-10 bg-white rounded-2xl border border-dashed border-gray-200">
+              <UserCheck className="h-10 w-10 mx-auto mb-3 text-gray-300" />
+              <p className="text-muted-foreground font-medium">No orders completed yet today</p>
+            </div>
+          )}
+        </div>
       </div>
-    </div>
+    </div >
   );
 
   // Accountant Dashboard
   const AccountantDashboard = () => (
     <div className="space-y-6">
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 md:gap-4 lg:grid-cols-4">
         <StatCard
           title="Today's Revenue"
           value="$3,842"
@@ -347,77 +391,109 @@ const Dashboard = () => {
   };
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900">
-          {user?.role === 'admin' && 'Admin Dashboard'}
-          {user?.role === 'sales_executive' && 'Sales Dashboard'}
-          {user?.role === 'accountant' && 'Financial Dashboard'}
-        </h1>
-        <p className="text-gray-600 mt-1">
-          Welcome back, {user?.name || user?.email}!
-        </p>
+    <div className="min-h-screen bg-gray-50/50">
+      {/* Mobile Sticky Header */}
+      <div className="sticky top-0 z-20 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/60 border-b md:hidden">
+        <div className="px-4 h-16 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <LetterAvatar name={user?.name} size="md" />
+            <div>
+              <p className="text-xs text-muted-foreground font-medium">Welcome back,</p>
+              <h2 className="text-sm font-bold truncate max-w-[150px]">{user?.name || user?.email}</h2>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" size="icon" className="rounded-full h-10 w-10">
+              <Search className="h-5 w-5" />
+            </Button>
+            <Button variant="ghost" size="icon" className="rounded-full h-10 w-10">
+              <Bell className="h-5 w-5" />
+            </Button>
+          </div>
+        </div>
       </div>
 
-      {getRoleDashboard()}
-      
-      {/* Order Detail Sheet */}
-      <Sheet open={!!selectedOrderId} onOpenChange={(open) => !open && handleCloseOrderDetail()}>
-        <SheetContent side="right" className="w-full sm:max-w-4xl p-0 overflow-y-auto">
-          {selectedOrderId && (
-            <OrderDetail 
-              orderId={selectedOrderId} 
-              onClose={handleCloseOrderDetail}
-              onUpdate={() => {
-                // Refresh today's orders after update
-                const fetchTodayOrders = async () => {
-                  try {
-                    setLoadingOrders(true);
-                    const today = format(new Date(), 'yyyy-MM-dd');
-                    const response = await orderService.getAllOrders({
-                      date_from: today,
-                      date_to: today,
-                      per_page: 50
-                    });
-                    const upcomingOrders = (response.orders || []).filter(
-                      order => order.status === 'confirmed' || order.status === 'in_progress'
-                    );
-                    setTodayOrders(upcomingOrders);
-                  } catch (error) {
-                    console.error('Error fetching today orders:', error);
-                  } finally {
-                    setLoadingOrders(false);
-                  }
-                };
-                fetchTodayOrders();
-              }}
-            />
-          )}
-        </SheetContent>
-      </Sheet>
+      <div className="p-4 md:p-6 space-y-6">
+        {/* Desktop Header - Hidden on Mobile */}
+        <div className="hidden md:block">
+          <h1 className="text-3xl font-bold text-gray-900">
+            {user?.role === 'admin' && 'Admin Dashboard'}
+            {user?.role === 'sales_executive' && 'Sales Dashboard'}
+            {user?.role === 'accountant' && 'Financial Dashboard'}
+          </h1>
+          <p className="text-gray-600 mt-1">
+            Welcome back, {user?.name || user?.email}!
+          </p>
+        </div>
+
+        {getRoleDashboard()}
+
+        {/* Order Detail Sheet */}
+        <Sheet open={!!selectedOrderId} onOpenChange={(open) => !open && handleCloseOrderDetail()}>
+          <SheetContent side="right" className="w-full sm:max-w-4xl p-0 overflow-y-auto">
+            {selectedOrderId && (
+              <OrderDetail
+                orderId={selectedOrderId}
+                onClose={handleCloseOrderDetail}
+                onUpdate={() => {
+                  // Refresh today's orders after update
+                  const fetchTodayOrders = async () => {
+                    try {
+                      setLoadingOrders(true);
+                      const today = format(new Date(), 'yyyy-MM-dd');
+                      const response = await orderService.getAllOrders({
+                        date_from: today,
+                        date_to: today,
+                        per_page: 50
+                      });
+                      const upcomingOrders = (response.orders || []).filter(
+                        order => order.status === 'confirmed' || order.status === 'in_progress'
+                      );
+                      setTodayOrders(upcomingOrders);
+                    } catch (error) {
+                      console.error('Error fetching today orders:', error);
+                    } finally {
+                      setLoadingOrders(false);
+                    }
+                  };
+                  fetchTodayOrders();
+                }}
+              />
+            )}
+          </SheetContent>
+        </Sheet>
+      </div>
     </div>
   );
 };
 
 // Helper Components
 const StatCard = ({ title, value, change, icon, isLoading }) => (
-  <Card>
-    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-      <CardTitle className="text-sm font-medium">{title}</CardTitle>
-      {icon}
+  <Card className="overflow-hidden border-none shadow-sm md:border-1 md:shadow-none active:scale-[0.98] transition-all duration-200">
+    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 bg-white">
+      <CardTitle className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{title}</CardTitle>
+      <div className="p-2 bg-primary/5 rounded-lg">
+        {icon}
+      </div>
     </CardHeader>
-    <CardContent>
+    <CardContent className="bg-white">
       {isLoading ? (
-        <>
-          <Skeleton className="h-8 w-24 mb-1" />
-          <Skeleton className="h-4 w-16" />
-        </>
+        <div className="space-y-2">
+          <Skeleton className="h-7 w-24" />
+          <Skeleton className="h-3 w-16" />
+        </div>
       ) : (
         <>
-          <div className="text-2xl font-bold">{value}</div>
-          <p className={`text-xs ${change.startsWith('+') ? 'text-green-600' : 'text-red-600'}`}>
-            {change} from last month
-          </p>
+          <div className="text-2xl font-bold tracking-tight">{value}</div>
+          <div className="flex items-center gap-1.5 mt-1">
+            <span className={cn(
+              "text-[11px] font-bold px-1.5 py-0.5 rounded-md",
+              change.startsWith('+') ? "bg-green-50 text-green-600" : "bg-red-50 text-red-600"
+            )}>
+              {change}
+            </span>
+            <span className="text-[10px] text-muted-foreground font-medium">vs last month</span>
+          </div>
         </>
       )}
     </CardContent>
@@ -425,12 +501,13 @@ const StatCard = ({ title, value, change, icon, isLoading }) => (
 );
 
 const ActivityItem = ({ text, time }) => (
-  <div className="flex items-start space-x-3 p-2 rounded-lg hover:bg-gray-50">
-    <div className="h-2 w-2 mt-1.5 rounded-full bg-primary-500" />
+  <div className="flex items-start space-x-3 p-3 rounded-xl bg-white border border-gray-100/50 active:bg-gray-50 transition-colors shadow-sm mb-2">
+    <div className="h-2 w-2 mt-2 rounded-full bg-primary" />
     <div className="flex-1">
-      <p className="text-gray-900">{text}</p>
-      <p className="text-xs text-gray-500">{time}</p>
+      <p className="text-sm font-medium text-gray-900 leading-tight">{text}</p>
+      <p className="text-[11px] text-muted-foreground mt-1">{time}</p>
     </div>
+    <ArrowRight className="h-4 w-4 text-muted-foreground/30" />
   </div>
 );
 
@@ -449,60 +526,65 @@ const BookingItem = ({ order, onClick }) => {
     }).format(amount || 0);
   };
 
-  const formatTime = (dateString) => {
-    if (!dateString) return '';
-    try {
-      return format(parseISO(dateString), 'h:mm a');
-    } catch {
-      return '';
-    }
-  };
 
   return (
-    <div className="group p-4 rounded-xl bg-white border border-gray-200 hover:border-primary-300 hover:shadow-md transition-all duration-200 cursor-pointer" onClick={onClick}>
-      {/* Header - Order Number, Status, and Amount */}
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2">
-          <button className="text-base font-bold text-gray-900 hover:text-primary-600 transition-colors">
-            #{order.order_number}
-          </button>
-          <Badge2 variant={order.status === 'confirmed' ? 'info' : 'warning'}>
-            {order.status === 'confirmed' ? 'Confirmed' : 'In Progress'}
-          </Badge2>
-        </div>
-        <div className="text-right">
-          <span className="text-base font-bold text-primary-600">{formatCurrency(order.total_amount)}</span>
-        </div>
-      </div>
+    <div
+      className="group p-4 rounded-2xl bg-white border border-gray-100 shadow-sm active:scale-[0.98] active:bg-gray-50 transition-all duration-200 cursor-pointer overflow-hidden relative"
+      onClick={onClick}
+    >
+      <div className="flex items-center gap-4">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center justify-between mb-0.5">
+            <h3 className="text-sm font-bold text-gray-900 truncate pr-2">
+              {order.customer_name || 'Unnamed Customer'}
+            </h3>
+            <span className="text-sm font-extrabold text-primary whitespace-nowrap">
+              {formatCurrency(order.total_amount)}
+            </span>
+          </div>
 
-      {/* Divider */}
-      <div className="h-px bg-gray-100 mb-3"></div>
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">#{order.order_number}</span>
+            <Badge2
+              variant={order.status === 'completed' ? 'success' : order.status === 'confirmed' ? 'info' : 'warning'}
+              className="text-[9px] h-4.5 px-1.5 leading-none font-bold"
+            >
+              {getStatusLabel(order.status)}
+            </Badge2>
+          </div>
 
-      {/* Customer Name */}
-      {/* <div className="flex items-center gap-2 mb-2.5">
-        <CircleUser className="text-gray-400" strokeWidth={1.5} size={16} />
-        <span className="text-sm font-semibold text-gray-900">{order.customer_name}</span>
-      </div> */}
+          <div className="flex items-center justify-between mt-1">
+            <div className="flex items-center gap-2.5">
+              <div className="flex items-center gap-1">
+                <Clock10 className="text-muted-foreground/70" size={11} />
+                <span className="text-[11px] text-muted-foreground font-semibold">
+                  {formatTime(order.booking_time_from)}
+                </span>
+              </div>
+              <div className="flex items-center gap-1">
+                <MapPin className="text-muted-foreground/70" size={11} />
+                <span className="text-[11px] text-muted-foreground font-semibold truncate max-w-[80px]">
+                  {order.area || 'N/A'}
+                </span>
+              </div>
+            </div>
 
-      {/* Area and Time */}
-      <div className="flex items-center justify-between text-xs">
-        <div className="flex items-center gap-1.5 text-gray-600">
-          <MapPin className="text-gray-400" strokeWidth={1.5} size={14} />
-          <span className="font-medium">{order.area || 'N/A'}</span>
-         {order.assigned_agent_name ? 
-                        <div className="flex items-center gap-2">
-                          <LetterAvatar name={order.assigned_agent_name} size="xs" />
-                          <div className="font-medium">{order.assigned_agent_name}</div>
-                        </div>:
-                        <Badge2 variant="destructive">Unassigned</Badge2>
-                        }
-        </div>
-        
-        <div className="flex items-center gap-1.5 text-gray-600">
-          <Clock10 className="text-gray-400" strokeWidth={1.5} size={14} />
-          <span className="font-medium">
-            {formatTime(order.booking_time_from)} - {formatTime(order.booking_time_to)}
-          </span>
+            <div className="flex items-center gap-1.5 pl-2">
+              {order.assigned_agent_name ? (
+                <div className="flex items-center gap-1.5 px-2 py-0.5 bg-gray-50 rounded-full border border-gray-100">
+                  <LetterAvatar name={order.assigned_agent_name} size="xs" />
+                  <span className="text-[10px] font-bold text-gray-600 truncate max-w-[50px]">
+                    {order.assigned_agent_name.split(' ')[0]}
+                  </span>
+                </div>
+              ) : (
+                <span className="text-[10px] font-bold text-destructive/80 bg-red-50 px-2 py-0.5 rounded-full border border-red-100/50">
+                  Unassigned
+                </span>
+              )}
+              <ChevronRight className="h-4 w-4 text-muted-foreground/20 ml-0.5" />
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -510,14 +592,14 @@ const BookingItem = ({ order, onClick }) => {
 };
 
 const PerformanceBar = ({ label, value }) => (
-  <div>
-    <div className="flex justify-between text-sm mb-1">
-      <span className="text-gray-600">{label}</span>
-      <span className="font-medium text-gray-900">{value}%</span>
+  <div className="mb-4">
+    <div className="flex justify-between text-xs font-semibold mb-1.5 uppercase tracking-wider text-muted-foreground">
+      <span>{label}</span>
+      <span>{value}%</span>
     </div>
-    <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
-      <div 
-        className="h-full bg-primary-500 rounded-full"
+    <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+      <div
+        className="h-full bg-primary rounded-full"
         style={{ width: `${value}%` }}
       />
     </div>
@@ -525,33 +607,34 @@ const PerformanceBar = ({ label, value }) => (
 );
 
 const TransactionItem = ({ amount, customer, status }) => (
-  <div className="flex items-center justify-between p-2 rounded-lg hover:bg-gray-50">
-    <div>
-      <p className="font-medium text-gray-900">{customer}</p>
-      <p className="text-sm text-gray-600">{amount}</p>
+  <div className="flex items-center justify-between p-3 rounded-xl bg-white border border-gray-100 shadow-sm mb-2 active:bg-gray-50 transition-colors">
+    <div className="flex items-center gap-3">
+      <div className="h-8 w-8 rounded-full bg-green-50 flex items-center justify-center text-green-600">
+        <DollarSign size={14} />
+      </div>
+      <div>
+        <p className="text-sm font-bold text-gray-900">{customer}</p>
+        <p className="text-[11px] text-muted-foreground font-medium">{amount}</p>
+      </div>
     </div>
-    <span className={`text-xs px-2 py-1 rounded-full ${
-      status === 'Completed' 
-        ? 'bg-green-100 text-green-700' 
-        : 'bg-yellow-100 text-yellow-700'
-    }`}>
+    <Badge2 variant={status === 'Completed' ? 'success' : 'warning'} className="text-[10px] h-5">
       {status}
-    </span>
+    </Badge2>
   </div>
 );
 
 const SummaryItem = ({ label, value, percentage }) => (
-  <div className="flex items-center justify-between">
-    <div className="flex-1">
-      <p className="text-sm text-gray-600">{label}</p>
-      <div className="h-2 bg-gray-200 rounded-full mt-1">
-        <div 
-          className="h-full bg-primary-500 rounded-full"
-          style={{ width: percentage }}
-        />
-      </div>
+  <div className="space-y-2 mb-4">
+    <div className="flex items-center justify-between">
+      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{label}</p>
+      <span className="text-sm font-bold text-gray-900">{value}</span>
     </div>
-    <span className="ml-4 font-medium text-gray-900">{value}</span>
+    <div className="h-2 bg-gray-100 rounded-full">
+      <div
+        className="h-full bg-primary rounded-full transition-all duration-1000"
+        style={{ width: percentage }}
+      />
+    </div>
   </div>
 );
 

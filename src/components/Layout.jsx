@@ -52,6 +52,8 @@ const Layout = ({ children }) => {
   const { user } = useAuthStore();
   const location = useLocation();
   const navigate = useNavigate();
+  const [moreMenuOpen, setMoreMenuOpen] = useState(false);
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false);
 
   const handleLogout = async () => {
     try {
@@ -113,7 +115,7 @@ const Layout = ({ children }) => {
     pathSegments.forEach((segment, index) => {
       const path = `/${pathSegments.slice(0, index + 1).join('/')}`;
       const navItem = navigationItems.find(item => item.href === path);
-      
+
       if (navItem) {
         breadcrumbs.push({ name: navItem.name, href: path });
       } else {
@@ -139,13 +141,11 @@ const Layout = ({ children }) => {
       <Link
         to={item.href}
         onClick={() => mobile && setSidebarOpen(false)}
-        className={`flex items-center gap-3 rounded-lg transition-colors ${
-          collapsed ? 'px-3 py-2 justify-center' : 'px-4 py-2'
-        } ${
-          isActive
+        className={`flex items-center gap-3 rounded-lg transition-colors ${collapsed ? 'px-3 py-2 justify-center' : 'px-4 py-2'
+          } ${isActive
             ? 'bg-primary text-primary-foreground'
             : 'text-gray-700 hover:bg-gray-100'
-        }`}
+          }`}
         title={collapsed ? item.name : undefined}
       >
         <Icon className="h-5 w-5" strokeWidth={1.5} />
@@ -155,27 +155,7 @@ const Layout = ({ children }) => {
   };
 
   return (
-    <div className="min-h-screen">
-      {/* Mobile Header */}
-      <header className="lg:hidden fixed top-0 left-0 right-0 z-50 bg-white border-b border-gray-200">
-        <div className="flex items-center justify-between px-4 py-3">
-          <button
-            onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="p-2 rounded-lg hover:bg-gray-100"
-          >
-            {sidebarOpen ? (
-              <X className="h-6 w-6 text-gray-700" />
-            ) : (
-              <Menu className="h-6 w-6 text-gray-700" />
-            )}
-          </button>
-          <h1 className="text-lg font-bold text-primary">
-            <Logo width={150} height={40} textColor="#0846c1" className="mb-2" />
-              
-          </h1>
-          <div className="w-10" /> {/* Spacer for centering */}
-        </div>
-      </header>
+    <div className="min-h-screen overflow-x-hidden">
 
       {/* Mobile Sidebar Overlay */}
       {sidebarOpen && (
@@ -187,11 +167,9 @@ const Layout = ({ children }) => {
 
       {/* Sidebar */}
       <aside
-        className={`fixed top-0 left-0 bottom-0 z-40 bg-gray-100 border-r border-gray-200 transform transition-all duration-300 ease-in-out ${
-          sidebarOpen ? 'translate-x-0' : '-translate-x-full'
-        } lg:translate-x-0 ${
-          sidebarCollapsed ? 'w-20' : 'w-64'
-        }`}
+        className={`fixed top-0 left-0 bottom-0 z-40 bg-gray-100 border-r border-gray-200 transform transition-all duration-300 ease-in-out ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'
+          } lg:translate-x-0 ${sidebarCollapsed ? 'w-20' : 'w-64'
+          }`}
       >
         <div className="flex flex-col h-full">
           {/* Logo */}
@@ -284,10 +262,10 @@ const Layout = ({ children }) => {
                       </p>
                     </div>
                     <div className='flex items-center cursor-pointer'>
-                    <div className="h-10 w-10 rounded-full bg-secondary hover:bg-gray-200 flex items-center justify-center">
-                      <UserCircle strokeWidth={1.5} className="h-6 w-6 text-foreground" />
-                    </div>
-                    <ChevronDown strokeWidth={1.5} className="h-4 w-4 text-gray-500" />
+                      <div className="h-10 w-10 rounded-full bg-secondary hover:bg-gray-200 flex items-center justify-center">
+                        <UserCircle strokeWidth={1.5} className="h-6 w-6 text-foreground" />
+                      </div>
+                      <ChevronDown strokeWidth={1.5} className="h-4 w-4 text-gray-500" />
                     </div>
                   </button>
                 </PopoverTrigger>
@@ -322,9 +300,122 @@ const Layout = ({ children }) => {
           </div>
         </header>
 
+        {/* Mobile Bottom Navigation */}
+        <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-gray-200 pb-safe">
+          <div className="flex items-center justify-around h-16">
+            {/* Dashboard */}
+            {navigationItems.find(i => i.name === 'Dashboard') && (
+              <Link
+                to="/dashboard"
+                className={`flex flex-col items-center justify-center flex-1 h-full gap-1 transition-colors ${location.pathname === '/dashboard' ? 'text-primary font-semibold' : 'text-gray-500'}`}
+              >
+                <LayoutDashboard className={`h-5 w-5 ${location.pathname === '/dashboard' ? 'stroke-2' : 'stroke-[1.5]'}`} />
+                <span className="text-[10px]">Dashboard</span>
+              </Link>
+            )}
+
+            {/* Orders */}
+            {navigationItems.find(i => i.name === 'Orders') && (
+              <Link
+                to="/orders"
+                className={`flex flex-col items-center justify-center flex-1 h-full gap-1 transition-colors ${location.pathname === '/orders' ? 'text-primary font-semibold' : 'text-gray-500'}`}
+              >
+                <Calendar className={`h-5 w-5 ${location.pathname === '/orders' ? 'stroke-2' : 'stroke-[1.5]'}`} />
+                <span className="text-[10px]">Orders</span>
+              </Link>
+            )}
+
+            {/* More Menu */}
+            <Popover open={moreMenuOpen} onOpenChange={setMoreMenuOpen}>
+              <PopoverTrigger asChild>
+                <button
+                  className={`flex flex-col items-center justify-center flex-1 h-full gap-1 transition-colors ${moreMenuOpen ? 'text-primary' : 'text-gray-500'}`}
+                >
+                  <Menu className={`h-5 w-5 ${moreMenuOpen ? 'stroke-2' : 'stroke-[1.5]'}`} />
+                  <span className="text-[10px]">More</span>
+                </button>
+              </PopoverTrigger>
+              <PopoverContent className="w-56 p-2 mb-2" align="center" side="top">
+                <div className="grid grid-cols-1 gap-1">
+                  {navigationItems
+                    .filter(item => !['Dashboard', 'Orders'].includes(item.name))
+                    .map((item) => {
+                      const Icon = item.icon;
+                      const isActive = location.pathname === item.href;
+                      return (
+                        <Link
+                          key={item.name}
+                          to={item.href}
+                          onClick={() => setMoreMenuOpen(false)}
+                          className={`flex items-center gap-3 px-3 py-2 text-sm rounded-md transition-colors ${isActive ? 'bg-primary text-primary-foreground' : 'hover:bg-gray-100 text-gray-700'}`}
+                        >
+                          <Icon className="h-4 w-4" />
+                          <span>{item.name}</span>
+                        </Link>
+                      );
+                    })}
+                </div>
+              </PopoverContent>
+            </Popover>
+
+            {/* Profile Menu */}
+            <Popover open={profileMenuOpen} onOpenChange={setProfileMenuOpen}>
+              <PopoverTrigger asChild>
+                <button
+                  className={`flex flex-col items-center justify-center flex-1 h-full gap-1 transition-colors ${location.pathname === '/profile' || profileMenuOpen ? 'text-primary font-semibold' : 'text-gray-500'}`}
+                >
+                  <UserCircle className={`h-5 w-5 ${location.pathname === '/profile' || profileMenuOpen ? 'stroke-2' : 'stroke-[1.5]'}`} />
+                  <span className="text-[10px]">Profile</span>
+                </button>
+              </PopoverTrigger>
+              <PopoverContent className="w-56 p-2 mb-2" align="end" side="top">
+                <div className="space-y-1">
+                  <div className="px-3 py-2 border-b mb-1">
+                    <p className="text-sm font-medium text-gray-900 truncate">
+                      {user?.name || user?.email}
+                    </p>
+                    <p className="text-xs text-gray-500 capitalize">
+                      {user?.role?.replace('_', ' ')}
+                    </p>
+                  </div>
+                  <Link
+                    to="/profile"
+                    onClick={() => setProfileMenuOpen(false)}
+                    className="flex items-center gap-3 px-3 py-2 text-sm rounded-md hover:bg-gray-100 transition-colors"
+                  >
+                    <User className="h-4 w-4" />
+                    <span>Profile Info</span>
+                  </Link>
+                  <Link
+                    to="/change-password"
+                    onClick={() => setProfileMenuOpen(false)}
+                    className="flex items-center gap-3 px-3 py-2 text-sm rounded-md hover:bg-gray-100 transition-colors"
+                  >
+                    <KeyRound className="h-4 w-4" />
+                    <span>Change Password</span>
+                  </Link>
+                  <div className="border-t my-1" />
+                  <button
+                    onClick={() => {
+                      setProfileMenuOpen(false);
+                      handleLogout();
+                    }}
+                    className="w-full flex items-center gap-3 px-3 py-2 text-sm rounded-md hover:bg-gray-100 transition-colors text-red-600"
+                  >
+                    <LogOut className="h-4 w-4" />
+                    <span>Logout</span>
+                  </button>
+                </div>
+              </PopoverContent>
+            </Popover>
+          </div>
+        </nav>
+
         {/* Page Content */}
-        <main className="p-2 pt-6 lg:p-4 mt-10 lg:mt-0">
+        <main className="mb-16 lg:mb-0 lg:mt-0 bg-gray-50">
+          <div className="mx-auto">
             {children}
+          </div>
         </main>
       </div>
     </div>

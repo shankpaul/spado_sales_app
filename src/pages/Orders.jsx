@@ -11,14 +11,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '../components/ui/select';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '../components/ui/table';
 import { toast } from 'sonner';
 import orderService from '../services/orderService';
 import OrderWizard from '../components/OrderWizard';
@@ -43,6 +35,7 @@ import {
   Filter,
   X,
   Repeat,
+  Blocks,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import {
@@ -54,6 +47,7 @@ import {
   SheetTrigger,
 } from '../components/ui/sheet';
 import { Badge2 } from '@/components/ui/badge2';
+import { Skeleton } from '../components/ui/skeleton';
 
 /**
  * Orders Page Component
@@ -417,11 +411,11 @@ const Orders = () => {
   };
 
   return (
-    <div className="p-4 md:p-2 space-y-5">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+    <div className="p-4 md:p-6  space-y-5">
+      {/* Header - Desktop Only */}
+      <div className="hidden md:flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold">Orders</h1>
+          <h1 className="text-2xl font-bold flex items-center gap-2 items-center"><Blocks className="h-8 w-8" strokeWidth={1.5} /> Orders</h1>
           <p className="text-muted-foreground">Manage customer orders and bookings</p>
         </div>
         <Button onClick={() => setIsWizardOpen(true)} className="w-full sm:w-auto">
@@ -430,146 +424,154 @@ const Orders = () => {
         </Button>
       </div>
 
-      {/* Search and Filters */}
-      <div className="flex flex-col sm:flex-row gap-4">
-        {/* Single Search Field */}
-        <div className="relative flex-1 flex gap-2">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search by order number or customer phone..."
-              value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value)}
-              onKeyPress={handleSearchKeyPress}
-              className="pl-10 pr-10"
-            />
-            {searchInput && (
-              <button
-                onClick={clearSearch}
-                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                type="button"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            )}
-          </div>
-          <Button onClick={handleSearch} variant="default" className="shrink-0">
-            <Search className="h-4 w-4 mr-2" />
-            Search
-          </Button>
-        </div>
+      {/* Mobile Title - Visible only on mobile */}
+      <div className="block md:hidden">
+        <h1 className="text-2xl font-bold flex items-center gap-2 items-center"><Blocks className="h-6 w-6" strokeWidth={1.5} /> Orders</h1>
+        <p className="text-muted-foreground text-sm">Manage customer orders and bookings</p>
+      </div>
 
-        {/* Filter Button */}
-        <Sheet open={isFilterOpen} onOpenChange={handleFilterOpen}>
-          <SheetTrigger asChild>
-            <Button
-              variant={hasActiveFilters() ? "default" : "outline"}
-              className="w-full sm:w-auto relative"
-            >
-              <Filter className="h-4 w-4 mr-2" />
-              Filters
-              {hasActiveFilters() && (
-                <Badge2
-                  variant="secondary"
-                  className="ml-2 bg-white text-primary px-1.5 py-0 text-xs h-5 min-w-[20px]"
+      {/* Search and Filters - Sticky on Mobile */}
+      <div className="sticky top-0 z-10 md:static bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 py-2 -mx-4 px-4 md:mx-0 md:px-0 flex flex-col sm:flex-row gap-4">
+        <div className="flex flex-col sm:flex-row gap-4 w-full">
+          {/* Single Search Field */}
+          <div className="relative flex-1 flex gap-2">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search orders..."
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+                onKeyPress={handleSearchKeyPress}
+                className="pl-10 pr-10"
+              />
+              {searchInput && (
+                <button
+                  onClick={clearSearch}
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                  type="button"
                 >
-                  {getActiveFilterCount()}
-                </Badge2>
+                  <X className="h-4 w-4" />
+                </button>
               )}
+            </div>
+            <Button onClick={handleSearch} variant="default" className="shrink-0 hidden sm:flex">
+              <Search className="h-4 w-4 mr-2" />
+              Search
             </Button>
-          </SheetTrigger>
-          <SheetContent side={isMobile ? "bottom" : "right"}>
-            <SheetHeader>
-              <SheetTitle>Filter Orders</SheetTitle>
-              <SheetDescription>
-                Apply filters to narrow down your order list
-              </SheetDescription>
-            </SheetHeader>
-            <div className="grid gap-4 py-4">
-              {/* Status Filter */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Order Status</label>
-                <Select value={tempStatus} onValueChange={setTempStatus}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="All Statuses" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Statuses</SelectItem>
-                    {ORDER_STATUSES.map((s) => (
-                      <SelectItem key={s.value} value={s.value}>
-                        {s.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+          </div>
 
-              {/* Payment Status Filter */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Payment Status</label>
-                <Select value={tempPaymentStatus} onValueChange={setTempPaymentStatus}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="All Payment Status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Payment Status</SelectItem>
-                    {PAYMENT_STATUSES.map((s) => (
-                      <SelectItem key={s.value} value={s.value}>
-                        {s.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Date Range */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Date From</label>
-                  <Input
-                    type="date"
-                    value={tempDateFrom}
-                    onChange={(e) => setTempDateFrom(e.target.value)}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Date To</label>
-                  <Input
-                    type="date"
-                    value={tempDateTo}
-                    onChange={(e) => setTempDateTo(e.target.value)}
-                  />
-                </div>
-              </div>
-
-              {/* Agent Filter */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Assigned Agent</label>
-                <Select value={tempAgentId} onValueChange={setTempAgentId}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="All Agents" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Agents</SelectItem>
-                    {agents && agents.map((agent) => (
-                      <SelectItem key={agent.id} value={String(agent.id)}>
-                        {agent.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            <div className="flex flex-col gap-2 pt-4 border-t">
-              <Button onClick={applyFilters} className="w-full">
-                Apply Filters
+          {/* Filter Button */}
+          <Sheet open={isFilterOpen} onOpenChange={handleFilterOpen}>
+            <SheetTrigger asChild>
+              <Button
+                variant={hasActiveFilters() ? "default" : "outline"}
+                className="w-full sm:w-auto relative"
+              >
+                <Filter className="h-4 w-4 mr-2" />
+                Filters
+                {hasActiveFilters() && (
+                  <Badge2
+                    variant="secondary"
+                    className="ml-2 bg-white text-primary px-1.5 py-0 text-xs h-5 min-w-[20px]"
+                  >
+                    {getActiveFilterCount()}
+                  </Badge2>
+                )}
               </Button>
-              <Button variant="outline" onClick={clearFilters} className="w-full">
-                Clear All
-              </Button>
-            </div>
-          </SheetContent>
-        </Sheet>
+            </SheetTrigger>
+            <SheetContent side={isMobile ? "bottom" : "right"}>
+              <SheetHeader>
+                <SheetTitle>Filter Orders</SheetTitle>
+                <SheetDescription>
+                  Apply filters to narrow down your order list
+                </SheetDescription>
+              </SheetHeader>
+              <div className="grid gap-4 py-4">
+                {/* Status Filter */}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Order Status</label>
+                  <Select value={tempStatus} onValueChange={setTempStatus}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="All Statuses" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Statuses</SelectItem>
+                      {ORDER_STATUSES.map((s) => (
+                        <SelectItem key={s.value} value={s.value}>
+                          {s.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Payment Status Filter */}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Payment Status</label>
+                  <Select value={tempPaymentStatus} onValueChange={setTempPaymentStatus}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="All Payment Status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Payment Status</SelectItem>
+                      {PAYMENT_STATUSES.map((s) => (
+                        <SelectItem key={s.value} value={s.value}>
+                          {s.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Date Range */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Date From</label>
+                    <Input
+                      type="date"
+                      value={tempDateFrom}
+                      onChange={(e) => setTempDateFrom(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Date To</label>
+                    <Input
+                      type="date"
+                      value={tempDateTo}
+                      onChange={(e) => setTempDateTo(e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                {/* Agent Filter */}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Assigned Agent</label>
+                  <Select value={tempAgentId} onValueChange={setTempAgentId}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="All Agents" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Agents</SelectItem>
+                      {agents && agents.map((agent) => (
+                        <SelectItem key={agent.id} value={String(agent.id)}>
+                          {agent.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="flex flex-col gap-2 pt-4 border-t">
+                <Button onClick={applyFilters} className="w-full">
+                  Apply Filters
+                </Button>
+                <Button variant="outline" onClick={clearFilters} className="w-full">
+                  Clear All
+                </Button>
+              </div>
+            </SheetContent>
+          </Sheet>
+        </div>
       </div>
 
       {/* Active Filters Summary */}
@@ -594,10 +596,58 @@ const Orders = () => {
       )}
 
       {/* Orders List */}
-      <Card className="p-4">
+      <Card className="border-0 shadow-none md:border-1 md:shadow-sm">
         {loading ? (
-          <div className="flex items-center justify-center py-12">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <div className="space-y-4">
+            {/* Desktop Skeleton */}
+            <div className="hidden md:block">
+              <div className="border-b px-4 py-3 flex gap-4">
+                <Skeleton className="h-4 w-1/4" />
+                <Skeleton className="h-4 w-1/5" />
+                <Skeleton className="h-4 w-1/6" />
+                <Skeleton className="h-4 w-20 ml-auto" />
+              </div>
+              {[1, 2, 3, 4, 5].map((i) => (
+                <div key={i} className="border-b last:border-0 px-4 py-4 flex items-center gap-4">
+                  <Skeleton className="h-10 w-10 rounded-full" />
+                  <div className="space-y-2 flex-1">
+                    <Skeleton className="h-4 w-1/3" />
+                    <Skeleton className="h-3 w-1/4" />
+                  </div>
+                  <Skeleton className="h-4 w-1/5" />
+                  <Skeleton className="h-4 w-1/6" />
+                  <Skeleton className="h-8 w-20 rounded-full ml-auto" />
+                </div>
+              ))}
+            </div>
+
+            {/* Mobile Skeleton */}
+            <div className="md:hidden space-y-3 px-1">
+              {[1, 2, 3, 4].map((i) => (
+                <div key={i} className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <Skeleton className="h-10 w-10 rounded-full" />
+                      <div className="space-y-2">
+                        <Skeleton className="h-4 w-32" />
+                        <Skeleton className="h-3 w-20" />
+                      </div>
+                    </div>
+                    <Skeleton className="h-6 w-16 rounded-full" />
+                  </div>
+                  <div className="flex justify-between items-center bg-gray-50 p-2 rounded-lg">
+                    <div className="space-y-1">
+                      <Skeleton className="h-3 w-12" />
+                      <Skeleton className="h-4 w-16" />
+                    </div>
+                    <div className="space-y-1 text-right">
+                      <Skeleton className="h-3 w-12" />
+                      <Skeleton className="h-4 w-16" />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         ) : error ? (
           <div className="text-center py-12">
@@ -621,73 +671,63 @@ const Orders = () => {
         ) : (
           <>
             {/* Mobile View - Cards with Infinite Scroll */}
-            <div className="block md:hidden space-y-4">
+            <div className="block md:hidden space-y-3">
               {orders.map((order) => (
-                <Card key={order.id} className="p-4">
-                  <div className="space-y-3">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex items-start gap-2 flex-1 min-w-0">
-                        <LetterAvatar name={order.customer_name} size="md" className="mt-0.5" />
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <div className="font-semibold text-lg">#{order.order_number}</div>
+                <div
+                  key={order.id}
+                  onClick={() => handleOpenOrderDetail(order.id)}
+                  className="bg-white shadow-sm border border-gray-100 rounded-xl p-4 active:scale-[0.98] active:bg-gray-50 transition-all duration-200"
+                >
+                  <div className="flex items-center gap-4">
+                    <LetterAvatar name={order.customer_name} size="sm" />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between">
+                        <div className="font-bold text-base truncate capitalize">
+                          {order.customer_name}
+                        </div>
+                        <div className="font-bold text-primary whitespace-nowrap">
+                          {formatCurrency(order.total_amount)}
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between mt-1">
+                        <div className="text-xs text-muted-foreground flex items-center gap-1">
+                          <span className="font-medium">#{order.order_number}</span>
                           {order.subscription_id && (
                             <Badge2
                               variant="secondary"
-                              className="text-[10px] px-1.5 h-5 flex items-center gap-1 cursor-pointer hover:bg-secondary/80"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                navigate(`/subscriptions/${order.subscription_id}`);
-                              }}
+                              className="text-[9px] px-1 h-4 flex items-center gap-0.5"
                             >
-                              <Repeat className="h-3 w-3" />
+                              <Repeat className="h-2.5 w-2.5" />
                               Sub
                             </Badge2>
                           )}
-                          </div>
-                          <div className="text-sm text-muted-foreground">{order.customer_name}</div>
                         </div>
-                      </div>
-                      <div className="flex gap-2 flex-shrink-0">
-                        <Badge2 variant={getBadgeVariant(order.status, 'order')}>
-                          {getStatusLabel(order.status, ORDER_STATUSES)}
-                        </Badge2>
-                      </div>
-                    </div>
-
-                    <div className="space-y-2 text-sm">
-                      <div className="flex items-center gap-2 text-muted-foreground">
-                        <Calendar className="h-4 w-4" />
-                        {formatDate(order.booking_date)}
-                      </div>
-                      <div className="flex items-center gap-2 text-muted-foreground">
-                        {formatCurrency(order.total_amount)}
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-muted-foreground">Payment:</span>
-                        <Badge2 variant={getBadgeVariant(order.payment_status, 'payment')}>
+                        <Badge2
+                          variant={getBadgeVariant(order.payment_status, 'payment')}
+                          className="h-5 text-[10px] px-1.5"
+                        >
                           {getStatusLabel(order.payment_status, PAYMENT_STATUSES)}
                         </Badge2>
                       </div>
-                      {order.assigned_agent && (
-                        <div className="flex items-center gap-2 text-muted-foreground">
-                          <User className="h-4 w-4" />
-                          {order.assigned_agent.name}
-                        </div>
-                      )}
                     </div>
-
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="w-full"
-                      onClick={() => handleOpenOrderDetail(order.id)}
-                    >
-                      <Eye className="h-4 w-4 mr-2" />
-                      View Details
-                    </Button>
                   </div>
-                </Card>
+
+                  <div className="flex items-center justify-between mt-4 pt-3 border-t border-gray-50">
+                    <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                      <div className="flex items-center gap-1">
+                        <Calendar className="h-3 w-3" />
+                        {formatDate(order.booking_date)}
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <User className="h-3 w-3" />
+                        {order.assigned_agent_name?.split(' ')[0] || 'Unassigned'}
+                      </div>
+                    </div>
+                    <Badge2 variant={getBadgeVariant(order.status, 'order')} className="px-2">
+                      {getStatusLabel(order.status, ORDER_STATUSES)}
+                    </Badge2>
+                  </div>
+                </div>
               ))}
 
               {/* Infinite scroll loader */}
@@ -699,84 +739,91 @@ const Orders = () => {
 
               {/* End of list message */}
               {!hasMore && orders.length > 0 && (
-                <div className="text-center py-4 text-sm text-muted-foreground">
+                <div className="text-center py-6 text-sm text-muted-foreground">
                   You've reached the end of the list ({totalItems} orders)
                 </div>
               )}
             </div>
 
             {/* Desktop View - Table */}
-            <div className="hidden md:block">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Order #</TableHead>
-                    <TableHead>Customer</TableHead>
-                    <TableHead>Area</TableHead>
-                    <TableHead>Booking Date</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Payment</TableHead>
-                    <TableHead>Amount</TableHead>
-                    <TableHead>Agent</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
+            <div className="hidden md:block overflow-x-auto text-sm">
+              <table className="w-full">
+                <thead className="border-b">
+                  <tr className="text-left">
+                    <th className="px-4 py-3 font-medium">Order #</th>
+                    <th className="px-4 py-3 font-medium">Customer</th>
+                    <th className="px-4 py-3 font-medium">Area</th>
+                    <th className="px-4 py-3 font-medium">Booking Date</th>
+                    <th className="px-4 py-3 font-medium">Status</th>
+                    <th className="px-4 py-3 font-medium">Payment</th>
+                    <th className="px-4 py-3 font-medium">Amount</th>
+                    <th className="px-4 py-3 font-medium">Agent</th>
+                  </tr>
+                </thead>
+                <tbody>
                   {orders.map((order) => (
-                    <TableRow key={order.id}>
-                      <TableCell
-                        className="font-medium hover:underline cursor-pointer text-primary"
-                        onClick={() => handleOpenOrderDetail(order.id)}
-                      >
-                        #{order.order_number}
-                      </TableCell>
-                      <TableCell>
+                    <tr
+                      key={order.id}
+                      className="border-b last:border-0 hover:bg-muted/50 cursor-pointer"
+                      onClick={() => handleOpenOrderDetail(order.id)}
+                    >
+                      <td className="px-4 py-3">
+                        <div className="font-medium hover:underline text-primary">
+                          #{order.order_number}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">
                         <div className="flex items-center gap-2">
                           <LetterAvatar name={order.customer_name} size="xs" />
                           <div className="font-medium capitalize">{order.customer_name}</div>
                         </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex flex-col">
-                          <div className="font-medium capitalize">{order.area}</div>
-                        </div>
-                      </TableCell>
-                      <TableCell>{formatDate(order.booking_date)}</TableCell>
-                      <TableCell>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="font-medium capitalize">{order.area}</div>
+                      </td>
+                      <td className="px-4 py-3">{formatDate(order.booking_date)}</td>
+                      <td className="px-4 py-3">
                         <Badge2 variant={getBadgeVariant(order.status, 'order')}>
                           {getStatusLabel(order.status, ORDER_STATUSES)}
                         </Badge2>
-                      </TableCell>
-                      <TableCell>
+                      </td>
+                      <td className="px-4 py-3">
                         <Badge2 variant={getBadgeVariant(order.payment_status, 'payment')}>
                           {getStatusLabel(order.payment_status, PAYMENT_STATUSES)}
                         </Badge2>
-                      </TableCell>
-                      <TableCell className="font-medium flex items-center gap-2">{formatCurrency(order.total_amount)} {order.subscription_id && (
-                        <Badge2
-                          variant="secondary"
-                          className="w-fit mt-1 text-[10px] px-1.5 h-5 flex items-center gap-1 cursor-pointer hover:bg-secondary"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            navigate(`/subscriptions/${order.subscription_id}`);
-                          }}
-                        >
-                          <Repeat className="h-3 w-3" />
-                          Sub
-                        </Badge2>
-                      )}</TableCell>
-                      <TableCell>
-                        {order.assigned_agent_name ? 
-                        <div className="flex items-center gap-2">
-                          <LetterAvatar name={order.assigned_agent_name} size="xs" />
-                          <div className="font-medium">{order.assigned_agent_name}</div>
-                        </div>:
-                        <Badge2 variant="destructive">Unassigned</Badge2>
-                        }
-                        </TableCell>
-                    </TableRow>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="font-medium flex items-center gap-2">
+                          {formatCurrency(order.total_amount)}
+                          {order.subscription_id && (
+                            <Badge2
+                              variant="outline"
+                              className="w-fit text-[10px] px-1.5 h-5 flex items-center gap-1 cursor-pointer hover:bg-secondary/80"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                navigate(`/subscriptions/${order.subscription_id}`);
+                              }}
+                            >
+                              <Repeat className="h-3 w-3" />
+                              Sub
+                            </Badge2>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">
+                        {order.assigned_agent_name ? (
+                          <div className="flex items-center gap-2">
+                            <LetterAvatar name={order.assigned_agent_name} size="xs" />
+                            <div className="font-medium">{order.assigned_agent_name}</div>
+                          </div>
+                        ) : (
+                          <Badge2 variant="danger">Unassigned</Badge2>
+                        )}
+                      </td>
+                    </tr>
                   ))}
-                </TableBody>
-              </Table>
+                </tbody>
+              </table>
             </div>
           </>
         )}
@@ -860,28 +907,38 @@ const Orders = () => {
         </div>
       )}
 
-      {/* Order Wizard Dialog */}
-      <OrderWizard
-        open={isWizardOpen}
-        onOpenChange={setIsWizardOpen}
-        onSuccess={handleWizardSuccess}
-      />
+      {/* Floating Action Button (FAB) for Mobile */}
+      <div className="md:hidden fixed bottom-20 right-6 z-40">
+        <Button
+          onClick={() => setIsWizardOpen(true)}
+          size="icon"
+          className="h-14 w-14 rounded-full shadow-lg bg-primary hover:bg-primary/90 active:scale-90 transition-all duration-200"
+        >
+          <Plus className="h-7 w-7" />
+        </Button>
+      </div>
 
-      {/* Order Detail Sheet for Desktop */}
+      {/* Order Detail Sheet */}
       <Sheet open={!!selectedOrderId} onOpenChange={(open) => !open && handleCloseOrderDetail()}>
-        <SheetContent side="right" className="w-full sm:max-w-6xl p-0 overflow-y-auto">
+        <SheetContent side="right" className="w-full sm:max-w-4xl p-0 overflow-y-auto">
           {selectedOrderId && (
             <OrderDetail
               orderId={selectedOrderId}
               onClose={handleCloseOrderDetail}
               onUpdate={() => {
-                // Refresh the current page after order update
                 fetchOrders(true);
               }}
             />
           )}
         </SheetContent>
       </Sheet>
+
+      {/* Create Order Wizard */}
+      <OrderWizard
+        open={isWizardOpen}
+        onOpenChange={() => setIsWizardOpen(false)}
+        onSuccess={handleWizardSuccess}
+      />
     </div>
   );
 };

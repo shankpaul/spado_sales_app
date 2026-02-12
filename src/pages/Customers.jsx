@@ -5,12 +5,13 @@ import { Card } from '../components/ui/card';
 import CustomerForm from '../components/CustomerForm';
 import CustomerDetails from '../components/CustomerDetails';
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from '../components/ui/dialog';
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+  SheetClose,
+} from '../components/ui/sheet';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -37,9 +38,29 @@ import {
   MessageCircle,
   ShoppingCart,
   Eye,
+  Users,
+  MoreVertical,
+  Filter,
+  ArrowLeft,
+  X,
 } from 'lucide-react';
 import OrderWizard from '../components/OrderWizard';
 import { format } from 'date-fns';
+import LetterAvatar from '../components/LetterAvatar';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '../components/ui/dropdown-menu';
+import { Skeleton } from '../components/ui/skeleton';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '../components/ui/select';
 
 /**
  * Customers Page Component
@@ -57,28 +78,31 @@ const Customers = () => {
   const [totalCount, setTotalCount] = useState(0);
   const [hasMore, setHasMore] = useState(true);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
-  
+
   // Refs for infinite scroll
   const observerTarget = useRef(null);
   const isLoadingMore = useRef(false);
-  
+
   // Dialog states
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [isOrderWizardOpen, setIsOrderWizardOpen] = useState(false);
   const [selectedCustomerForOrder, setSelectedCustomerForOrder] = useState(null);
-  
+
   // Customer details dialog
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [customerForDetails, setCustomerForDetails] = useState(null);
-  
+
+  // Form ref
+  const formRef = useRef(null);
+
   // Fetch customers
   const fetchCustomers = async (pageNum = 1, append = false) => {
     if (!append) {
       setLoading(true);
     }
-    
+
     try {
       const params = {
         page: pageNum,
@@ -97,13 +121,13 @@ const Customers = () => {
 
       const response = await customerService.getAllCustomers(params);
       const newCustomers = response.customers || [];
-      
+
       if (append) {
         setCustomers(prev => [...prev, ...newCustomers]);
       } else {
         setCustomers(newCustomers);
       }
-      
+
       setTotalPages(response.pagination?.total_pages || 1);
       setTotalCount(response.pagination?.total_count || 0);
       setHasMore(pageNum < (response.pagination?.total_pages || 1));
@@ -154,7 +178,7 @@ const Customers = () => {
   // Intersection Observer for infinite scroll
   useEffect(() => {
     if (!isMobile) return;
-    
+
     const observer = new IntersectionObserver(
       (entries) => {
         if (entries[0].isIntersecting) {
@@ -201,7 +225,7 @@ const Customers = () => {
   const handleSearch = (e) => {
     setSearchTerm(e.target.value);
   };
-  
+
   // Open customer details dialog
   const handleViewDetails = (customer) => {
     setCustomerForDetails(customer);
@@ -219,67 +243,131 @@ const Customers = () => {
   };
 
   return (
-    <div className="p-4 md:p-2 space-y-5">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+    <div className="p-4 md:p-6 space-y-6">
+      {/* Header - Desktop Only */}
+      <div className="hidden md:flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold">Customers</h1>
-          <p className="text-muted-foreground">Manage your customer database</p>
+          <h1 className="text-2xl font-bold flex items-center gap-2">
+            <Users className="h-8 w-8" strokeWidth={1.5} />
+            Customers
+          </h1>
+          <p className="text-muted-foreground">Manage your customers</p>
         </div>
-        <Button onClick={() => handleOpenForm()} className="w-full sm:w-auto">
+        <Button onClick={() => handleOpenForm()} className="w-full sm:w-auto shadow-sm">
           <Plus className="h-4 w-4 mr-2" />
           Add Customer
         </Button>
       </div>
 
-      {/* Filters */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {/* Search */}
-          <div className="relative">
+      {/* Header - Mobile Only */}
+      <div className="block md:hidden">
+        <h1 className="text-2xl font-bold flex items-center gap-2">
+          <Users className="h-6 w-6" strokeWidth={1.5} />
+          Customers
+        </h1>
+        <p className="text-muted-foreground text-sm">Manage your customer database ({totalCount})</p>
+      </div>
+
+      {/* Search and Filters - Improved for Mobile App Feel */}
+      <div className="sticky top-0 z-10 bg-gray-50/80 backdrop-blur-md py-2 -mx-4 px-4 sm:mx-0 sm:px-0 space-y-3">
+        <div className="flex gap-2">
+          <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="Search by name or phone..."
               value={searchTerm}
               onChange={handleSearch}
-              className="pl-10"
+              className="pl-10 pr-10 bg-white border-gray-200 h-10 shadow-sm"
             />
+            {searchTerm && (
+              <button
+                onClick={() => setSearchTerm('')}
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                type="button"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
           </div>
-
-          {/* Date Filter */}
-          <select
-            value={dateFilter}
-            onChange={(e) => setDateFilter(e.target.value)}
-            className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-          >
-            <option value="all">All Customers</option>
-            <option value="7d">Last 7 days</option>
-            <option value="1m">Last month</option>
-            <option value="3m">Last 3 months</option>
-            <option value="6m">Last 6 months</option>
-            <option value="custom">Custom days</option>
-          </select>
-
-          {/* Custom Days Input */}
-          {dateFilter === 'custom' && (
-            <Input
-              type="number"
-              placeholder="Enter days"
-              value={customDays}
-              onChange={(e) => setCustomDays(e.target.value)}
-              min="1"
-            />
-          )}
+          <div className="flex-shrink-0">
+            <Select value={dateFilter} onValueChange={setDateFilter}>
+              <SelectTrigger className="h-10 w-[130px] bg-white border-gray-200 shadow-sm focus:ring-1 focus:ring-primary">
+                <SelectValue placeholder="Filter" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Time</SelectItem>
+                <SelectItem value="7d">Last 7d</SelectItem>
+                <SelectItem value="1m">Last month</SelectItem>
+                <SelectItem value="3m">Last 3m</SelectItem>
+                <SelectItem value="custom">Custom</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
 
-      {/* Customer List */}
-      <Card>
+        {/* Custom Days Input */}
+        {dateFilter === 'custom' && (
+          <Input
+            type="number"
+            placeholder="Enter range in days"
+            value={customDays}
+            onChange={(e) => setCustomDays(e.target.value)}
+            min="1"
+            className="h-9 bg-white shadow-sm"
+          />
+        )}
+      </div>
+      <Card className="border-0 shadow-none md:border-1 md:shadow-sm">
         {loading ? (
-          <div className="flex items-center justify-center py-12">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <div className="space-y-4">
+            {/* Desktop Skeleton */}
+            <div className="hidden md:block">
+              <div className="border-b px-4 py-3 flex gap-4">
+                <Skeleton className="h-4 w-1/4" />
+                <Skeleton className="h-4 w-1/4" />
+                <Skeleton className="h-4 w-1/4" />
+                <Skeleton className="h-4 w-12 ml-auto" />
+              </div>
+              {[1, 2, 3, 4, 5].map((i) => (
+                <div key={i} className="border-b last:border-0 px-4 py-4 flex items-center gap-4">
+                  <Skeleton className="h-10 w-10 rounded-full" />
+                  <div className="space-y-2 flex-1">
+                    <Skeleton className="h-4 w-1/3" />
+                  </div>
+                  <Skeleton className="h-4 w-1/4" />
+                  <Skeleton className="h-4 w-1/4" />
+                  <Skeleton className="h-8 w-8 rounded-full ml-auto" />
+                </div>
+              ))}
+            </div>
+
+            {/* Mobile Skeleton */}
+            <div className="md:hidden space-y-3 px-1">
+              {[1, 2, 3, 4].map((i) => (
+                <div key={i} className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 space-y-4">
+                  <div className="flex items-center gap-4">
+                    <Skeleton className="h-12 w-12 rounded-full" />
+                    <div className="flex-1 space-y-2">
+                      <div className="flex justify-between">
+                        <Skeleton className="h-4 w-1/2" />
+                        <Skeleton className="h-8 w-8 rounded-full" />
+                      </div>
+                      <Skeleton className="h-3 w-1/3" />
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <Skeleton className="h-6 w-20 rounded-md" />
+                    <Skeleton className="h-6 w-24 rounded-md" />
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         ) : customers.length === 0 ? (
-          <div className="text-center py-12">
-            <p className="text-muted-foreground">No customers found</p>
+          <div className="text-center py-20 bg-white rounded-xl border border-dashed border-gray-200">
+            <Users className="h-12 w-12 mx-auto mb-3 text-gray-300" />
+            <p className="text-muted-foreground font-medium">No customers found</p>
+            <Button variant="link" onClick={() => { setSearchTerm(''); setDateFilter('all'); }}>Clear filters</Button>
           </div>
         ) : (
           <>
@@ -300,7 +388,8 @@ const Customers = () => {
                     <tr key={customer.id} className="border-b last:border-0 hover:bg-muted/50">
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2">
-                          <button 
+                          <LetterAvatar name={customer.name} size="sm" />
+                          <button
                             onClick={() => handleViewDetails(customer)}
                             className="font-medium hover:text-primary hover:underline cursor-pointer transition-colors"
                           >
@@ -355,71 +444,97 @@ const Customers = () => {
               </table>
             </div>
 
-            {/* Mobile Cards */}
-            <div className="md:hidden divide-y">
+            {/* Mobile Cards - App Style */}
+            <div className="md:hidden space-y-3">
               {customers.map((customer) => (
-                <div key={customer.id} className="p-4 space-y-3">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <button
-                          onClick={() => handleViewDetails(customer)}
-                          className="font-medium hover:text-primary hover:underline cursor-pointer transition-colors"
-                        >
-                          {customer.name}
-                        </button>
+                <div
+                  key={customer.id}
+                  className="bg-white shadow-sm border border-gray-100 rounded-xl p-4 active:scale-[0.98] transition-all duration-200"
+                >
+                  <div className="flex items-center gap-4">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between pb-4">
+                        <div className='flex gap-2 items-center'>
+                          <LetterAvatar name={customer.name} size="sm" />
+                          <div>
+                            <button
+                              onClick={() => handleViewDetails(customer)}
+                              className="font-bold flex items-center gap-2 text-base truncate capitalize hover:text-primary transition-colors text-left"
+                            >
+
+                              {customer.name}
+                            </button>
+                            <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                              <MapPin className="h-3 w-3" />
+                              <span className="truncate max-w-[120px] capitalize">
+                                {customer.area || customer.city || 'N/A'}
+                              </span>
+                            </div>
+                          </div>
+
+                        </div>
+
+
+
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full">
+                              <MoreVertical className="h-4 w-4 text-gray-400" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-48">
+                            <DropdownMenuItem onClick={() => handleViewDetails(customer)}>
+                              <Eye className="h-4 w-4 mr-2" />
+                              View Details
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => {
+                              setSelectedCustomerForOrder(customer.id);
+                              setIsOrderWizardOpen(true);
+                            }}>
+                              <ShoppingCart className="h-4 w-4 mr-2" />
+                              Create Order
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleOpenForm(customer)}>
+                              <Edit2 className="h-4 w-4 mr-2" />
+                              Edit Customer
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => {
+                                setSelectedCustomer(customer);
+                                setIsDeleteOpen(true);
+                              }}
+                              className="text-destructive focus:text-destructive"
+                            >
+                              <Trash2 className="h-4 w-4 mr-2" />
+                              Delete Customer
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </div>
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <Phone className="h-3 w-3" />
-                        {customer.phone}
+
+                      <div className="flex flex-wrap items-center gap-3 border-t border-gray-50 pt-2">
+                        <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                          <Calendar className="h-3 w-3" />
+                          <span>Last Booked: {formatDate(customer.last_booked_at)}</span>
+                        </div>
+                        <div className="flex ml-auto items-center gap-1.5 ">
+
+                          <Button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedCustomerForOrder(customer.id);
+                              setIsOrderWizardOpen(true);
+                            }}
+                            // variant="outline"
+                            size="sm"
+                            className="flex items-center gap-1.5"
+                          >
+                            <ShoppingCart className="h-3 w-3" />
+                            New
+                          </Button>
+                        </div>
                       </div>
                     </div>
-                    <div className="flex gap-1">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleViewDetails(customer)}
-                        title="View Details"
-                      >
-                        <Eye className="h-4 w-4 text-primary" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => {
-                          setSelectedCustomerForOrder(customer.id);
-                          setIsOrderWizardOpen(true);
-                        }}
-                        title="Create Order"
-                      >
-                        <ShoppingCart className="h-4 w-4 text-primary" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleOpenForm(customer)}
-                      >
-                        <Edit2 className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => {
-                          setSelectedCustomer(customer);
-                          setIsDeleteOpen(true);
-                        }}
-                      >
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <MapPin className="h-3 w-3" />
-                    {customer.city || customer.area || customer.district || 'N/A'}
-                  </div>
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <Calendar className="h-3 w-3" />
-                    Last booked: {formatDate(customer.last_booked_at)}
                   </div>
                 </div>
               ))}
@@ -427,7 +542,6 @@ const Customers = () => {
           </>
         )}
       </Card>
-
       {/* Desktop Pagination */}
       {!isMobile && totalPages > 1 && (
         <div className="flex items-center justify-center gap-2">
@@ -447,7 +561,7 @@ const Customers = () => {
           >
             <ChevronLeft className="h-4 w-4" />
           </Button>
-          
+
           {/* Page numbers */}
           <div className="flex items-center gap-1">
             {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
@@ -461,7 +575,7 @@ const Customers = () => {
               } else {
                 pageNum = page - 2 + i;
               }
-              
+
               return (
                 <Button
                   key={pageNum}
@@ -475,7 +589,7 @@ const Customers = () => {
               );
             })}
           </div>
-          
+
           <Button
             variant="outline"
             size="icon"
@@ -497,11 +611,19 @@ const Customers = () => {
 
       {/* Mobile Infinite Scroll Trigger */}
       {isMobile && hasMore && (
-        <div ref={observerTarget} className="flex items-center justify-center py-4">
-          {isLoadingMore.current && (
-            <Loader2 className="h-6 w-6 animate-spin text-primary" />
-          )}
+        <div ref={observerTarget} className="flex items-center justify-center py-8">
+          <Loader2 className="h-6 w-6 animate-spin text-primary opacity-50" />
         </div>
+      )}
+
+      {/* FAB for Mobile */}
+      {isMobile && (
+        <Button
+          onClick={() => handleOpenForm()}
+          className="fixed bottom-20 right-6 h-14 w-14 rounded-full shadow-lg z-40 bg-primary text-white p-0 flex items-center justify-center animate-in fade-in slide-in-from-bottom-4 duration-300"
+        >
+          <Plus className="h-6 w-6" />
+        </Button>
       )}
 
       {/* Results Info */}
@@ -511,27 +633,55 @@ const Customers = () => {
         </div>
       )}
 
-      {/* Customer Form Dialog */}
-      <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>
-              {selectedCustomer ? 'Edit Customer' : 'Add New Customer'}
-            </DialogTitle>
-            <DialogDescription>
-              Fill in the customer details below. Map link will auto-fill location fields.
-            </DialogDescription>
-          </DialogHeader>
-          <CustomerForm
-            customer={selectedCustomer}
-            onSuccess={() => {
-              setIsFormOpen(false);
-              fetchCustomers();
-            }}
-            onCancel={() => setIsFormOpen(false)}
-          />
-        </DialogContent>
-      </Dialog>
+      {/* Customer Form Sheet - App Page Feel on Mobile */}
+      <Sheet open={isFormOpen} onOpenChange={setIsFormOpen}>
+        <SheetContent
+          side={isMobile ? "bottom" : "right"}
+          className={`w-full ${isMobile ? 'h-full' : 'sm:max-w-2xl'} p-0 flex flex-col bg-gray-50 border-none`}
+        >
+          {/* App-like Header */}
+          <div className="flex items-center justify-between px-4 py-3 bg-white border-b sticky top-0 z-20 shadow-sm">
+            <div className="flex items-center gap-3">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="rounded-full"
+                onClick={() => setIsFormOpen(false)}
+              >
+                {isMobile ? <ArrowLeft className="h-6 w-6" /> : <X className="h-5 w-5" />}
+              </Button>
+              <div>
+                <h2 className="font-bold text-lg leading-none">
+                  {selectedCustomer ? 'Edit Customer' : 'Add Customer'}
+                </h2>
+                <p className="text-[10px] text-muted-foreground uppercase tracking-wider mt-0.5">
+                  {selectedCustomer ? 'Update details' : 'New entry'}
+                </p>
+              </div>
+            </div>
+
+            <Button
+              onClick={() => formRef.current?.submit()}
+              className="px-6 h-9 rounded-full shadow-sm"
+            >
+              Save
+            </Button>
+          </div>
+
+          <div className="flex-1 overflow-y-auto p-4 pb-20">
+            <CustomerForm
+              ref={formRef}
+              customer={selectedCustomer}
+              showActions={false}
+              onSuccess={() => {
+                setIsFormOpen(false);
+                fetchCustomers();
+              }}
+              onCancel={() => setIsFormOpen(false)}
+            />
+          </div>
+        </SheetContent>
+      </Sheet>
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>
@@ -539,7 +689,7 @@ const Customers = () => {
           <AlertDialogHeader>
             <AlertDialogTitle>Are you sure?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently delete {selectedCustomer?.name} from your customer database.
+              This will permanently delete {selectedCustomer?.name} from your customer system.
               This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -563,7 +713,7 @@ const Customers = () => {
           toast.success('Order created successfully');
         }}
       />
-      
+
       {/* Customer Details Dialog */}
       <CustomerDetails
         customer={customerForDetails}

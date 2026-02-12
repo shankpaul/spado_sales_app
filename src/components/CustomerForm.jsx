@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, forwardRef, useImperativeHandle } from 'react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
@@ -8,14 +8,31 @@ import { ComboBox } from './ui/combobox';
 import { toast } from 'sonner';
 import customerService from '../services/customerService';
 import locationService from '../services/locationService';
-import { Loader2 } from 'lucide-react';
+import {
+  Loader2,
+  User,
+  Phone,
+  MapPin,
+  Map,
+  MessageSquare,
+  Globe,
+  Navigation,
+  Check
+} from 'lucide-react';
 
 /**
  * CustomerForm Component
  * Reusable form for creating/editing customers
  * Props: customer (for edit), onSuccess, onCancel
  */
-const CustomerForm = ({ customer = null, onSuccess, onCancel }) => {
+const CustomerForm = forwardRef(({ customer = null, onSuccess, onCancel, showActions = true }, ref) => {
+  useImperativeHandle(ref, () => ({
+    submit: () => {
+      handleSubmit();
+    },
+    isLoading: formLoading
+  }));
+
   const [formData, setFormData] = useState({
     name: '',
     phone: '',
@@ -79,7 +96,7 @@ const CustomerForm = ({ customer = null, onSuccess, onCancel }) => {
       const newCities = locationService.getCities(formData.state);
       setDistricts(newDistricts);
       setCities(newCities);
-      
+
       // Reset district and city if they don't exist in new lists
       if (!newDistricts.includes(formData.district)) {
         setFormData((prev) => ({ ...prev, district: '' }));
@@ -98,10 +115,10 @@ const CustomerForm = ({ customer = null, onSuccess, onCancel }) => {
       setMapLinkLoading(true);
       try {
         const { latitude, longitude } = customerService.parseMapLink(value);
-        
+
         if (latitude && longitude) {
           setFormData((prev) => ({ ...prev, latitude, longitude }));
-          
+
           // Fetch address details
           const addressData = await customerService.reverseGeocode(latitude, longitude);
           setFormData((prev) => ({
@@ -112,7 +129,7 @@ const CustomerForm = ({ customer = null, onSuccess, onCancel }) => {
             state: addressData.state || prev.state,
             country: addressData.country || prev.country,
           }));
-          
+
           toast.success('Location details fetched successfully');
         } else {
           toast.warning('Could not extract coordinates from the link');
@@ -129,35 +146,38 @@ const CustomerForm = ({ customer = null, onSuccess, onCancel }) => {
   // Validate form
   const validateForm = () => {
     const errors = {};
-    
+
     if (!formData.name.trim()) {
       errors.name = 'Name is required';
     }
-    
+    if (!formData.area || !formData.area.trim()) {
+      errors.area = 'Area / Locality is required';
+    }
+
     if (!formData.phone.trim()) {
       errors.phone = 'Phone number is required';
     } else if (!/^[0-9]{10}$/.test(formData.phone.trim())) {
       errors.phone = 'Phone number must be exactly 10 digits';
     }
-    
+
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
   };
 
   // Handle form submit
   const handleSubmit = async (e) => {
-    e.preventDefault();
-    
+    if (e) e.preventDefault();
+
     if (!validateForm()) {
       return;
     }
-    
+
     setFormLoading(true);
 
     try {
       // Prepare data with country default to India
       const submitData = { ...formData, country: 'India' };
-      
+
       let result;
       if (customer) {
         result = await customerService.updateCustomer(customer.id, submitData);
@@ -166,7 +186,7 @@ const CustomerForm = ({ customer = null, onSuccess, onCancel }) => {
         result = await customerService.createCustomer(submitData);
         toast.success('Customer created successfully');
       }
-      
+
       if (onSuccess) {
         onSuccess(result);
       }
@@ -179,58 +199,74 @@ const CustomerForm = ({ customer = null, onSuccess, onCancel }) => {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      {/* Name & Phone */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <Label htmlFor="name">Name *</Label>
-          <Input
-            id="name"
-            value={formData.name}
-            onChange={(e) => {
-              setFormData({ ...formData, name: e.target.value });
-              setFormErrors({ ...formErrors, name: '' });
-            }}
-            className={formErrors.name ? 'border-destructive' : ''}
-          />
-          {formErrors.name && (
-            <p className="text-xs text-destructive">{formErrors.name}</p>
-          )}
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="phone">Phone Number *</Label>
-          <div className="flex gap-2">
-            <div className="flex items-center px-3 border rounded-md bg-muted">
-              <span className="text-sm">+91</span>
+    <form onSubmit={handleSubmit} className="space-y-6">
+      {/* Basic Information Section */}
+      <div className="space-y-4">
+        <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider px-1">Basic Information</h3>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label htmlFor="name" className="flex items-center gap-2">
+              <User className="h-4 w-4 text-primary/70" />
+              Name <span className="text-destructive">*</span>
+            </Label>
+            <Input
+              id="name"
+              placeholder="Full name"
+              value={formData.name}
+              onChange={(e) => {
+                setFormData({ ...formData, name: e.target.value });
+                setFormErrors({ ...formErrors, name: '' });
+              }}
+              className={`${formErrors.name ? 'border-destructive focus-visible:ring-destructive' : ''}`}
+            />
+            {formErrors.name && (
+              <p className="text-xs text-destructive font-medium pl-1">{formErrors.name}</p>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="phone" className="flex items-center gap-2">
+              <Phone className="h-4 w-4 text-primary/70" />
+              Phone Number <span className="text-destructive">*</span>
+            </Label>
+            <div className="flex gap-2">
+              <div className="flex items-center px-3 border rounded-md bg-muted text-muted-foreground text-sm font-medium">
+                +91
+              </div>
+              <div className="flex-1">
+                <Input
+                  id="phone"
+                  type="tel"
+                  maxLength={10}
+                  value={formData.phone}
+                  onChange={(e) => {
+                    const value = e.target.value.replace(/\D/g, '');
+                    setFormData({ ...formData, phone: value });
+                    setFormErrors({ ...formErrors, phone: '' });
+                  }}
+                  placeholder="10 digit number"
+                  className={`${formErrors.phone ? 'border-destructive focus-visible:ring-destructive' : ''}`}
+                />
+              </div>
             </div>
-            <div className="flex-1">
-              <Input
-                id="phone"
-                type="tel"
-                maxLength={10}
-                value={formData.phone}
-                onChange={(e) => {
-                  const value = e.target.value.replace(/\D/g, '');
-                  setFormData({ ...formData, phone: value });
-                  setFormErrors({ ...formErrors, phone: '' });
-                }}
-                placeholder="10 digit number"
-                className={formErrors.phone ? 'border-destructive' : ''}
-              />
+            {formErrors.phone && (
+              <p className="text-xs text-destructive font-medium pl-1">{formErrors.phone}</p>
+            )}
+          </div>
+        </div>
+
+        {/* WhatsApp Toggle - Sleeker look */}
+        <div className="flex items-center justify-between p-3 rounded-lg border bg-muted/30">
+          <div className="flex items-center gap-3">
+            <div className={`p-2 rounded-full ${formData.has_whatsapp ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-400'}`}>
+              <MessageSquare className="h-4 w-4" />
+            </div>
+            <div>
+              <p className="text-sm font-medium">WhatsApp Available</p>
+              <p className="text-xs text-muted-foreground">Is this phone number on WhatsApp?</p>
             </div>
           </div>
-          {formErrors.phone && (
-            <p className="text-xs text-destructive">{formErrors.phone}</p>
-          )}
-        </div>
-      </div>
-
-      {/* WhatsApp */}
-      <div className="space-y-2">
-        <Label htmlFor="whatsapp" className="flex items-center gap-2">
-          Using WhatsApp on this number
-        </Label>
-        <div className="flex items-center space-x-2 h-9">
           <Switch
             id="whatsapp"
             checked={formData.has_whatsapp}
@@ -238,91 +274,130 @@ const CustomerForm = ({ customer = null, onSuccess, onCancel }) => {
               setFormData({ ...formData, has_whatsapp: checked })
             }
           />
-          <span className="text-sm text-muted-foreground">
-            {formData.has_whatsapp ? 'Yes' : 'No'}
-          </span>
         </div>
       </div>
 
-      {/* Map Link */}
-      <div className="space-y-2">
-        <Label htmlFor="map_link">Google Maps Link</Label>
-        <div className="relative">
-          <Textarea
-            id="map_link"
-            value={formData.map_link}
-            onChange={(e) => handleMapLinkChange(e.target.value)}
-            placeholder="Paste Google Maps link here to auto-fill location..."
-            rows={2}
-            disabled={mapLinkLoading}
-          />
-          {mapLinkLoading && (
-            <Loader2 className="absolute right-3 top-3 h-4 w-4 animate-spin" />
-          )}
-        </div>
-      </div>
+      {/* Location Section */}
+      <div className="space-y-4 pt-2">
+        <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider px-1">Location Details</h3>
 
-      {/* State, District, City */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="space-y-2">
-          <Label>State</Label>
-          <ComboBox
-            value={formData.state}
-            onValueChange={(value) => setFormData({ ...formData, state: value })}
-            options={states}
-            placeholder="Select state"
-          />
+          <Label htmlFor="map_link" className="flex items-center gap-2">
+            <Navigation className="h-4 w-4 text-primary/70" />
+            Google Maps Link
+          </Label>
+          <div className="relative">
+            <Textarea
+              id="map_link"
+              value={formData.map_link}
+              onChange={(e) => handleMapLinkChange(e.target.value)}
+              placeholder="Paste maps link to auto-fill location..."
+              className="min-h-[80px] pr-10 resize-none bg-blue-50/10 border-blue-100 focus-visible:border-blue-400 focus-visible:ring-blue-100"
+              disabled={mapLinkLoading}
+            />
+            {mapLinkLoading ? (
+              <Loader2 className="absolute right-3 top-3 h-5 w-5 animate-spin text-primary" />
+            ) : formData.latitude && (
+              <Check className="absolute right-3 top-3 h-5 w-5 text-green-500" />
+            )}
+          </div>
+          <p className="text-[10px] text-muted-foreground italic px-1">
+            Tip: Long press on Google Maps to drop a pin and copy the link.
+          </p>
         </div>
-        <div className="space-y-2">
-          <Label>District</Label>
-          <ComboBox
-            value={formData.district}
-            onValueChange={(value) => setFormData({ ...formData, district: value })}
-            options={districts}
-            placeholder="Select district"
-            emptyText={formData.state ? 'No districts available' : 'Select state first'}
-          />
-        </div>
-        <div className="space-y-2">
-          <Label>City</Label>
-          <ComboBox
-            value={formData.city}
-            onValueChange={(value) => setFormData({ ...formData, city: value })}
-            options={cities}
-            placeholder="Select city"
-            emptyText={formData.state ? 'No cities available' : 'Select state first'}
-          />
-        </div>
-      </div>
 
-      {/* Area */}
-      <div className="space-y-2">
-        <Label htmlFor="area">Area / Locality</Label>
-        <Input
-          id="area"
-          value={formData.area}
-          onChange={(e) => setFormData({ ...formData, area: e.target.value })}
-          placeholder="Enter area or locality name"
-        />
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label className="flex items-center gap-2">
+              <Globe className="h-4 w-4 text-primary/70" />
+              State
+            </Label>
+            <ComboBox
+              value={formData.state}
+              onValueChange={(value) => setFormData({ ...formData, state: value })}
+              options={states}
+              placeholder="Select state"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label className="flex items-center gap-2">
+              <Map className="h-4 w-4 text-primary/70" />
+              District
+            </Label>
+            <ComboBox
+              value={formData.district}
+              onValueChange={(value) => setFormData({ ...formData, district: value })}
+              options={districts}
+              placeholder="Select district"
+              emptyText={formData.state ? 'No districts' : 'Select state first'}
+            />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label className="flex items-center gap-2">
+              <MapPin className="h-4 w-4 text-primary/70" />
+              City / Town
+            </Label>
+            <ComboBox
+              value={formData.city}
+              onValueChange={(value) => setFormData({ ...formData, city: value })}
+              options={cities}
+              placeholder="Select city"
+              emptyText={formData.state ? 'No cities' : 'Select state first'}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="area" className="flex items-center gap-2">
+              <MapPin className="h-4 w-4 text-primary/70" />
+              Area / Locality <span className="text-destructive">*</span>
+            </Label>
+            <Input
+              id="area"
+              value={formData.area}
+              onChange={(e) => {
+                setFormData({ ...formData, area: e.target.value });
+                setFormErrors({ ...formErrors, area: '' });
+              }}
+              placeholder="Local area name"
+              className={formErrors.area ? 'border-destructive focus-visible:ring-destructive' : ''}
+            />
+            {formErrors.area && (
+              <p className="text-xs text-destructive font-medium pl-1">{formErrors.area}</p>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* Form Actions */}
-      <div className="flex gap-2 justify-end pt-4">
-        <Button
-          type="button"
-          variant="outline"
-          onClick={onCancel}
-          disabled={formLoading}
-        >
-          Cancel
-        </Button>
-        <Button type="submit" disabled={formLoading}>
-          {formLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-          {customer ? 'Update' : 'Create'}
-        </Button>
-      </div>
+      {showActions && (
+        <div className="flex flex-col sm:flex-row gap-3 pt-6 border-t mt-6">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onCancel}
+            disabled={formLoading}
+            className="order-2 sm:order-1 h-12 sm:h-auto"
+          >
+            Cancel
+          </Button>
+          <Button
+            type="submit"
+            disabled={formLoading}
+            className="order-1 sm:order-2 flex-1 h-12 sm:h-auto shadow-sm"
+          >
+            {formLoading ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Check className="mr-2 h-4 w-4" />
+            )}
+            {customer ? 'Update Customer' : 'Save Customer'}
+          </Button>
+        </div>
+      )}
     </form>
   );
-};
+});
 
 export default CustomerForm;

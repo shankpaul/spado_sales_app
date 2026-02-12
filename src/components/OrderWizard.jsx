@@ -1,5 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from './ui/dialog';
+import {
+  Sheet,
+  SheetContent,
+} from './ui/sheet';
 import { Button } from './ui/button';
 import CustomerForm from './CustomerForm';
 import { Input } from './ui/input';
@@ -55,6 +59,7 @@ import {
   Search,
   Phone,
   PenIcon,
+  ArrowLeft,
 } from 'lucide-react';
 
 /**
@@ -77,13 +82,18 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
   const customerSearchRef = useRef(null);
   const [editingCustomer, setEditingCustomer] = useState(false);
   const [editCustomerData, setEditCustomerData] = useState({ phone: '', area: '', city: '' });
-  
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+
+  // Form refs
+  const customerFormRef = useRef(null);
+
   // Data states
   const [customers, setCustomers] = useState([]);
   const [packages, setPackages] = useState([]);
   const [addons, setAddons] = useState([]);
   const [agents, setAgents] = useState([]);
-  
+
   // Form states
   const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [packageItems, setPackageItems] = useState([]);
@@ -102,7 +112,7 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
   const [customerPhone, setCustomerPhone] = useState(''); // Order-specific customer phone
   const [notes, setNotes] = useState('');
   const [orderStatus, setOrderStatus] = useState('');
-  
+
   // Validation errors
   const [errors, setErrors] = useState({});
 
@@ -126,6 +136,13 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
       fetchOrderData();
     }
   }, [open, orderId]);
+
+  // Handle window resize for responsiveness
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   // Debounced customer search
   useEffect(() => {
@@ -180,7 +197,7 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
         const { data, timestamp } = JSON.parse(draft);
         const now = new Date().getTime();
         const hoursPassed = (now - timestamp) / (1000 * 60 * 60);
-        
+
         if (hoursPassed < DRAFT_EXPIRY_HOURS) {
           // Check if customerId conflicts with draft
           if (customerId && data.selectedCustomer?.id !== customerId) {
@@ -214,14 +231,13 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
     setAddress(data.address || { area: '', city: '', district: '', state: '', map_link: '' });
     setCustomerPhone(data.customerPhone || '');
     setNotes(data.notes || '');
-    toast.info('Draft order restored');
   };
 
   // Save to localStorage (only for new orders, not edit mode)
   const saveDraft = (step = currentStep) => {
     // Don't save draft when editing existing order
     if (orderId) return;
-    
+
     const draftData = {
       currentStep: step,
       selectedCustomer,
@@ -235,7 +251,7 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
       address,
       notes,
     };
-    
+
     localStorage.setItem(
       STORAGE_KEYS.ORDER_WIZARD_DRAFT,
       JSON.stringify({
@@ -311,11 +327,11 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
     try {
       const response = await orderService.getOrderById(orderId);
       const order = response.order;
-      
+
       if (order) {
         // Store order status
         setOrderStatus(order.status);
-        
+
         // Set customer
         if (order.customer) {
           setSelectedCustomer({
@@ -336,7 +352,7 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
             city: order.customer.city,
           }]);
         }
-       
+
         // Set packages with all necessary fields
         const orderPackages = order.packages?.map(pkg => ({
           package_id: String(pkg.package.id), // Convert to string for Select component
@@ -351,7 +367,7 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
           package: pkg.package, // Include full package details
         })) || [];
         setPackageItems(orderPackages);
-        
+
         // Set addons
         const orderAddons = order.addons?.map(addon => ({
           addon_id: String(addon.addon.id), // Convert to string for Select component
@@ -364,15 +380,15 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
           addon: addon.addon, // Include full addon details
         })) || [];
         setAddonItems(orderAddons);
-        
+
         // Set booking details
         setBookingDate(order.booking_date || '');
         setBookingTimeFrom(extractTimeFromDateTime(order.booking_time_from));
         setBookingTimeTo(extractTimeFromDateTime(order.booking_time_to));
-        
+
         // Set agent
         setSelectedAgent(order.assigned_to?.id?.toString() || '');
-        
+
         // Set address
         setAddress({
           area: order.area || '',
@@ -381,10 +397,10 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
           state: order.state || '',
           map_link: order.map_link || '',
         });
-        
+
         // Set notes
         setNotes(order.notes || '');
-        
+
         toast.success('Order data loaded');
       }
     } catch (error) {
@@ -417,7 +433,7 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
   const handleDeleteDraft = () => {
     clearDraft();
     resetWizard();
-    toast.success('Draft deleted');
+
   };
 
   // Reset wizard
@@ -449,13 +465,13 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
   // Step validation
   const validateStep = (step) => {
     const newErrors = {};
-    
+
     if (step === 1) {
       if (!selectedCustomer) {
         newErrors.customer = 'Please select a customer';
       }
     }
-    
+
     if (step === 2) {
       if (packageItems.length === 0) {
         newErrors.packages = 'Please add at least one package';
@@ -466,7 +482,7 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
         if (!item.quantity || item.quantity < 1) newErrors[`package_${index}_quantity`] = 'Required';
       });
     }
-    
+
     if (step === 3) {
       // Validate addons if any are added
       addonItems.forEach((item, index) => {
@@ -474,19 +490,19 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
         if (!item.quantity || item.quantity < 1) newErrors[`addon_${index}_quantity`] = 'Required';
       });
     }
-    
+
     if (step === 4) {
       if (!bookingDate) newErrors.bookingDate = 'Required';
       if (!bookingTimeFrom) newErrors.bookingTimeFrom = 'Required';
       if (!bookingTimeTo) newErrors.bookingTimeTo = 'Required';
       if (!address.area) newErrors.area = 'Area is required';
-      
+
       // Validate time range
       if (bookingTimeFrom && bookingTimeTo && bookingTimeFrom >= bookingTimeTo) {
         newErrors.bookingTimeTo = 'End time must be after start time';
       }
     }
-    
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -528,7 +544,7 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
   const updatePackageItem = (index, field, value) => {
     const updated = [...packageItems];
     updated[index][field] = value;
-    
+
     // Auto-fill vehicle type when brand and model selected
     if (field === 'model' && updated[index].brand) {
       const vehicleType = getVehicleType(updated[index].brand, value);
@@ -536,7 +552,7 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
         updated[index].vehicle_type = vehicleType;
       }
     }
-    
+
     // Update price when package selected
     if (field === 'package_id') {
       const pkg = packages.find((p) => String(p.id) === String(value));
@@ -544,7 +560,7 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
         updated[index].unit_price = pkg.unit_price || pkg.price || 0;
       }
     }
-    
+
     setPackageItems(updated);
     saveDraft();
   };
@@ -553,17 +569,17 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
   const calculateLineTotal = (item) => {
     const subtotal = item.quantity * item.unit_price;
     let discount = 0;
-    
+
     if (item.discount_type === DISCOUNT_TYPES.PERCENTAGE) {
       discount = (subtotal * item.discount_value) / 100;
     } else {
       discount = item.discount_value;
     }
-    
+
     // Ensure discount doesn't exceed 50% of subtotal
     const maxDiscount = subtotal * 0.5;
     discount = Math.min(discount, maxDiscount);
-    
+
     return subtotal - discount;
   };
 
@@ -614,14 +630,14 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
   const updateAddonItem = (index, field, value) => {
     const updated = [...addonItems];
     updated[index][field] = value;
-    
+
     if (field === 'addon_id') {
       const addon = addons.find((a) => String(a.id) === String(value));
       if (addon) {
         updated[index].unit_price = addon.unit_price || addon.price || 0;
       }
     }
-    
+
     setAddonItems(updated);
     saveDraft();
   };
@@ -662,7 +678,7 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
           discount_value: item.discount_value,
         })),
       };
-      
+
       if (orderId) {
         await orderService.updateOrder(orderId, orderData);
         toast.success('Order updated successfully');
@@ -670,7 +686,7 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
         await orderService.createOrder(orderData);
         toast.success(`Order ${finalStatus === 'draft' ? 'saved as draft' : 'confirmed'} successfully`);
       }
-      
+
       clearDraft();
       resetWizard();
       onSuccess();
@@ -725,7 +741,7 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
               <Loader2 className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />
             )}
           </div>
-          
+
           {/* Suggestions Dropdown */}
           {showCustomerSuggestions && customerSearchTerm.length >= 2 && (
             <Card className="absolute z-50 w-full mt-1 max-h-64 overflow-y-auto shadow-lg">
@@ -740,7 +756,7 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
                     <button
                       key={customer.id}
                       type="button"
-                      className="w-full px-4 py-3 text-left hover:bg-secondary transition-colors border-b last:border-b-0"
+                      className="w-full px-4 py-3 text-left hover:bg-secondary active:bg-secondary/80 active:scale-[0.99] transition-all border-b last:border-b-0"
                       onClick={() => {
                         setSelectedCustomer(customer);
                         setCustomerPhone(customer.phone || ''); // Initialize order-specific phone
@@ -795,13 +811,13 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
         </div>
         {errors.customer && <p className="text-sm text-destructive mt-1">{errors.customer}</p>}
       </div>
-      
+
       {selectedCustomer && (
         <Card className="p-4 bg-secondary/50">
           <div className="flex justify-between items-start">
             <div className="space-y-2 text-sm flex-1">
               <div><strong>Name:</strong> {selectedCustomer.name}</div>
-              
+
               {editingCustomer ? (
                 <div className='grid grid-cols-2 gap-2 '>
                   <div>
@@ -894,32 +910,32 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
 
       <div className="space-y-3">
 
-          <div>
-            <Label className="text-xs">Map Link</Label>
-            <Input
-              value={address.map_link}
-              onChange={(e) => {
-                setAddress({ ...address, map_link: e.target.value });
-                saveDraft();
-              }}
-              placeholder="Google Maps link"
-            />
-          </div>
-          
-          <div>
-            <Label className="text-xs">Area</Label>
-            <Input
-              value={address.area}
-              onChange={(e) => {
-                setAddress({ ...address, area: e.target.value });
-                saveDraft();
-              }}
-              placeholder="Area or locality"
-            />
-            {errors.area && <p className="text-sm text-destructive mt-1">{errors.area}</p>}
-          </div>
-          
-          {/* <div className="grid grid-cols-2 gap-3">
+        <div>
+          <Label className="text-xs">Map Link</Label>
+          <Input
+            value={address.map_link}
+            onChange={(e) => {
+              setAddress({ ...address, map_link: e.target.value });
+              saveDraft();
+            }}
+            placeholder="Google Maps link"
+          />
+        </div>
+
+        <div>
+          <Label className="text-xs">Area</Label>
+          <Input
+            value={address.area}
+            onChange={(e) => {
+              setAddress({ ...address, area: e.target.value });
+              saveDraft();
+            }}
+            placeholder="Area or locality"
+          />
+          {errors.area && <p className="text-sm text-destructive mt-1">{errors.area}</p>}
+        </div>
+
+        {/* <div className="grid grid-cols-2 gap-3">
             <div>
               <Label className="text-xs">City</Label>
               <Input
@@ -956,9 +972,9 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
               placeholder="State"
             />
           </div> */}
-          
-          
-        </div>
+
+
+      </div>
     </div>
   );
 
@@ -972,9 +988,9 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
           Add Package
         </Button>
       </div>
-      
+
       {errors.packages && <p className="text-sm text-destructive">{errors.packages}</p>}
-      
+
       {packageItems.length === 0 ? (
         <Card className="p-8 text-center">
           <ShoppingCart className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
@@ -990,160 +1006,160 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
           {packageItems.map((item, index) => {
             const hasError = errors[`package_${index}_vehicle_type`] || errors[`package_${index}_package`];
             return (
-          <Card key={index} className={`p-4 `}>
-            <div className="space-y-3">
-              <div className="flex justify-between items-start">
-                <span className="font-medium">Service {index + 1}</span>
-                <div className='flex gap-2 items-center'>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="h-6 text-xs cursor-pointer"
-                      onClick={() => {
-                        setIdentifyDialog({ open: true, index });
-                        setIdentifyBrand('');
-                        setIdentifyModel('');
-                      }}
-                    >
-                      <Search className="h-3 w-3 mr-1" />
-                      Identify Vehicle Type
-                    </Button>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setDeletePackageDialog({ open: true, index })}
-                  >
-                    <Trash2 className="h-4 w-4 text-destructive" />
-                  </Button>
-                </div>
-              </div>
-              
-              {hasError && (
-                <div className="flex items-center gap-2 text-destructive text-sm bg-destructive/10 p-2 rounded">
-                  <X className="h-4 w-4" />
-                  <span>
-                    {errors[`package_${index}_vehicle_type`] && 'Vehicle type is required. '}
-                    {errors[`package_${index}_package`] && 'Package selection is required.'}
-                  </span>
-                </div>
-              )}
-              
-              <div className="grid grid-cols-2 gap-3">
-                <div className="col-span-2">
-                  <div className={`flex gap-2 `}>
-                    {[{ type: 'hatchback', icon: Car }, { type: 'sedan', icon: Car }, { type: 'suv', icon: Truck }].map(({ type, icon: Icon }) => (
+              <Card key={index} className={`p-4 `}>
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center">
+                    <span className="font-medium">Service {index + 1}</span>
+                    <div className='flex gap-2 items-center'>
                       <Button
-                        key={type}
                         type="button"
-                        variant={item.vehicle_type === type ? 'default' : 'outline'}
+                        variant="ghost"
                         size="sm"
-                        className="flex-1 h-10 flex flex-row gap-2 rounded-full cursor-pointer"
-                        onClick={() => updatePackageItem(index, 'vehicle_type', type)}
+                        className="h-6 text-xs cursor-pointer"
+                        onClick={() => {
+                          setIdentifyDialog({ open: true, index });
+                          setIdentifyBrand('');
+                          setIdentifyModel('');
+                        }}
                       >
-                        <Icon className="h-5 w-5" />
-                        <span className="text-xs capitalize">{type}</span>
+                        <Search className="h-3 w-3 mr-1" />
+                        Identify Vehicle Type
                       </Button>
-                    ))}
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setDeletePackageDialog({ open: true, index })}
+                      >
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </div>
+                  </div>
+
+                  {hasError && (
+                    <div className="flex items-center gap-2 text-destructive text-sm bg-destructive/10 p-2 rounded">
+                      <X className="h-4 w-4" />
+                      <span>
+                        {errors[`package_${index}_vehicle_type`] && 'Vehicle type is required. '}
+                        {errors[`package_${index}_package`] && 'Package selection is required.'}
+                      </span>
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="col-span-2">
+                      <div className={`flex gap-2 `}>
+                        {[{ type: 'hatchback', icon: Car }, { type: 'sedan', icon: Car }, { type: 'suv', icon: Truck }].map(({ type, icon: Icon }) => (
+                          <Button
+                            key={type}
+                            type="button"
+                            variant={item.vehicle_type === type ? 'default' : 'outline'}
+                            size="sm"
+                            className="flex-1 h-12 flex flex-col items-center justify-center gap-1 rounded-xl cursor-pointer active:scale-[0.95] transition-all"
+                            onClick={() => updatePackageItem(index, 'vehicle_type', type)}
+                          >
+                            <Icon className="h-5 w-5" />
+                            <span className="text-[10px] capitalize font-semibold">{type}</span>
+                          </Button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div>
+                      <Label className="text-xs">Package *</Label>
+                      <div>
+                        <Select
+                          value={item.package_id}
+                          onValueChange={(value) => updatePackageItem(index, 'package_id', value)}
+                          disabled={!item.vehicle_type}
+                        >
+                          <SelectTrigger className="h-8 text-sm">
+                            <SelectValue placeholder="Select package" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {packages
+                              .filter((p) => p.vehicle_type?.toLowerCase() === item.vehicle_type?.toLowerCase())
+                              .map((pkg) => (
+                                <SelectItem key={pkg.id} value={String(pkg.id)}>
+                                  {pkg.name} - ₹{pkg.unit_price || pkg.price || pkg.base_price}
+                                </SelectItem>
+                              ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+
+                    <div>
+                      <Label className="text-xs">Quantity *</Label>
+                      <div className="flex items-center gap-1">
+                        <Button
+                          type="button"
+                          size="icon"
+                          className="h-8 w-8  aspect-square rounded-full"
+                          onClick={() => {
+                            const newQty = Math.max(1, item.quantity - 1);
+                            updatePackageItem(index, 'quantity', newQty);
+                          }}
+                          disabled={item.quantity <= 1}
+                        >
+                          <Minus className="h-3 w-3" />
+                        </Button>
+                        <Input
+                          type="number"
+                          min="1"
+                          value={item.quantity}
+                          readOnly
+                          className="h-8 text-sm text-center bg-secondary"
+                        />
+                        <Button
+                          type="button"
+                          size="icon"
+                          className="h-8 w-8 aspect-square rounded-full"
+                          onClick={() => {
+                            updatePackageItem(index, 'quantity', item.quantity + 1);
+                          }}
+                        >
+                          <Plus className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    </div>
+
+                    <div>
+                      <Label className="text-xs">Discount</Label>
+                      <div className="flex gap-1">
+                        <Input
+                          type="number"
+                          min="0"
+                          value={item.discount_value}
+                          onChange={(e) => updatePackageItem(index, 'discount_value', parseFloat(e.target.value) || 0)}
+                          className="h-8 text-sm"
+                        />
+                        <Select
+                          value={item.discount_type}
+                          onValueChange={(value) => updatePackageItem(index, 'discount_type', value)}
+                        >
+                          <SelectTrigger className="h-8 w-16 text-xs">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value={DISCOUNT_TYPES.FIXED}>₹</SelectItem>
+                            <SelectItem value={DISCOUNT_TYPES.PERCENTAGE}>%</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+
+                    <div className='text-right'>
+                      <Label className="text-sm">Package Amount</Label>
+                      <h2 className="h-8 text-2xl font-bold">
+                        {`₹${calculateLineTotal(item).toFixed(2)}`}
+                      </h2>
+                    </div>
                   </div>
                 </div>
-                
-                <div>
-                  <Label className="text-xs">Package *</Label>
-                  <div>
-                    <Select
-                      value={item.package_id}
-                      onValueChange={(value) => updatePackageItem(index, 'package_id', value)}
-                      disabled={!item.vehicle_type}
-                    >
-                      <SelectTrigger className="h-8 text-sm">
-                        <SelectValue placeholder="Select package" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {packages
-                          .filter((p) => p.vehicle_type?.toLowerCase() === item.vehicle_type?.toLowerCase())
-                          .map((pkg) => (
-                            <SelectItem key={pkg.id} value={String(pkg.id)}>
-                              {pkg.name} - ₹{pkg.unit_price || pkg.price || pkg.base_price}
-                            </SelectItem>
-                          ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                
-                <div>
-                  <Label className="text-xs">Quantity *</Label>
-                  <div className="flex items-center gap-1">
-                    <Button
-                      type="button"
-                      size="icon"
-                      className="h-8 w-8  aspect-square rounded-full"
-                      onClick={() => {
-                        const newQty = Math.max(1, item.quantity - 1);
-                        updatePackageItem(index, 'quantity', newQty);
-                      }}
-                      disabled={item.quantity <= 1}
-                    >
-                      <Minus className="h-3 w-3" />
-                    </Button>
-                    <Input
-                      type="number"
-                      min="1"
-                      value={item.quantity}
-                      readOnly
-                      className="h-8 text-sm text-center bg-secondary"
-                    />
-                    <Button
-                      type="button"
-                      size="icon"
-                      className="h-8 w-8 aspect-square rounded-full"
-                      onClick={() => {
-                        updatePackageItem(index, 'quantity', item.quantity + 1);
-                      }}
-                    >
-                      <Plus className="h-3 w-3" />
-                    </Button>
-                  </div>
-                </div>
-                
-                <div>
-                  <Label className="text-xs">Discount</Label>
-                  <div className="flex gap-1">
-                    <Input
-                      type="number"
-                      min="0"
-                      value={item.discount_value}
-                      onChange={(e) => updatePackageItem(index, 'discount_value', parseFloat(e.target.value) || 0)}
-                      className="h-8 text-sm"
-                    />
-                    <Select
-                      value={item.discount_type}
-                      onValueChange={(value) => updatePackageItem(index, 'discount_type', value)}
-                    >
-                      <SelectTrigger className="h-8 w-16 text-xs">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value={DISCOUNT_TYPES.FIXED}>₹</SelectItem>
-                        <SelectItem value={DISCOUNT_TYPES.PERCENTAGE}>%</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                
-                <div className='text-right'>
-                  <Label className="text-sm">Package Amount</Label>
-                  <h2 className="h-8 text-2xl font-bold">
-                    {`₹${calculateLineTotal(item).toFixed(2)}`}
-                  </h2>
-                </div>
-              </div>
-            </div>
-          </Card>
-          );
-        })}
+              </Card>
+            );
+          })}
         </div>
       )}
     </div>
@@ -1162,7 +1178,7 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
           Add Add-on
         </Button>
       </div>
-      
+
       {addonItems.length === 0 ? (
         <Card className="p-8 text-center">
           <ShoppingCart className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
@@ -1177,121 +1193,121 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
           {addonItems.map((item, index) => {
             const hasError = errors[`addon_${index}_addon`];
             return (
-            <Card key={index} className={`p-4`}>
-              <div className="space-y-3">
-                <div className="flex justify-between items-start">
-                  <span className="font-medium">Add-on {index + 1}</span>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => removeAddonItem(index)}
-                  >
-                    <Trash2 className="h-4 w-4 text-destructive" />
-                  </Button>
-                </div>
-                
-                {hasError && (
-                  <div className="flex items-center gap-2 text-destructive text-sm bg-destructive/10 p-2 rounded">
-                    <X className="h-4 w-4" />
-                    <span>Add-on selection is required</span>
+              <Card key={index} className={`p-4`}>
+                <div className="space-y-3">
+                  <div className="flex justify-between items-start">
+                    <span className="font-medium">Add-on {index + 1}</span>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => removeAddonItem(index)}
+                    >
+                      <Trash2 className="h-4 w-4 text-destructive" />
+                    </Button>
                   </div>
-                )}
-                
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <Label className="text-xs">Add-on Service *</Label>
+
+                  {hasError && (
+                    <div className="flex items-center gap-2 text-destructive text-sm bg-destructive/10 p-2 rounded">
+                      <X className="h-4 w-4" />
+                      <span>Add-on selection is required</span>
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <Select
-                        value={item.addon_id}
-                        onValueChange={(value) => updateAddonItem(index, 'addon_id', value)}
-                      >
-                        <SelectTrigger className="h-8 text-sm">
-                          <SelectValue placeholder="Select add-on" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {addons.map((addon) => (
-                            <SelectItem key={addon.id} value={String(addon.id)}>
-                              {addon.name} - ₹{addon.unit_price || addon.price}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <Label className="text-xs">Add-on Service *</Label>
+                      <div>
+                        <Select
+                          value={item.addon_id}
+                          onValueChange={(value) => updateAddonItem(index, 'addon_id', value)}
+                        >
+                          <SelectTrigger className="h-8 text-sm">
+                            <SelectValue placeholder="Select add-on" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {addons.map((addon) => (
+                              <SelectItem key={addon.id} value={String(addon.id)}>
+                                {addon.name} - ₹{addon.unit_price || addon.price}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+
+                    <div>
+                      <Label className="text-xs">Quantity *</Label>
+                      <div className="flex items-center gap-1">
+                        <Button
+                          type="button"
+                          size="icon"
+                          className="h-8 w-8 rounded-full aspect-square"
+                          onClick={() => {
+                            const newQty = Math.max(1, item.quantity - 1);
+                            updateAddonItem(index, 'quantity', newQty);
+                          }}
+                          disabled={item.quantity <= 1}
+                        >
+                          <Minus className="h-3 w-3" />
+                        </Button>
+                        <Input
+                          type="number"
+                          min="1"
+                          value={item.quantity}
+                          readOnly
+                          className="h-8 text-sm text-center bg-secondary"
+                        />
+                        <Button
+                          type="button"
+                          size="icon"
+                          className="h-8 w-8 rounded-full aspect-square"
+                          onClick={() => {
+                            updateAddonItem(index, 'quantity', item.quantity + 1);
+                          }}
+                        >
+                          <Plus className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    </div>
+
+
+                    <div>
+                      <Label className="text-xs">Discount</Label>
+                      <div className="flex gap-1">
+                        <Input
+                          type="number"
+                          min="0"
+                          value={item.discount_value}
+                          onChange={(e) => updateAddonItem(index, 'discount_value', parseFloat(e.target.value) || 0)}
+                          className="h-8 text-sm"
+                        />
+                        <Select
+                          value={item.discount_type}
+                          onValueChange={(value) => updateAddonItem(index, 'discount_type', value)}
+                        >
+                          <SelectTrigger className="h-8 w-16 text-xs">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value={DISCOUNT_TYPES.FIXED}>₹</SelectItem>
+                            <SelectItem value={DISCOUNT_TYPES.PERCENTAGE}>%</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+
+                    <div className='text-right'>
+                      <Label className="text-sm">Addon Amount</Label>
+                      <h2 className="h-8 text-2xl font-bold">
+                        {`₹${calculateLineTotal(item).toFixed(2)}`}
+                      </h2>
                     </div>
                   </div>
-                  
-                  <div>
-                    <Label className="text-xs">Quantity *</Label>
-                    <div className="flex items-center gap-1">
-                      <Button
-                        type="button"
-                        size="icon"
-                        className="h-8 w-8 rounded-full aspect-square"
-                        onClick={() => {
-                          const newQty = Math.max(1, item.quantity - 1);
-                          updateAddonItem(index, 'quantity', newQty);
-                        }}
-                        disabled={item.quantity <= 1}
-                      >
-                        <Minus className="h-3 w-3" />
-                      </Button>
-                      <Input
-                        type="number"
-                        min="1"
-                        value={item.quantity}
-                        readOnly
-                        className="h-8 text-sm text-center bg-secondary"
-                      />
-                      <Button
-                        type="button"
-                        size="icon"
-                        className="h-8 w-8 rounded-full aspect-square"
-                        onClick={() => {
-                          updateAddonItem(index, 'quantity', item.quantity + 1);
-                        }}
-                      >
-                        <Plus className="h-3 w-3" />
-                      </Button>
-                    </div>
-                  </div>
-                  
-                  
-                  <div>
-                    <Label className="text-xs">Discount</Label>
-                    <div className="flex gap-1">
-                      <Input
-                        type="number"
-                        min="0"
-                        value={item.discount_value}
-                        onChange={(e) => updateAddonItem(index, 'discount_value', parseFloat(e.target.value) || 0)}
-                        className="h-8 text-sm"
-                      />
-                      <Select
-                        value={item.discount_type}
-                        onValueChange={(value) => updateAddonItem(index, 'discount_type', value)}
-                      >
-                        <SelectTrigger className="h-8 w-16 text-xs">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value={DISCOUNT_TYPES.FIXED}>₹</SelectItem>
-                          <SelectItem value={DISCOUNT_TYPES.PERCENTAGE}>%</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                  
-                  <div className='text-right'>
-                  <Label className="text-sm">Addon Amount</Label>
-                  <h2 className="h-8 text-2xl font-bold">
-                    {`₹${calculateLineTotal(item).toFixed(2)}`}
-                  </h2>
                 </div>
-                </div>
-              </div>
-            </Card>
-          );
-        })}
+              </Card>
+            );
+          })}
         </div>
       )}
     </div>
@@ -1300,7 +1316,7 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
   // Step 4: Booking Details
   const renderStep4 = () => {
     const totals = calculateTotals();
-    
+
     return (
       <div className="space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1319,68 +1335,68 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
               </div>
 
               <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label>From Time *</Label>
-                <Select
-                  value={bookingTimeFrom}
-                  onValueChange={(value) => {
-                    setBookingTimeFrom(value);
-                    
-                    // Auto-calculate toTime (30 minutes later)
-                    if (value) {
-                      const [hours, minutes] = value.split(':').map(Number);
-                      const fromDate = new Date();
-                      fromDate.setHours(hours, minutes);
-                      fromDate.setMinutes(fromDate.getMinutes() + 30);
-                      const toHours = String(fromDate.getHours()).padStart(2, '0');
-                      const toMinutes = String(fromDate.getMinutes()).padStart(2, '0');
-                      setBookingTimeTo(`${toHours}:${toMinutes}`);
-                    }
-                    saveDraft();
-                  }}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select time" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {generateTimeOptions().map((time) => (
-                      <SelectItem key={time.value} value={time.value}>
-                        {time.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {errors.bookingTimeFrom && <p className="text-sm text-destructive mt-1">{errors.bookingTimeFrom}</p>}
-              </div>
-              
-              <div>
-                <Label>To Time *</Label>
-                <Select
-                  value={bookingTimeTo}
-                  onValueChange={(value) => {
-                    setBookingTimeTo(value);
-                    saveDraft();
-                  }}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select time" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {generateTimeOptions()
-                      .filter((time) => !bookingTimeFrom || time.value > bookingTimeFrom)
-                      .map((time) => (
+                <div>
+                  <Label>From *</Label>
+                  <Select
+                    value={bookingTimeFrom}
+                    onValueChange={(value) => {
+                      setBookingTimeFrom(value);
+
+                      // Auto-calculate toTime (30 minutes later)
+                      if (value) {
+                        const [hours, minutes] = value.split(':').map(Number);
+                        const fromDate = new Date();
+                        fromDate.setHours(hours, minutes);
+                        fromDate.setMinutes(fromDate.getMinutes() + 30);
+                        const toHours = String(fromDate.getHours()).padStart(2, '0');
+                        const toMinutes = String(fromDate.getMinutes()).padStart(2, '0');
+                        setBookingTimeTo(`${toHours}:${toMinutes}`);
+                      }
+                      saveDraft();
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select time" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {generateTimeOptions().map((time) => (
                         <SelectItem key={time.value} value={time.value}>
                           {time.label}
                         </SelectItem>
                       ))}
-                  </SelectContent>
-                </Select>
-                {errors.bookingTimeTo && <p className="text-sm text-destructive mt-1">{errors.bookingTimeTo}</p>}
+                    </SelectContent>
+                  </Select>
+                  {errors.bookingTimeFrom && <p className="text-sm text-destructive mt-1">{errors.bookingTimeFrom}</p>}
+                </div>
+
+                <div>
+                  <Label>To *</Label>
+                  <Select
+                    value={bookingTimeTo}
+                    onValueChange={(value) => {
+                      setBookingTimeTo(value);
+                      saveDraft();
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select time" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {generateTimeOptions()
+                        .filter((time) => !bookingTimeFrom || time.value > bookingTimeFrom)
+                        .map((time) => (
+                          <SelectItem key={time.value} value={time.value}>
+                            {time.label}
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                  {errors.bookingTimeTo && <p className="text-sm text-destructive mt-1">{errors.bookingTimeTo}</p>}
+                </div>
               </div>
+
             </div>
-              
-            </div>
-          
+
             <div>
               <Label>Assign Agent (Optional)</Label>
               <Select value={selectedAgent || "unassigned"} onValueChange={(value) => {
@@ -1400,7 +1416,7 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
                 </SelectContent>
               </Select>
             </div>
-            
+
             <div className='flex-grow flex flex-col'>
               <Label>Notes</Label>
               <Textarea
@@ -1416,45 +1432,43 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
             </div>
           </div>
           <Card className="p-4 bg-secondary/50">
-          <div className="space-y-2 text-sm">
-            <div className="flex justify-between">
-              <span>Packages Total:</span>
-              <span className="font-medium">₹{totals.packages.toFixed(2)}</span>
+            <div className="space-y-2 text-sm">
+              <div className="flex justify-between">
+                <span>Packages Total:</span>
+                <span className="font-medium">₹{totals.packages.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Add-ons Total:</span>
+                <span className="font-medium">₹{totals.addons.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between text-base font-bold border-t pt-2">
+                <span>Grand Total:</span>
+                <span>₹{totals.total.toFixed(2)}</span>
+              </div>
             </div>
-            <div className="flex justify-between">
-              <span>Add-ons Total:</span>
-              <span className="font-medium">₹{totals.addons.toFixed(2)}</span>
-            </div>
-            <div className="flex justify-between text-base font-bold border-t pt-2">
-              <span>Grand Total:</span>
-              <span>₹{totals.total.toFixed(2)}</span>
-            </div>
-          </div>
-        </Card>
+          </Card>
         </div>
-        
+
       </div>
     );
   };
 
   // Render step indicator
   const renderStepIndicator = () => (
-    <div className="flex items-center justify-between mb-6">
+    <div className="flex items-center justify-between mb-4 px-2">
       {[1, 2, 3, 4].map((step) => (
         <div key={step} className="flex items-center flex-1">
-          <div className={`flex items-center justify-center w-8 h-8 rounded-full border-2 ${
-            step === currentStep
-              ? 'border-primary bg-primary text-primary-foreground'
-              : step < currentStep
+          <div className={`flex items-center justify-center w-7 h-7 md:w-8 md:h-8 rounded-full border-2 text-xs md:text-sm font-medium transition-colors ${step === currentStep
+            ? 'border-primary bg-primary text-primary-foreground'
+            : step < currentStep
               ? 'border-primary bg-primary text-primary-foreground'
               : 'border-muted-foreground/30 bg-background text-muted-foreground'
-          }`}>
+            }`}>
             {step < currentStep ? <Check className="h-4 w-4" /> : step}
           </div>
           {step < 4 && (
-            <div className={`flex-1 h-0.5 mx-2 ${
-              step < currentStep ? 'bg-primary' : 'bg-muted-foreground/30'
-            }`} />
+            <div className={`flex-1 h-0.5 mx-1 md:mx-2 ${step < currentStep ? 'bg-primary' : 'bg-muted-foreground/30'
+              }`} />
           )}
         </div>
       ))}
@@ -1464,73 +1478,114 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
   return (
     <>
       <Dialog open={open} onOpenChange={handleClose}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-          <div className="space-y-4">
-            {/* Header */}
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-2xl font-bold">
-                  {orderId ? 'Edit Order' : 'Create New Order'}
-                </h2>
-                <p className="text-sm text-muted-foreground">
-                  Step {currentStep} of 4
-                </p>
-              </div>
-              {!orderId && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleDeleteDraft}
-                >
-                  <Trash2 className="h-4 w-4 mr-2" />
-                  Clear Draft
-                </Button>
-              )}
+        <DialogContent className="max-w-4xl p-0 md:p-6 h-full md:h-auto md:max-h-[90vh] w-full rounded-none md:rounded-xl border-0 md:border overflow-hidden flex flex-col">
+          {/* Mobile Header */}
+          <div className="md:hidden sticky top-0 z-20 bg-background border-b px-4 py-3 flex items-center justify-between">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="p-0 h-auto text-primary"
+              onClick={handleClose}
+            >
+              Cancel
+            </Button>
+            <div className="text-center">
+              <h2 className="font-bold text-base">
+                {orderId ? 'Edit Order' : 'New Order'}
+              </h2>
+              <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold">
+                Step {currentStep} of 4
+              </p>
             </div>
-            
-            {/* Step Indicator */}
-            {renderStepIndicator()}
-            
-            {/* Step Content */}
-            <div className="min-h-[400px] pt-5">
-              {renderStepContent()}
-            </div>
-            
-            {/* Mobile Bottom Navigation */}
-            <div className="sticky bottom-0 bg-background border-t pt-4 pb-2 -mx-6 px-6 md:static md:border-0 md:p-0">
-              <div className="flex flex-col md:flex-row justify-between items-center gap-3 lg:ml-7">
-                <div className="flex justify-between items-center w-full md:w-auto gap-3">
-                  {currentStep > 1 && (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={handleBack}
-                      disabled={loading}
-                    >
-                      <ChevronLeft className="h-4 w-4 mr-1" />
-                      Back
-                    </Button>
-                  )}
-                </div>
-                
-                <div className="flex gap-2 w-full md:w-auto md:ml-auto lg:mr-10">
-                  {currentStep < 4 && (
-                    <div className="flex items-center gap-2 text-lg font-bold md:ml-4">
-                      <span>Total:</span>
-                      <span>₹{calculateTotals().total.toFixed(2)}</span>
-                    </div>
-                  )}
+            <Button
+              variant="ghost"
+              size="sm"
+              className="p-0 h-auto text-destructive"
+              onClick={() => setShowClearConfirm(true)}
+              disabled={orderId}
+            >
+              Clear
+            </Button>
+          </div>
 
+          <div className="flex-1 overflow-y-auto p-4 md:p-0">
+            <div className="space-y-6">
+              {/* Desktop Header */}
+              <div className="hidden md:flex items-center justify-between mb-2">
+                <div>
+                  <h2 className="text-2xl font-bold">
+                    {orderId ? 'Edit Order' : 'Create New Order'}
+                  </h2>
+                  <p className="text-sm text-muted-foreground">
+                    Step {currentStep} of 4
+                  </p>
+                </div>
+                {!orderId && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setShowClearConfirm(true)}
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Clear Draft
+                  </Button>
+                )}
+              </div>
+
+              {/* Step Indicator */}
+              {/* {renderStepIndicator()} */}
+
+              {/* Step Content */}
+              <div className="min-h-[400px] pb-24 md:pb-0">
+                {renderStepContent()}
+              </div>
+            </div>
+          </div>
+
+          {/* Sticky Bottom Navigation */}
+          <div className="sticky bottom-0 z-20 bg-background/95 backdrop-blur-md border-t px-4 py-4 md:px-6 md:py-0 md:static md:bg-transparent md:border-0 md:mt-6">
+            <div className="flex items-center justify-between w-full h-12 md:h-auto gap-2">
+              {/* Back Button Slot */}
+              <div className="flex-1 flex justify-start">
+                {currentStep > 1 && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleBack}
+                    disabled={loading}
+                    className="h-10 px-2 md:px-4 md:border md:bg-background"
+                  >
+                    <ChevronLeft className="h-5 w-5 md:mr-1" />
+                    <span className="hidden md:inline">Back</span>
+                  </Button>
+                )}
+              </div>
+
+              {/* Centered Amount */}
+              <div className="flex-[2] flex flex-col items-center justify-center">
+                <span className="text-[10px] text-muted-foreground uppercase tracking-tight font-semibold leading-none mb-1">
+                  Total
+                </span>
+                <span className="text-lg font-bold leading-none">
+                  ₹{calculateTotals().total.toLocaleString('en-IN', { minimumFractionDigits: 0 })}
+                </span>
+              </div>
+
+              {/* Next/Confirm Buttons Slot */}
+              <div className="flex-1 flex justify-end">
+                <div className="flex gap-2">
                   {currentStep < 4 ? (
                     <Button
                       type="button"
                       onClick={handleNext}
                       disabled={loading}
-                      className="flex-1 md:flex-none"
+                      size="sm"
+                      className="h-10 px-4"
                     >
-                      Next
-                      <ChevronRight className="h-4 w-4 ml-1" />
+                      <span className="hidden md:inline mr-1">Next</span>
+                      <ChevronRight className="h-5 w-5" />
                     </Button>
                   ) : orderId ? (
                     // Edit mode buttons
@@ -1540,30 +1595,22 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
                         variant="outline"
                         onClick={() => handleSubmit()}
                         disabled={loading}
+                        size="sm"
+                        className="h-10 hidden md:flex"
                       >
                         {loading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                         Save
                       </Button>
-                      {(orderStatus === 'draft' || orderStatus === 'tentative') && (
-                        <Button
-                          type="button"
-                          onClick={() => handleSubmit('confirmed')}
-                          disabled={loading}
-                        >
-                          {loading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                          Confirm Order
-                        </Button>
-                      )}
-                      {orderStatus !== 'draft' && orderStatus !== 'tentative' && (
-                        <Button
-                          type="button"
-                          onClick={() => handleSubmit()}
-                          disabled={loading}
-                        >
-                          {loading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                          Update Order
-                        </Button>
-                      )}
+                      <Button
+                        type="button"
+                        onClick={() => handleSubmit('confirmed')}
+                        disabled={loading}
+                        size="sm"
+                        className="h-10 px-4"
+                      >
+                        {loading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                        {orderStatus === 'draft' || orderStatus === 'tentative' ? 'Confirm' : 'Update'}
+                      </Button>
                     </>
                   ) : (
                     // Create mode buttons
@@ -1573,17 +1620,21 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
                         variant="outline"
                         onClick={() => handleSubmit('draft')}
                         disabled={loading}
+                        size="sm"
+                        className="h-10 hidden md:flex"
                       >
                         {loading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                        Save as Draft
+                        Draft
                       </Button>
                       <Button
                         type="button"
                         onClick={() => handleSubmit('confirmed')}
                         disabled={loading}
+                        size="sm"
+                        className="h-10 px-4"
                       >
                         {loading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                        Confirm Order
+                        Confirm
                       </Button>
                     </>
                   )}
@@ -1591,167 +1642,210 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
               </div>
             </div>
           </div>
-        </DialogContent>
-      </Dialog>
 
-      {/* Draft Conflict Dialog */}
-      <AlertDialog open={showDraftDialog} onOpenChange={setShowDraftDialog}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Existing Draft Found</AlertDialogTitle>
-            <AlertDialogDescription>
-              You have an existing draft order. Would you like to continue with the draft or start a new order?
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={handleStartFresh}>Start Fresh</AlertDialogCancel>
-            <AlertDialogAction onClick={handleUseDraft}>Continue Draft</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+          {/* Sub-dialogs nested inside main DialogContent to prevent interaction issues with parent */}
 
-      {/* Delete Package Confirmation Dialog */}
-      <ConfirmDialog
-        open={deletePackageDialog.open}
-        onOpenChange={(open) => !open && setDeletePackageDialog({ open: false, index: null })}
-        onConfirm={() => {
-          if (deletePackageDialog.index !== null) {
-            removePackageItem(deletePackageDialog.index);
-          }
-        }}
-        title="Remove Package"
-        description="Are you sure you want to remove this package from the order? This action cannot be undone."
-        confirmText="Remove"
-        cancelText="Cancel"
-        variant="destructive"
-      />
+          {/* Draft Conflict Dialog */}
+          <AlertDialog open={showDraftDialog} onOpenChange={setShowDraftDialog}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Existing Draft Found</AlertDialogTitle>
+                <AlertDialogDescription>
+                  You have an existing draft order. Would you like to continue with the draft or start a new order?
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel onClick={handleStartFresh}>Start Fresh</AlertDialogCancel>
+                <AlertDialogAction onClick={handleUseDraft}>Continue Draft</AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
 
-      {/* Vehicle Identification Dialog */}
-      <Dialog open={identifyDialog.open} onOpenChange={(open) => setIdentifyDialog({ open, index: null })}>
-        <DialogContent className="sm:max-w-md">
-          <div className="space-y-4">
-            <div>
-              <h3 className="text-lg font-semibold">Identify Vehicle Type</h3>
-              <p className="text-sm text-muted-foreground">Enter brand and model to auto-detect vehicle type</p>
-            </div>
-            
-            <div className="space-y-3">
-              <div>
-                <Label>Brand</Label>
-                <Select value={identifyBrand} onValueChange={setIdentifyBrand}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select brand" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {getBrands().map((brand) => (
-                      <SelectItem key={brand} value={brand}>{brand}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              
-              <div>
-                <Label>Model</Label>
-                <Select value={identifyModel} onValueChange={setIdentifyModel} disabled={!identifyBrand}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select model" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {identifyBrand && getModelsByBrand(identifyBrand).map((model) => (
-                      <SelectItem key={model.name} value={model.name}>{model.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              
-              {identifyBrand && identifyModel && (
-                <Card className="p-3 bg-secondary/50">
-                  <div className="flex items-center gap-2">
-                    <Car className="h-5 w-5 text-primary" />
-                    <div>
-                      <p className="text-sm font-medium">
-                        Detected: {getVehicleType(identifyBrand, identifyModel) || 'Unknown'}
-                      </p>
-                      <p className="text-xs text-muted-foreground">{identifyBrand} {identifyModel}</p>
-                    </div>
-                  </div>
-                </Card>
-              )}
-            </div>
-            
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                className="flex-1"
-                onClick={() => {
-                  setIdentifyDialog({ open: false, index: null });
-                  setIdentifyBrand('');
-                  setIdentifyModel('');
-                }}
-              >
-                Cancel
-              </Button>
-              <Button
-                className="flex-1"
-                disabled={!identifyBrand || !identifyModel}
-                onClick={() => {
-                  const vehicleType = getVehicleType(identifyBrand, identifyModel);
-                  if (vehicleType && identifyDialog.index !== null) {
-                    updatePackageItem(identifyDialog.index, 'brand', identifyBrand);
-                    updatePackageItem(identifyDialog.index, 'model', identifyModel);
-                    updatePackageItem(identifyDialog.index, 'vehicle_type', vehicleType.toString().toLowerCase());
-                    toast.success(`Vehicle identified as ${vehicleType}`);
-                  }
-                  setIdentifyDialog({ open: false, index: null });
-                  setIdentifyBrand('');
-                  setIdentifyModel('');
-                }}
-              >
-                Apply
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Customer Form Dialog */}
-      <Dialog open={showCustomerForm} onOpenChange={setShowCustomerForm}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Add New Customer</DialogTitle>
-            <DialogDescription>
-              Fill in the customer details below. Map link will auto-fill location fields.
-            </DialogDescription>
-          </DialogHeader>
-          <CustomerForm
-            onSuccess={(newCustomer) => {
-              setShowCustomerForm(false);
-              // Auto-select the new customer
-              if (newCustomer && newCustomer.customer) {
-                const customer = newCustomer.customer;
-                setSelectedCustomer({
-                  id: customer.id,
-                  name: customer.name,
-                  phone: customer.phone,
-                  email: customer.email,
-                });
-                // Add to customers list
-                setCustomers(prev => [...prev, customer]);
-                // Pre-fill address
-                setAddress({
-                  area: customer.area || '',
-                  city: customer.city || '',
-                  district: customer.district || '',
-                  state: customer.state || '',
-                  map_link: customer.map_link || '',
-                });
+          {/* Delete Package Confirmation Dialog */}
+          <ConfirmDialog
+            open={deletePackageDialog.open}
+            onOpenChange={(open) => !open && setDeletePackageDialog({ open: false, index: null })}
+            onConfirm={() => {
+              if (deletePackageDialog.index !== null) {
+                removePackageItem(deletePackageDialog.index);
               }
-              toast.success('Customer added and selected');
             }}
-            onCancel={() => setShowCustomerForm(false)}
+            title="Remove Package"
+            description="Are you sure you want to remove this package from the order? This action cannot be undone."
+            confirmText="Remove"
+            cancelText="Cancel"
+            variant="destructive"
           />
+
+          {/* Clear Draft Confirmation Dialog */}
+          <ConfirmDialog
+            open={showClearConfirm}
+            onOpenChange={setShowClearConfirm}
+            onConfirm={() => {
+              handleDeleteDraft();
+              setShowClearConfirm(false);
+            }}
+            title="Clear Draft Order"
+            description="Are you sure you want to clear this draft? All entered information will be lost."
+            confirmText="Clear Draft"
+            cancelText="Cancel"
+            variant="destructive"
+          />
+
+          {/* Vehicle Identification Dialog */}
+          <Dialog open={identifyDialog.open} onOpenChange={(open) => setIdentifyDialog({ open, index: null })}>
+            <DialogContent className="sm:max-w-md">
+              {/* ... (Keep existing content inside) ... */}
+              <div className="space-y-4">
+                <div>
+                  <h3 className="text-lg font-semibold">Identify Vehicle Type</h3>
+                  <p className="text-sm text-muted-foreground">Enter brand and model to auto-detect vehicle type</p>
+                </div>
+
+                <div className="space-y-3">
+                  <div>
+                    <Label>Brand</Label>
+                    <Select value={identifyBrand} onValueChange={setIdentifyBrand}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select brand" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {getBrands().map((brand) => (
+                          <SelectItem key={brand} value={brand}>{brand}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div>
+                    <Label>Model</Label>
+                    <Select value={identifyModel} onValueChange={setIdentifyModel} disabled={!identifyBrand}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select model" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {identifyBrand && getModelsByBrand(identifyBrand).map((model) => (
+                          <SelectItem key={model.name} value={model.name}>{model.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {identifyBrand && identifyModel && (
+                    <Card className="p-3 bg-secondary/50">
+                      <div className="flex items-center gap-2">
+                        <Car className="h-5 w-5 text-primary" />
+                        <div>
+                          <p className="text-sm font-medium">
+                            Detected: {getVehicleType(identifyBrand, identifyModel) || 'Unknown'}
+                          </p>
+                          <p className="text-xs text-muted-foreground">{identifyBrand} {identifyModel}</p>
+                        </div>
+                      </div>
+                    </Card>
+                  )}
+                </div>
+
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    className="flex-1"
+                    onClick={() => {
+                      setIdentifyDialog({ open: false, index: null });
+                      setIdentifyBrand('');
+                      setIdentifyModel('');
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    className="flex-1"
+                    disabled={!identifyBrand || !identifyModel}
+                    onClick={() => {
+                      const vehicleType = getVehicleType(identifyBrand, identifyModel);
+                      if (vehicleType && identifyDialog.index !== null) {
+                        updatePackageItem(identifyDialog.index, 'brand', identifyBrand);
+                        updatePackageItem(identifyDialog.index, 'model', identifyModel);
+                        updatePackageItem(identifyDialog.index, 'vehicle_type', vehicleType.toString().toLowerCase());
+                        toast.success(`Vehicle identified as ${vehicleType}`);
+                      }
+                      setIdentifyDialog({ open: false, index: null });
+                      setIdentifyBrand('');
+                      setIdentifyModel('');
+                    }}
+                  >
+                    Apply
+                  </Button>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
+
+          {/* Customer Form Sheet - App Page Feel on Mobile */}
+          <Sheet open={showCustomerForm} onOpenChange={setShowCustomerForm}>
+            <SheetContent
+              side={isMobile ? "bottom" : "right"}
+              className={`w-full ${isMobile ? 'h-full' : 'sm:max-w-xl'} p-0 flex flex-col bg-gray-50 border-none z-50`}
+            >
+              <div className="flex items-center justify-between px-4 py-3 bg-white border-b sticky top-0 z-20 shadow-sm">
+                <div className="flex items-center gap-3">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="rounded-full"
+                    onClick={() => setShowCustomerForm(false)}
+                  >
+                    {isMobile ? <ArrowLeft className="h-6 w-6" /> : <X className="h-5 w-5" />}
+                  </Button>
+                  <div>
+                    <h2 className="font-bold text-lg leading-none">Add Customer</h2>
+                    <p className="text-[10px] text-muted-foreground uppercase tracking-wider mt-0.5">New entry</p>
+                  </div>
+                </div>
+
+                <Button
+                  onClick={() => customerFormRef.current?.submit()}
+                  className="px-6 h-9 rounded-full shadow-sm"
+                >
+                  Save
+                </Button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-4 pb-20">
+                <CustomerForm
+                  ref={customerFormRef}
+                  showActions={false}
+                  onSuccess={(newCustomer) => {
+                    setShowCustomerForm(false);
+                    // Auto-select the new customer
+                    if (newCustomer && newCustomer.customer) {
+                      const customer = newCustomer.customer;
+                      setSelectedCustomer({
+                        id: customer.id,
+                        name: customer.name,
+                        phone: customer.phone,
+                        email: customer.email,
+                      });
+                      // Add to customers list
+                      setCustomers(prev => [...prev, customer]);
+                      // Pre-fill address
+                      setAddress({
+                        area: customer.area || '',
+                        city: customer.city || '',
+                        district: customer.district || '',
+                        state: customer.state || '',
+                        map_link: customer.map_link || '',
+                      });
+                    }
+                    toast.success('Customer added and selected');
+                  }}
+                  onCancel={() => setShowCustomerForm(false)}
+                />
+              </div>
+            </SheetContent>
+          </Sheet>
         </DialogContent>
-      </Dialog>
+      </Dialog >
     </>
   );
 };

@@ -84,6 +84,43 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
   const id = orderId || routeParams.id;
   const navigate = useNavigate();
 
+  // Tabs state
+  const [activeTab, setActiveTab] = useState('packages');
+  const tabsList = ['packages', 'timeline', 'reassignments'];
+
+  // Swipe logic for tabs
+  const [touchStart, setTouchStart] = useState(null);
+  const [touchEnd, setTouchEnd] = useState(null);
+  const minSwipeDistance = 60;
+
+  const onTouchStart = (e) => {
+    setTouchEnd(null);
+    setTouchStart(e.targetTouches[0].clientX);
+  };
+
+  const onTouchMove = (e) => {
+    setTouchEnd(e.targetTouches[0].clientX);
+  };
+
+  const onTouchEnd = () => {
+    if (!touchStart || !touchEnd) return;
+    const distance = touchStart - touchEnd;
+    const isLeftSwipe = distance > minSwipeDistance;
+    const isRightSwipe = distance < -minSwipeDistance;
+
+    if (isLeftSwipe || isRightSwipe) {
+      const currentIndex = tabsList.indexOf(activeTab);
+      if (isLeftSwipe && currentIndex < tabsList.length - 1) {
+        setActiveTab(tabsList[currentIndex + 1]);
+        // Subtle haptic feedback feel
+        if (window.navigator?.vibrate) window.navigator.vibrate(10);
+      } else if (isRightSwipe && currentIndex > 0) {
+        setActiveTab(tabsList[currentIndex - 1]);
+        if (window.navigator?.vibrate) window.navigator.vibrate(10);
+      }
+    }
+  };
+
   const [order, setOrder] = useState(null);
   const [loading, setLoading] = useState(true);
   const [timeline, setTimeline] = useState([]);
@@ -113,7 +150,7 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
 
   // Feedback dialog state
   const [isFeedbackDialogOpen, setIsFeedbackDialogOpen] = useState(false);
-  const [feedbackRating, setFeedbackRating] = useState(5);
+  const [feedbackRating, setFeedbackRating] = useState(0);
   const [hoveredRating, setHoveredRating] = useState(0);
   const [feedbackComment, setFeedbackComment] = useState('');
   const [submittingFeedback, setSubmittingFeedback] = useState(false);
@@ -302,6 +339,11 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
 
   // Handle feedback submission
   const handleSubmitFeedback = async () => {
+    if (feedbackRating === 0) {
+      toast.error('Please select a rating');
+      return;
+    }
+
     setSubmittingFeedback(true);
     try {
       await orderService.submitOrderFeedback(id, {
@@ -310,7 +352,7 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
       });
       toast.success('Feedback submitted successfully');
       setIsFeedbackDialogOpen(false);
-      setFeedbackRating(5);
+      setFeedbackRating(0);
       setFeedbackComment('');
       fetchOrderDetails();
     } catch (error) {
@@ -468,110 +510,115 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
   return (
     <div className="min-h-screen bg-white">
       {/* Header */}
-      <div className="border-b sticky top-0 z-10 bg-white">
+      <div className="border-b sticky top-0 z-30 bg-white">
         <div className="px-4 sm:px-6">
-          <div className="flex items-center justify-between h-16">
-            <div className="flex items-center gap-4">
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => onClose ? onClose() : navigate(-1)}
-                className="rounded-full"
-              >
-                <ArrowLeft className="h-5 w-5" />
-              </Button>
-
-              <div className="flex items-center gap-3">
-                <h1 className="text-xl sm:text-2xl font-semibold">Order-{order.order_number}</h1>
-                <Badge2 variant={getBadgeVariant(order.status, 'order')} className="text-xs">
+          <div className="flex flex-col py-2 sm:h-16 justify-center">
+            {/* Top Row: Navigation and Actions */}
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3 overflow-hidden">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => onClose ? onClose() : navigate(-1)}
+                  className="rounded-full flex-shrink-0"
+                >
+                  <ArrowLeft className="h-5 w-5" />
+                </Button>
+                <h1 className="text-xl sm:text-2xl font-semibold truncate">#{order.order_number}</h1>
+                <Badge2 variant={getBadgeVariant(order.status, 'order')} className="text-[10px] sm:text-xs">
                   {getStatusLabel(order.status, ORDER_STATUSES)}
                 </Badge2>
 
                 {order.subscription_id && (
                   <Badge2
                     variant="secondary"
-                    className="flex items-center gap-1 cursor-pointer hover:bg-secondary/80"
+                    className="flex items-center gap-1 cursor-pointer hover:bg-secondary/80 text-[10px] sm:text-xs h-5 sm:h-6 px-1.5"
                     onClick={() => navigate(`/subscriptions/${order.subscription_id}`)}
                   >
                     <Repeat className="h-3 w-3" />
-                    Subscription
+                    Sub
                   </Badge2>
                 )}
+              </div>
 
-                {/* Star Rating Display */}
-                {order.rating && (
-                  <div className="flex items-center gap-1">
+              {isEditable && (
+                <div className="flex items-center gap-1">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="icon" className="rounded-full">
+                        <MoreVertical className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      {isEditable && (
+                        <>
+                          <DropdownMenuItem onClick={() => setIsWizardOpen(true)}>
+                            <Edit className="h-4 w-4 mr-2" />
+                            Edit Order
+                          </DropdownMenuItem>
+
+                          {order.status === 'confirmed' && (
+                            <DropdownMenuItem onClick={() => handleStatusChange('in_progress')}>
+                              <Clock className="h-4 w-4 mr-2" />
+                              Mark as In Progress
+                            </DropdownMenuItem>
+                          )}
+
+                          {(order.status === 'confirmed' || order.status === 'in_progress') && (
+                            <DropdownMenuItem onClick={() => handleStatusChange('completed')}>
+                              <CheckCircle2 className="h-4 w-4 mr-2" />
+                              Mark as Completed
+                            </DropdownMenuItem>
+                          )}
+
+                          <DropdownMenuItem
+                            onClick={() => setIsCancelDialogOpen(true)}
+                            className="text-destructive focus:text-destructive"
+                          >
+                            <Ban className="h-4 w-4 mr-2" />
+                            Cancel Order
+                          </DropdownMenuItem>
+                        </>
+                      )}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              )}
+            </div>
+
+            {/* Bottom Row: Badges and Ratings (Mobile mostly) */}
+            <div className="flex items-center gap-2 sm:mt-0 px-1 sm:px-0 flex-wrap sm:ml-12">
+
+
+              {/* Star Rating Display */}
+              {order.rating && (
+                <div className="flex items-center gap-1 bg-yellow-50 px-2 py-0.5 rounded-full border border-yellow-100">
+                  <div className="flex items-center">
                     {[1, 2, 3, 4, 5].map((star) => (
                       <Star
                         key={star}
-                        className={`h-4 w-4 ${star <= order.rating
-                            ? 'fill-yellow-400 text-yellow-400'
-                            : 'text-gray-300'
+                        className={`h-3 w-3 ${star <= order.rating
+                          ? 'fill-yellow-400 text-yellow-400'
+                          : 'text-gray-300'
                           }`}
                       />
                     ))}
-                    <span className="text-sm text-muted-foreground ml-1">
-                      ({order.rating})
-                    </span>
-                    {order.feedback_comments && (
-                      <button
-                        onClick={() => setIsFeedbackViewOpen(true)}
-                        className="ml-1 text-blue-600 hover:text-blue-700 transition-colors"
-                        title="View feedback comments"
-                      >
-                        <MessageSquare className="h-4 w-4" />
-                      </button>
-                    )}
                   </div>
-                )}
-              </div>
+                  <span className="text-[10px] font-medium text-yellow-700">
+                    {order.rating}
+                  </span>
+                  {order.feedback_comments && (
+                    <button
+                      onClick={() => setIsFeedbackViewOpen(true)}
+                      className="ml-1 text-blue-600 hover:text-blue-700 transition-colors"
+                      title="View feedback comments"
+                    >
+                      <MessageSquare className="h-3 w-3" />
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
-            {isEditable &&
-              <div className="flex items-center gap-3 text-sm">
-
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon">
-                      <MoreVertical className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    {isEditable && (
-                      <>
-                        <DropdownMenuItem onClick={() => setIsWizardOpen(true)}>
-                          <Edit className="h-4 w-4 mr-2" />
-                          Edit Order
-                        </DropdownMenuItem>
-
-                        {/* Change to In Progress - only if confirmed */}
-                        {order.status === 'confirmed' && (
-                          <DropdownMenuItem onClick={() => handleStatusChange('in_progress')}>
-                            <Clock className="h-4 w-4 mr-2" />
-                            Mark as In Progress
-                          </DropdownMenuItem>
-                        )}
-
-                        {/* Change to Completed - only if confirmed or in_progress */}
-                        {(order.status === 'confirmed' || order.status === 'in_progress') && (
-                          <DropdownMenuItem onClick={() => handleStatusChange('completed')}>
-                            <CheckCircle2 className="h-4 w-4 mr-2" />
-                            Mark as Completed
-                          </DropdownMenuItem>
-                        )}
-
-                        <DropdownMenuItem
-                          onClick={() => setIsCancelDialogOpen(true)}
-                          className="text-destructive focus:text-destructive"
-                        >
-                          <Ban className="h-4 w-4 mr-2" />
-                          Cancel Order
-                        </DropdownMenuItem>
-                      </>
-                    )}
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
-            }
           </div>
         </div>
       </div>
@@ -609,14 +656,28 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
 
             {/* Service Location */}
             <div className="py-4 px-4 bg-gray-50 rounded-lg border">
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2 text-sm">
-                  <MapPin className="h-4 w-4 text-muted-foreground" />
-                  <span>{order.area || 'N/A'}, {order.city || 'N/A'}</span>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-y-3 gap-x-6 mb-4">
+                <div className="flex items-start gap-3">
+                  <div className="p-2 bg-primary/10 rounded-full flex-shrink-0">
+                    <MapPin className="h-4 w-4 text-primary" />
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-xs uppercase tracking-wider font-bold text-muted-foreground opacity-70">Service Location</span>
+                    <span className="text-sm font-semibold capitalize text-foreground">{order.area || 'N/A'}, {order.city || 'N/A'}</span>
+                  </div>
                 </div>
-                <span className="text-sm text-muted-foreground flex gap-2 items-center">
-                  <Calendar1Icon size={16} strokeWidth={1.5} /> {formatDate(order.booking_date)} at {formatTime(order.booking_time_from)} - {formatTime(order.booking_time_to)}
-                </span>
+
+                <div className="flex items-start gap-3">
+                  <div className="p-2 bg-blue-50 rounded-full flex-shrink-0">
+                    <Calendar1Icon className="h-4 w-4 text-blue-600" />
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-xs uppercase tracking-wider font-bold text-muted-foreground opacity-70">Scheduled Time</span>
+                    <span className="text-sm font-semibold text-foreground">
+                      {formatDate(order.booking_date)} at {formatTime(order.booking_time_from)} - {formatTime(order.booking_time_to)}
+                    </span>
+                  </div>
+                </div>
               </div>
 
               {/* Progress Bar */}
@@ -633,15 +694,15 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
                     <div key={stage} className="flex-1">
                       <div className="flex flex-col items-center">
                         <div className={`text-xs mb-1 ${isActive && !isCancelled ? 'font-semibold text-foreground' :
-                            isCompleted && !isCancelled ? 'font-medium text-foreground' :
-                              'text-muted-foreground'
+                          isCompleted && !isCancelled ? 'font-medium text-foreground' :
+                            'text-muted-foreground'
                           }`}>
                           {stage}
                         </div>
                         <div className={`w-full h-1 rounded-full ${isCancelled ? 'bg-red-200' :
-                            isActive ? 'bg-foreground' :
-                              isCompleted ? 'bg-green-500' :
-                                'bg-gray-200'
+                          isActive ? 'bg-foreground' :
+                            isCompleted ? 'bg-green-500' :
+                              'bg-gray-200'
                           }`} />
                       </div>
                     </div>
@@ -654,20 +715,27 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
             <div className="flex flex-col sm:flex-row gap-3">
               {isEditable && (
                 <>
+                  {order.status === 'draft' && <Button
+                    variant="default"
+                    onClick={() => handleStatusChange('confirmed')}
+                    className="flex-1"
+                  >
+                    Confirm
+                  </Button>}
                   <Button
-                    variant="outline"
+                    variant="destructive"
                     onClick={() => setIsCancelDialogOpen(true)}
                     className="flex-1"
                   >
                     Cancel Order
                   </Button>
-                  <Button
+                  {/* <Button
                     onClick={() => setIsWizardOpen(true)}
                     className="flex-1 bg-orange-500 hover:bg-orange-600 text-white"
                   >
                     Edit Order
                     <ChevronRight className="h-4 w-4 ml-2" />
-                  </Button>
+                  </Button> */}
                 </>
               )}
 
@@ -683,236 +751,298 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
               )}
             </div>
 
-            {/* Tabs */}
-            <Tabs defaultValue="packages" className="space-y-6">
-              <TabsList className="grid w-full grid-cols-3 bg-transparent border-b rounded-none h-auto p-0">
-                <TabsTrigger
-                  value="packages"
-                  className="rounded-none border-b-2 border-transparent data-[state=active]:border-foreground data-[state=active]:bg-transparent"
-                >
-                  Packages & Addons
-                </TabsTrigger>
-                <TabsTrigger
-                  value="timeline"
-                  className="rounded-none border-b-2 border-transparent data-[state=active]:border-foreground data-[state=active]:bg-transparent"
-                >
-                  Timeline
-                </TabsTrigger>
-                <TabsTrigger
-                  value="reassignments"
-                  className="rounded-none border-b-2 border-transparent data-[state=active]:border-foreground data-[state=active]:bg-transparent"
-                >
-                  Reassignments
-                </TabsTrigger>
-              </TabsList>
+            {/* Swipable Tabs Section */}
+            <div
+              onTouchStart={onTouchStart}
+              onTouchMove={onTouchMove}
+              onTouchEnd={onTouchEnd}
+              className="touch-pan-y" // Allow vertical scrolling while swiping
+            >
+              <Tabs
+                value={activeTab}
+                onValueChange={setActiveTab}
+                className="space-y-6"
+              >
+                <TabsList className="grid w-full grid-cols-3 bg-transparent border-b rounded-none h-auto p-0">
+                  <TabsTrigger
+                    value="packages"
+                    className="rounded-none border-b-2 cursor-pointer border-transparent data-[state=active]:border-foreground data-[state=active]:bg-transparent"
+                  >
+                    Packages & Addons
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="timeline"
+                    className="rounded-none border-b-2 cursor-pointer border-transparent data-[state=active]:border-foreground data-[state=active]:bg-transparent"
+                  >
+                    Timeline
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="reassignments"
+                    className="rounded-none border-b-2 cursor-pointer border-transparent data-[state=active]:border-foreground data-[state=active]:bg-transparent"
+                  >
+                    Reassignments
+                  </TabsTrigger>
+                </TabsList>
 
-              {/* Packages Tab */}
-              <TabsContent value="packages" className="space-y-6 mt-6">
-                {/* Packages */}
-                <div>
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="font-semibold text-lg">Service Packages</h3>
-                    <Badge2 variant="outline" className="text-xs">{order.packages?.length || 0} items</Badge2>
-                  </div>
-                  <div className="space-y-4">
-                    {order.packages && order.packages.length > 0 ? (
-                      order.packages.map((item, index) => (
-                        <div key={index} className="flex gap-4  border-b last:border-0">
-                          <div className="w-20 h-20 bg-gray-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                            <Car className="h-10 w-10 text-gray-400" />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <h4 className="font-medium mb-2">{item.package_name}</h4>
-                            <div className="text-sm  space-y-1">
-                              <div>{item.package.name}</div>
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <span className="capitalize">{item.vehicle_type}</span>
-                                {item.brand && item.model && (
-                                  <>
-                                    <span>•</span>
-                                    <span>{item.brand} {item.model}</span>
-                                  </>
-                                )}
-                                <span>•</span>
-                                <span>Quantity {item.quantity}</span>
+                {/* Packages Tab */}
+                <TabsContent value="packages" className="space-y-6 mt-6">
+                  {/* Packages */}
+                  <div>
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="font-semibold text-lg">Service Packages</h3>
+                      <Badge2 variant="outline" className="text-xs">{order.packages?.length || 0} items</Badge2>
+                    </div>
+                    <div className="space-y-4">
+                      {order.packages && order.packages.length > 0 ? (
+                        order.packages.map((item, index) => (
+                          <div key={index} className="flex gap-4  border-b last:border-0">
+                            <div className="w-20 h-20 bg-gray-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                              <Car className="h-10 w-10 text-gray-400" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <h4 className="font-medium mb-2">{item.package_name}</h4>
+                              <div className="text-sm  space-y-1">
+                                <div>{item.package.name}</div>
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className="capitalize">{item.vehicle_type}</span>
+                                  {item.brand && item.model && (
+                                    <>
+                                      <span>•</span>
+                                      <span>{item.brand} {item.model}</span>
+                                    </>
+                                  )}
+                                  <span>•</span>
+                                  <span>Quantity {item.quantity}</span>
+                                </div>
+                                <div className='text-muted-foreground'>{item.notes}</div>
                               </div>
-                              <div className='text-muted-foreground'>{item.notes}</div>
+                            </div>
+                            <div className="text-right flex-shrink-0">
+                              <div className="font-semibold text-lg">{formatCurrency(item.total_price)}</div>
+                              {item.discount > 0 && (
+                                <div className="text-sm text-destructive mt-1">
+                                  Discount -{formatCurrency(item.discount)}
+                                </div>
+                              )}
                             </div>
                           </div>
-                          <div className="text-right flex-shrink-0">
-                            <div className="font-semibold text-lg">{formatCurrency(item.total_price)}</div>
-                            {item.discount > 0 && (
-                              <div className="text-sm text-destructive mt-1">
-                                Discount -{formatCurrency(item.discount)}
+                        ))
+                      ) : (
+                        <div className="py-12 text-center text-muted-foreground">
+                          <Package className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                          <p>No packages added</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Add-ons */}
+                  {order.addons && order.addons.length > 0 && (
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <h3 className="font-semibold text-lg">Add-on Services</h3>
+                        <Badge2 variant="outline" className="text-xs">{order.addons.length} items</Badge2>
+                      </div>
+                      <div className="space-y-4">
+                        {order.addons.map((item, index) => (
+                          <div key={index} className="flex gap-4 border-b last:border-0">
+
+                            <div className="flex-1 min-w-0">
+                              <h4 className="font-medium mb-2">{item.addon_name}</h4>
+                              <div className="text-sm ">
+                                {item.addon.name} • Quantity {item.quantity}
                               </div>
+                            </div>
+                            <div className="text-right flex-shrink-0">
+                              <div className="font-semibold text-lg">{formatCurrency(item.total_price)}</div>
+                              {item.discount > 0 && (
+                                <div className="text-sm text-destructive mt-1">
+                                  Discount -{formatCurrency(item.discount)}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+
+                </TabsContent>
+
+                {/* Timeline Tab */}
+                <TabsContent value="timeline" className="mt-6">
+                  <div className="space-y-6">
+                    {timeline.length > 0 ? (
+                      timeline.map((event, index) => (
+                        <div key={index} className="flex gap-4">
+                          <div className="flex flex-col items-center">
+                            <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${event.type === 'created' || event.type === 'status_changed'
+                              ? 'bg-primary text-primary-foreground'
+                              : 'bg-gray-100 text-gray-600'
+                              }`}>
+                              {event.type === 'status_changed' ? (
+                                <CheckCircle2 className="h-5 w-5" />
+                              ) : event.type === 'cancelled' ? (
+                                <XCircle className="h-5 w-5" />
+                              ) : (
+                                <Clock className="h-5 w-5" />
+                              )}
+                            </div>
+                            {index < timeline.length - 1 && (
+                              <div className="w-0.5 flex-1 bg-gray-200 mt-2" style={{ minHeight: '3rem' }} />
                             )}
+                          </div>
+                          <div className="flex-1 pb-6">
+                            <div className="font-medium mb-1">{event.title}</div>
+                            <div className="text-sm text-muted-foreground mb-2">{event.description}</div>
+                            <div className="text-xs text-muted-foreground">
+                              {formatDateTime(event.created_at)}
+                              {event.user_name && ` • by ${event.user_name}`}
+                            </div>
                           </div>
                         </div>
                       ))
                     ) : (
                       <div className="py-12 text-center text-muted-foreground">
-                        <Package className="h-12 w-12 mx-auto mb-3 opacity-50" />
-                        <p>No packages added</p>
+                        <Clock className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                        <p>No timeline events yet</p>
                       </div>
                     )}
                   </div>
-                </div>
+                </TabsContent>
 
-                {/* Add-ons */}
-                {order.addons && order.addons.length > 0 && (
-                  <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <h3 className="font-semibold text-lg">Add-on Services</h3>
-                      <Badge2 variant="outline" className="text-xs">{order.addons.length} items</Badge2>
-                    </div>
-                    <div className="space-y-4">
-                      {order.addons.map((item, index) => (
-                        <div key={index} className="flex gap-4 border-b last:border-0">
-
-                          <div className="flex-1 min-w-0">
-                            <h4 className="font-medium mb-2">{item.addon_name}</h4>
-                            <div className="text-sm ">
-                              {item.addon.name} • Quantity {item.quantity}
-                            </div>
+                {/* Reassignments Tab */}
+                <TabsContent value="reassignments" className="mt-6">
+                  <div className="space-y-4">
+                    {reassignments.length > 0 ? (
+                      reassignments.map((item, index) => (
+                        <div key={index} className="flex items-start gap-4 py-4 border-b last:border-0">
+                          <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                            <User className="h-5 w-5 text-primary" />
                           </div>
-                          <div className="text-right flex-shrink-0">
-                            <div className="font-semibold text-lg">{formatCurrency(item.total_price)}</div>
-                            {item.discount > 0 && (
-                              <div className="text-sm text-destructive mt-1">
-                                Discount -{formatCurrency(item.discount)}
+                          <div className="flex-1">
+                            <div className="font-medium mb-1">{item.agent_name}</div>
+                            <div className="text-sm text-muted-foreground">
+                              Assigned by {item.assigned_by_name}
+                            </div>
+                            {item.notes && (
+                              <div className="text-sm text-muted-foreground mt-2 p-3 bg-gray-50 rounded-lg">
+                                {item.notes}
                               </div>
                             )}
+                            <div className="text-xs text-muted-foreground mt-2">
+                              {formatDateTime(item.assigned_at)}
+                            </div>
                           </div>
                         </div>
-                      ))}
-                    </div>
+                      ))
+                    ) : (
+                      <div className="py-12 text-center text-muted-foreground">
+                        <User className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                        <p>No reassignments yet</p>
+                      </div>
+                    )}
                   </div>
-                )}
+                </TabsContent>
 
-                {/* Payment Details */}
-                <div className="pt-6 border-t">
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="font-semibold text-lg">Payment Details</h3>
-                    <div className="flex items-center gap-2">
-                      {order.payment_method && (
-                        <Badge2 variant="outline" className="text-xs uppercase">
-                          {order.payment_method.replace('_', ' ')}
-                        </Badge2>
-                      )}
-                      <Badge2 variant={getBadgeVariant(order.payment_status, 'payment')}>
-                        {getStatusLabel(order.payment_status, PAYMENT_STATUSES)}
+              </Tabs>
+            </div>
+
+            <div className="p-4 border rounded-lg">
+              {/* Payment Details */}
+              <div >
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="font-semibold text-lg">Payment Details</h3>
+                  <div className="flex items-center gap-2">
+                    {order.payment_method && (
+                      <Badge2 variant="outline" className="text-xs uppercase">
+                        {order.payment_method.replace('_', ' ')}
                       </Badge2>
-                    </div>
+                    )}
+                    <Badge2 variant={getBadgeVariant(order.payment_status, 'payment')}>
+                      {getStatusLabel(order.payment_status, PAYMENT_STATUSES)}
+                    </Badge2>
+                  </div>
+                </div>
+
+                <div className="space-y-3 max-w-md ml-auto">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">
+                      Subtotal ({(order.packages?.length || 0) + (order.addons?.length || 0)} items)
+                    </span>
+                    <span className="font-medium">{formatCurrency(calculateSubtotal())}</span>
                   </div>
 
-                  <div className="space-y-3 max-w-md ml-auto">
+                  {order.discount > 0 && (
+                    <div className="flex justify-between text-sm text-destructive">
+                      <span>Discount</span>
+                      <span>-{formatCurrency(order.discount)}</span>
+                    </div>
+                  )}
+
+                  {order.gst_amount > 0 && (
                     <div className="flex justify-between text-sm">
                       <span className="text-muted-foreground">
-                        Subtotal ({(order.packages?.length || 0) + (order.addons?.length || 0)} items)
+                        GST {order.gst_percentage ? `(${order.gst_percentage}%)` : ''}
                       </span>
-                      <span className="font-medium">{formatCurrency(calculateSubtotal())}</span>
+                      <span className="font-medium">{formatCurrency(order.gst_amount)}</span>
                     </div>
+                  )}
 
-                    {order.discount > 0 && (
-                      <div className="flex justify-between text-sm text-destructive">
-                        <span>Discount</span>
-                        <span>-{formatCurrency(order.discount)}</span>
-                      </div>
-                    )}
-
-                    {order.gst_amount > 0 && (
-                      <div className="flex justify-between text-sm">
-                        <span className="text-muted-foreground">
-                          GST {order.gst_percentage ? `(${order.gst_percentage}%)` : ''}
-                        </span>
-                        <span className="font-medium">{formatCurrency(order.gst_amount)}</span>
-                      </div>
-                    )}
-
-                    <div className="border-t pt-3 flex justify-between items-center">
-                      <span className="font-semibold">Total</span>
-                      <span className="text-2xl font-bold">{formatCurrency(order.total_amount)}</span>
-                    </div>
+                  <div className="border-t pt-3 flex justify-between items-center">
+                    <span className="font-semibold">Total</span>
+                    <span className="text-2xl font-bold">{formatCurrency(order.total_amount)}</span>
                   </div>
                 </div>
-              </TabsContent>
+              </div>
+            </div>
 
-              {/* Timeline Tab */}
-              <TabsContent value="timeline" className="mt-6">
-                <div className="space-y-6">
-                  {timeline.length > 0 ? (
-                    timeline.map((event, index) => (
-                      <div key={index} className="flex gap-4">
-                        <div className="flex flex-col items-center">
-                          <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${event.type === 'created' || event.type === 'status_changed'
-                              ? 'bg-primary text-primary-foreground'
-                              : 'bg-gray-100 text-gray-600'
-                            }`}>
-                            {event.type === 'status_changed' ? (
-                              <CheckCircle2 className="h-5 w-5" />
-                            ) : event.type === 'cancelled' ? (
-                              <XCircle className="h-5 w-5" />
-                            ) : (
-                              <Clock className="h-5 w-5" />
-                            )}
-                          </div>
-                          {index < timeline.length - 1 && (
-                            <div className="w-0.5 flex-1 bg-gray-200 mt-2" style={{ minHeight: '3rem' }} />
-                          )}
-                        </div>
-                        <div className="flex-1 pb-6">
-                          <div className="font-medium mb-1">{event.title}</div>
-                          <div className="text-sm text-muted-foreground mb-2">{event.description}</div>
-                          <div className="text-xs text-muted-foreground">
-                            {formatDateTime(event.created_at)}
-                            {event.user_name && ` • by ${event.user_name}`}
-                          </div>
-                        </div>
+            {/* Customer Feedback */}
+            {(order.rating || order.feedback_comments) && (
+              <div className="border rounded-lg">
+                <div className="p-4 border-b">
+                  <h3 className="font-semibold">Customer Feedback</h3>
+                </div>
+                <div className="p-4 space-y-4">
+                  {order.rating && (
+                    <div>
+                      <label className="text-sm font-medium text-muted-foreground mb-2 block">Rating</label>
+                      <div className="flex items-center gap-1">
+                        {[1, 2, 3, 4, 5].map((star) => (
+                          <Star
+                            key={star}
+                            className={`h-6 w-6 ${star <= order.rating
+                              ? 'fill-yellow-400 text-yellow-400'
+                              : 'text-gray-300'
+                              }`}
+                          />
+                        ))}
+                        <span className="text-sm text-muted-foreground ml-2">
+                          {order.rating} out of 5
+                        </span>
                       </div>
-                    ))
-                  ) : (
-                    <div className="py-12 text-center text-muted-foreground">
-                      <Clock className="h-12 w-12 mx-auto mb-3 opacity-50" />
-                      <p>No timeline events yet</p>
+                    </div>
+                  )}
+
+                  {order.feedback_comments && (
+                    <div>
+                      <label className="text-sm font-medium text-muted-foreground mb-2 block">Comments</label>
+                      <div className="bg-gray-50 rounded-lg p-4 border text-sm text-foreground">
+                        {order.feedback_comments}
+                      </div>
+                    </div>
+                  )}
+
+                  {order.feedback_submitted_at && (
+                    <div className="text-xs text-muted-foreground pt-2 border-t">
+                      Submitted on {formatDateTime(order.feedback_submitted_at)}
                     </div>
                   )}
                 </div>
-              </TabsContent>
+              </div>
+            )}
 
-              {/* Reassignments Tab */}
-              <TabsContent value="reassignments" className="mt-6">
-                <div className="space-y-4">
-                  {reassignments.length > 0 ? (
-                    reassignments.map((item, index) => (
-                      <div key={index} className="flex items-start gap-4 py-4 border-b last:border-0">
-                        <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                          <User className="h-5 w-5 text-primary" />
-                        </div>
-                        <div className="flex-1">
-                          <div className="font-medium mb-1">{item.agent_name}</div>
-                          <div className="text-sm text-muted-foreground">
-                            Assigned by {item.assigned_by_name}
-                          </div>
-                          {item.notes && (
-                            <div className="text-sm text-muted-foreground mt-2 p-3 bg-gray-50 rounded-lg">
-                              {item.notes}
-                            </div>
-                          )}
-                          <div className="text-xs text-muted-foreground mt-2">
-                            {formatDateTime(item.assigned_at)}
-                          </div>
-                        </div>
-                      </div>
-                    ))
-                  ) : (
-                    <div className="py-12 text-center text-muted-foreground">
-                      <User className="h-12 w-12 mx-auto mb-3 opacity-50" />
-                      <p>No reassignments yet</p>
-                    </div>
-                  )}
-                </div>
-              </TabsContent>
-            </Tabs>
           </div>
 
           {/* Right Column - Sidebar */}
@@ -1219,9 +1349,9 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
                 {[1, 2, 3, 4, 5].map((star) => (
                   <Star
                     key={star}
-                    className={`h-6 w-6 ${star <= (order.rating || 0)
-                        ? 'fill-yellow-400 text-yellow-400'
-                        : 'text-gray-300'
+                    className={`h-6 w-6 cursor-pointer ${star <= (order.rating || 0)
+                      ? 'fill-yellow-400 text-yellow-400'
+                      : 'text-gray-300'
                       }`}
                   />
                 ))}
@@ -1279,9 +1409,9 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
                     className="transition-all hover:scale-110 focus:outline-none"
                   >
                     <Star
-                      className={`h-10 w-10 ${(hoveredRating > 0 ? hoveredRating : feedbackRating) >= rating
-                          ? 'fill-yellow-400 text-yellow-400'
-                          : 'text-gray-300'
+                      className={`h-10 w-10 cursor-pointer ${(hoveredRating > 0 ? hoveredRating : feedbackRating) >= rating
+                        ? 'fill-yellow-400 text-yellow-400'
+                        : 'text-gray-300'
                         } transition-colors`}
                     />
                   </button>
@@ -1308,7 +1438,7 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
             <AlertDialogCancel disabled={submittingFeedback}>Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleSubmitFeedback}
-              disabled={submittingFeedback}
+              disabled={submittingFeedback || feedbackRating === 0}
               className="bg-blue-600 hover:bg-blue-700"
             >
               {submittingFeedback && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}

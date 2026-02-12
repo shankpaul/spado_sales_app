@@ -3,7 +3,6 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Card } from '../components/ui/card';
-import { Badge } from '../components/ui/badge';
 import {
   Sheet,
   SheetContent,
@@ -47,8 +46,13 @@ import {
   X as XIcon,
   Car,
   Truck,
+  Repeat,
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
+import { Badge2 } from '@/components/ui/badge2';
+import LetterAvatar from '@/components/LetterAvatar';
+import { cn } from '@/lib/utils';
+import { Skeleton } from '../components/ui/skeleton';
 
 /**
  * Subscriptions Page Component
@@ -325,7 +329,7 @@ const Subscriptions = () => {
     }
   };
 
-  // Get badge variant for status
+  // Get Badge2 variant for status
   const getBadgeVariant = (status, type = 'status') => {
     const statusArray = type === 'payment' ? SUBSCRIPTION_PAYMENT_STATUSES : SUBSCRIPTION_STATUSES;
     const statusObj = statusArray.find(s => s.value === status);
@@ -337,10 +341,12 @@ const Subscriptions = () => {
 
   return (
     <div className="p-4 md:p-6 space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      {/* Header - Desktop Only */}
+      <div className="hidden md:flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold">Subscriptions</h1>
+          <h1 className="text-2xl font-bold flex items-center gap-2">
+            <Repeat className="h-8 w-8" strokeWidth={1.5} />
+            Subscriptions</h1>
           <p className="text-muted-foreground">Manage recurring service subscriptions</p>
         </div>
         <Button onClick={handleCreateSubscription} className="w-full sm:w-auto">
@@ -349,33 +355,57 @@ const Subscriptions = () => {
         </Button>
       </div>
 
-      {/* Search and Filters */}
-      <div className="flex flex-col sm:flex-row gap-4">
-        {/* Search */}
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search by customer name or phone..."
-            value={searchTerm}
-            onChange={handleSearch}
-            className="pl-10"
-          />
-        </div>
+      {/* Mobile Title - Visible only on mobile */}
+      <div className="block md:hidden">
+        <h1 className="text-2xl font-bold flex items-center gap-2">
+          <Repeat className="h-6 w-6" strokeWidth={1.5} />
+          Subscriptions</h1>
+        <p className="text-muted-foreground text-sm">Manage recurring service subscriptions</p>
+      </div>
 
-        {/* Filter Button */}
-        <Button
-          variant="outline"
-          onClick={() => setIsFilterOpen(true)}
-          className="relative"
-        >
-          <Filter className="h-4 w-4 mr-2" />
-          Filters
-          {activeFilterCount > 0 && (
-            <Badge variant="destructive" className="ml-2 px-1.5 min-w-5 h-5">
-              {activeFilterCount}
-            </Badge>
-          )}
-        </Button>
+      {/* Search and Filters - Sticky on Mobile */}
+      <div className="sticky top-0 z-10 md:static bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 py-2 -mx-4 px-4 md:mx-0 md:px-0 flex flex-col sm:flex-row gap-4">
+        <div className="flex flex-col sm:flex-row gap-4 w-full">
+          {/* Search */}
+          <div className="relative flex-1 flex gap-2">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search by name or phone..."
+                value={searchTerm}
+                onChange={handleSearch}
+                className="pl-10 pr-10"
+              />
+              {searchTerm && (
+                <button
+                  onClick={() => setSearchTerm('')}
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                  type="button"
+                >
+                  <XIcon className="h-4 w-4" />
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Filter Button */}
+          <Button
+            variant={activeFilterCount > 0 ? "default" : "outline"}
+            onClick={() => setIsFilterOpen(true)}
+            className="w-full sm:w-auto relative"
+          >
+            <Filter className="h-4 w-4 mr-2" />
+            Filters
+            {activeFilterCount > 0 && (
+              <Badge2
+                variant="secondary"
+                className="ml-2 bg-white text-primary px-1.5 py-0 text-xs h-5 min-w-[20px]"
+              >
+                {activeFilterCount}
+              </Badge2>
+            )}
+          </Button>
+        </div>
       </div>
 
       {/* Active Filters */}
@@ -383,7 +413,7 @@ const Subscriptions = () => {
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-sm text-muted-foreground">Active filters:</span>
           {statusFilter && (
-            <Badge variant="secondary" className="gap-1">
+            <Badge2 variant="secondary" className="gap-1">
               Status: {getStatusLabel(statusFilter, SUBSCRIPTION_STATUSES)}
               <button
                 onClick={() => setStatusFilter('')}
@@ -391,10 +421,10 @@ const Subscriptions = () => {
               >
                 <XIcon className="h-3 w-3" />
               </button>
-            </Badge>
+            </Badge2>
           )}
           {paymentStatusFilter && (
-            <Badge variant="secondary" className="gap-1">
+            <Badge2 variant="secondary" className="gap-1">
               Payment: {getStatusLabel(paymentStatusFilter, SUBSCRIPTION_PAYMENT_STATUSES)}
               <button
                 onClick={() => setPaymentStatusFilter('')}
@@ -402,10 +432,10 @@ const Subscriptions = () => {
               >
                 <XIcon className="h-3 w-3" />
               </button>
-            </Badge>
+            </Badge2>
           )}
           {vehicleTypeFilter && (
-            <Badge variant="secondary" className="gap-1">
+            <Badge2 variant="secondary" className="gap-1">
               Vehicle: {vehicleTypeFilter.charAt(0).toUpperCase() + vehicleTypeFilter.slice(1)}
               <button
                 onClick={() => setVehicleTypeFilter('')}
@@ -413,10 +443,10 @@ const Subscriptions = () => {
               >
                 <XIcon className="h-3 w-3" />
               </button>
-            </Badge>
+            </Badge2>
           )}
           {(startDateFrom || startDateTo) && (
-            <Badge variant="secondary" className="gap-1">
+            <Badge2 variant="secondary" className="gap-1">
               Date: {startDateFrom && formatDate(startDateFrom)}
               {startDateFrom && startDateTo && ' - '}
               {startDateTo && formatDate(startDateTo)}
@@ -429,7 +459,7 @@ const Subscriptions = () => {
               >
                 <XIcon className="h-3 w-3" />
               </button>
-            </Badge>
+            </Badge2>
           )}
           <Button variant="ghost" size="sm" onClick={clearFilters}>
             Clear all
@@ -438,10 +468,51 @@ const Subscriptions = () => {
       )}
 
       {/* Subscriptions List */}
-      <Card>
+      <Card className="border-0 shadow-none md:border-1 md:shadow-sm">
         {loading ? (
-          <div className="flex items-center justify-center py-12">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <div className="space-y-4">
+            {/* Desktop Skeleton */}
+            <div className="hidden md:block">
+              <div className="border-b px-4 py-3 flex gap-4">
+                <Skeleton className="h-4 w-1/4" />
+                <Skeleton className="h-4 w-1/5" />
+                <Skeleton className="h-4 w-1/6" />
+                <Skeleton className="h-4 w-12 ml-auto" />
+              </div>
+              {[1, 2, 3, 4, 5].map((i) => (
+                <div key={i} className="border-b last:border-0 px-4 py-4 flex items-center gap-4">
+                  <Skeleton className="h-8 w-8 rounded-full" />
+                  <div className="space-y-2 flex-1">
+                    <Skeleton className="h-4 w-1/3" />
+                  </div>
+                  <Skeleton className="h-4 w-1/5" />
+                  <Skeleton className="h-4 w-1/6" />
+                  <Skeleton className="h-8 w-20 rounded-full ml-auto" />
+                </div>
+              ))}
+            </div>
+
+            {/* Mobile Skeleton */}
+            <div className="md:hidden space-y-3 px-1">
+              {[1, 2, 3, 4].map((i) => (
+                <div key={i} className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 space-y-4">
+                  <div className="flex items-center gap-4">
+                    <Skeleton className="h-12 w-12 rounded-full" />
+                    <div className="flex-1 space-y-2">
+                      <div className="flex justify-between">
+                        <Skeleton className="h-4 w-1/2" />
+                        <Skeleton className="h-8 w-8 rounded-full" />
+                      </div>
+                      <Skeleton className="h-3 w-1/3" />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Skeleton className="h-6 w-full rounded-md" />
+                    <Skeleton className="h-6 w-full rounded-md" />
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         ) : subscriptions.length === 0 ? (
           <div className="text-center py-12">
@@ -473,11 +544,9 @@ const Subscriptions = () => {
                       onClick={() => handleViewDetails(subscription.id)}
                     >
                       <td className="px-4 py-3">
-                        <div>
-                          <div className="font-medium">{subscription.customer?.name}</div>
-                          <div className="text-sm text-muted-foreground">
-                            {subscription.customer?.phone}
-                          </div>
+                        <div className="font-normal flex gap-2">
+                          <LetterAvatar name={subscription.customer?.name} size="xs" />
+                          {subscription.customer?.name}
                         </div>
                       </td>
                       <td className="px-4 py-3">
@@ -490,13 +559,13 @@ const Subscriptions = () => {
                             {subscription.selected_packages?.length > 1 && (
                               <Popover>
                                 <PopoverTrigger asChild>
-                                  <Badge
+                                  <Badge2
                                     variant="secondary"
                                     className="h-5 px-1.5 text-[10px] cursor-pointer hover:bg-secondary/80"
                                     onClick={(e) => e.stopPropagation()}
                                   >
                                     +{subscription.subscription_packages.length - 1}
-                                  </Badge>
+                                  </Badge2>
                                 </PopoverTrigger>
                                 <PopoverContent className="w-auto p-3" align="start">
                                   <div className="space-y-2">
@@ -529,14 +598,14 @@ const Subscriptions = () => {
                         </div>
                       </td>
                       <td className="px-4 py-3">
-                        <Badge variant={getBadgeVariant(subscription.status)}>
+                        <Badge2 variant={getBadgeVariant(subscription.status)}>
                           {getStatusLabel(subscription.status, SUBSCRIPTION_STATUSES)}
-                        </Badge>
+                        </Badge2>
                       </td>
                       <td className="px-4 py-3">
-                        <Badge variant={getBadgeVariant(subscription.payment_status, 'payment')}>
+                        <Badge2 variant={getBadgeVariant(subscription.payment_status, 'payment')}>
                           {getStatusLabel(subscription.payment_status, SUBSCRIPTION_PAYMENT_STATUSES)}
-                        </Badge>
+                        </Badge2>
                       </td>
                       <td className="px-4 py-3">
                         <div className="text-sm">
@@ -549,6 +618,7 @@ const Subscriptions = () => {
                             <Button
                               variant="ghost"
                               size="icon"
+                              className={cn(subscription.status === 'active' ? 'text-amber-500' : 'text-green-500', 'hover:bg-muted')}
                               onClick={(e) => handleTogglePause(subscription, e)}
                               title={subscription.status === 'active' ? 'Pause' : 'Resume'}
                             >
@@ -568,84 +638,101 @@ const Subscriptions = () => {
             </div>
 
             {/* Mobile Cards */}
-            <div className="md:hidden divide-y">
+            <div className="block md:hidden space-y-3">
               {subscriptions.map((subscription) => (
                 <div
                   key={subscription.id}
-                  className="p-4 space-y-3 cursor-pointer hover:bg-muted/50"
+                  className="bg-white border border-gray-100 rounded-xl p-4 space-y-4 active:scale-[0.98] active:bg-gray-50 transition-all duration-200 cursor-pointer shadow-sm"
                   onClick={() => handleViewDetails(subscription.id)}
                 >
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <div className="font-medium">{subscription.customer?.name}</div>
-                      <div className="text-sm text-muted-foreground">
-                        {subscription.customer?.phone}
+                  <div className="flex items-center gap-4">
+                    <LetterAvatar name={subscription.customer?.name} size="md" />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between">
+                        <div className="font-bold text-base truncate capitalize">
+                          {subscription.customer?.name}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Badge2
+                            variant={getBadgeVariant(subscription.status)}
+                            className="h-5 text-[10px] px-1.5"
+                          >
+                            {getStatusLabel(subscription.status, SUBSCRIPTION_STATUSES)}
+                          </Badge2>
+                        </div>
                       </div>
-                    </div>
-                    <div className="flex gap-2">
-                      <Badge variant={getBadgeVariant(subscription.status)}>
-                        {getStatusLabel(subscription.status, SUBSCRIPTION_STATUSES)}
-                      </Badge>
+
+                      <div className="flex items-center justify-between mt-1">
+                        <div className="flex items-center gap-2">
+                          <Package className="h-3 w-3 text-muted-foreground" />
+                          <span className="text-xs text-muted-foreground truncate max-w-[120px] capitalize">
+                            {subscription.subscription_packages?.[0]?.name || 'N/A'}
+                          </span>
+                        </div>
+                        <Badge2
+                          variant={getBadgeVariant(subscription.payment_status, 'payment')}
+                          className="h-5 text-[10px] px-1.5"
+                        >
+                          {getStatusLabel(subscription.payment_status, SUBSCRIPTION_PAYMENT_STATUSES)}
+                        </Badge2>
+                      </div>
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-2 text-sm">
+                  <div className="grid grid-cols-2 gap-y-3 gap-x-4 text-xs text-muted-foreground pt-1">
                     <div className="flex items-center gap-2">
-                      <Package className="h-3 w-3 text-muted-foreground" />
-                      <div className="flex items-center gap-1">
-                        <span className="capitalize">
-                          {subscription.subscription_packages?.[0]?.name || 'N/A'}
-                        </span>
-                        {subscription.subscription_packages?.length > 1 && (
-                          <Popover>
-                            <PopoverTrigger asChild>
-                              <Badge
-                                variant="secondary"
-                                className="h-4 px-1 text-[9px] cursor-pointer hover:bg-secondary/80"
-                                onClick={(e) => e.stopPropagation()}
-                              >
-                                +{subscription.subscription_packages.length - 1}
-                              </Badge>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-auto p-3" align="start">
-                              <div className="space-y-2">
-                                <h4 className="font-medium text-xs text-muted-foreground">All Packages</h4>
-                                <ul className="space-y-1">
-                                  {subscription.subscription_packages.map((pkg, idx) => (
-                                    <li key={idx} className="text-sm capitalize list-disc ml-4">
-                                      {pkg.name}
-                                    </li>
-                                  ))}
-                                </ul>
-                              </div>
-                            </PopoverContent>
-                          </Popover>
-                        )}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Calendar className="h-3 w-3 text-muted-foreground" />
+                      <Calendar className="h-3.5 w-3.5" />
                       <span>{subscription.months_duration} month(s)</span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <IndianRupee className="h-3 w-3 text-muted-foreground" />
-                      <Badge variant={getBadgeVariant(subscription.payment_status, 'payment')} className="text-xs">
-                        {getStatusLabel(subscription.payment_status, SUBSCRIPTION_PAYMENT_STATUSES)}
-                      </Badge>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <MapPin className="h-3 w-3 text-muted-foreground" />
+                      <MapPin className="h-3.5 w-3.5" />
                       <span>{subscription.washing_schedules?.length || 0} washes</span>
                     </div>
                   </div>
 
                   {subscription.next_wash_date && (
-                    <div className="text-xs text-muted-foreground">
-                      Next wash: {formatDate(subscription.next_wash_date)}
+                    <div className="flex items-center justify-between mt-1 pt-3 border-t border-gray-50">
+                      <div className="text-[11px] text-muted-foreground flex items-center gap-1.5">
+                        <Calendar className="h-3 w-3" />
+                        Next: {formatDate(subscription.next_wash_date)}
+                      </div>
+                      <div className="flex gap-2">
+                        {(subscription.status === 'active' || subscription.status === 'paused') && (
+                          <div
+                            className={cn(
+                              "p-1.5 rounded-full",
+                              subscription.status === 'active' ? "bg-amber-50 text-amber-600" : "bg-green-50 text-green-600"
+                            )}
+                            onClick={(e) => handleTogglePause(subscription, e)}
+                          >
+                            {subscription.status === 'active' ? (
+                              <Pause className="h-3.5 w-3.5" />
+                            ) : (
+                              <Play className="h-3.5 w-3.5" />
+                            )}
+                          </div>
+                        )}
+                      </div>
                     </div>
                   )}
                 </div>
               ))}
+
+              {/* Mobile Infinite Scroll Trigger */}
+              {isMobile && hasMore && (
+                <div ref={observerTarget} className="flex items-center justify-center py-4">
+                  {isLoadingMore.current && (
+                    <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                  )}
+                </div>
+              )}
+
+              {/* End of list message */}
+              {!hasMore && subscriptions.length > 0 && (
+                <div className="text-center py-6 text-sm text-muted-foreground">
+                  You've reached the end of the list ({totalCount} subscriptions)
+                </div>
+              )}
             </div>
           </>
         )}
@@ -727,16 +814,20 @@ const Subscriptions = () => {
         </div>
       )}
 
-      {/* Results Info */}
-      {!loading && subscriptions.length > 0 && (
-        <div className="text-center text-sm text-muted-foreground">
-          Showing {subscriptions.length} of {totalCount} subscriptions
-        </div>
-      )}
+      {/* Floating Action Button (FAB) for Mobile */}
+      <div className="md:hidden fixed bottom-20 right-6 z-40">
+        <Button
+          onClick={handleCreateSubscription}
+          size="icon"
+          className="h-14 w-14 rounded-full shadow-lg bg-primary hover:bg-primary/90 active:scale-90 transition-all duration-200"
+        >
+          <Plus className="h-7 w-7" />
+        </Button>
+      </div>
 
       {/* Filter Sheet */}
       <Sheet open={isFilterOpen} onOpenChange={setIsFilterOpen}>
-        <SheetContent side="right" className="w-full sm:max-w-md">
+        <SheetContent side={isMobile ? "bottom" : "right"} className="w-full sm:max-w-md">
           <SheetHeader>
             <SheetTitle>Filter Subscriptions</SheetTitle>
           </SheetHeader>

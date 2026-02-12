@@ -35,6 +35,7 @@ import {
   Mail,
 } from 'lucide-react';
 import { format } from 'date-fns';
+import CustomerContact from './CustomerContact';
 
 /**
  * CustomerDetails Component
@@ -158,8 +159,12 @@ const CustomerDetails = ({ customer, open, onOpenChange }) => {
                   <div>
                     <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Phone Number</label>
                     <div className="flex items-center gap-2 mt-1">
-                      <Phone className="h-4 w-4 text-muted-foreground" />
-                      <p className="text-base">{customer.phone}</p>
+                      <CustomerContact
+                        phone={customer.phone}
+                        customerName={customer.name}
+                        variant="outline"
+                        className="text-blue-600 border-blue-600"
+                      />
                       {customer.has_whatsapp && (
                         <Badge variant="outline" className="text-green-600 border-green-600 ml-2">
                           <MessageCircle className="h-3 w-3 mr-1" />
