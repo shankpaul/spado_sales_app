@@ -292,6 +292,7 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
       red: 'destructive',
       yellow: 'warning',
       purple: 'outline',
+      amber: 'warning',
     };
 
     return variantMap[color] || 'default';

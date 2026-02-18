@@ -15,6 +15,7 @@ const Orders = lazy(() => import('./pages/Orders'));
 const OrderDetail = lazy(() => import('./pages/OrderDetail'));
 const Subscriptions = lazy(() => import('./pages/Subscriptions'));
 const SubscriptionDetail = lazy(() => import('./pages/SubscriptionDetail'));
+const Users = lazy(() => import('./pages/Users'));
 
 // Loading fallback component
 const LoadingFallback = () => (
@@ -127,6 +128,17 @@ function App() {
                     <h2 className="text-2xl font-bold text-gray-900 mb-2">Services</h2>
                     <p className="text-gray-600">Services management page coming soon...</p>
                   </div>
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/users"
+            element={
+              <ProtectedRoute allowedRoles={['admin']}>
+                <Layout>
+                  <Users />
                 </Layout>
               </ProtectedRoute>
             }

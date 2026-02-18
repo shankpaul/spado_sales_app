@@ -658,7 +658,6 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
         booking_time_from: bookingTimeFrom,
         booking_time_to: bookingTimeTo,
         agent_id: selectedAgent,
-        address,
         notes,
         packages: packageItems.map((item) => ({
           package_id: item.package_id,
@@ -677,6 +676,7 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
           discount_type: item.discount_type,
           discount_value: item.discount_value,
         })),
+        ...address
       };
 
       if (orderId) {
@@ -736,6 +736,7 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
                 }
               }}
               className="pl-10"
+              disabled={!!orderId}
             />
             {customerSearchLoading && (
               <Loader2 className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />
@@ -744,7 +745,7 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
 
           {/* Suggestions Dropdown */}
           {showCustomerSuggestions && customerSearchTerm.length >= 2 && (
-            <Card className="absolute z-50 w-full mt-1 max-h-64 overflow-y-auto shadow-lg">
+            <Card className="absolute bg-white z-50 w-full mt-1 max-h-64 overflow-y-auto shadow-lg">
               {customerSearchLoading ? (
                 <div className="p-4 text-center text-sm text-muted-foreground">
                   <Loader2 className="h-4 w-4 animate-spin mx-auto mb-2" />
@@ -891,18 +892,20 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
                   <PenIcon className="h-4 w-4" />
                 </Button>
               )}
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  setSelectedCustomer(null);
-                  setCustomerSearchTerm('');
-                  setEditingCustomer(false);
-                }}
-              >
-                <X className="h-4 w-4" />
-              </Button>
+              {!orderId && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setSelectedCustomer(null);
+                    setCustomerSearchTerm('');
+                    setEditingCustomer(false);
+                  }}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              )}
             </div>
           </div>
         </Card>
@@ -1358,7 +1361,7 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
                     <SelectTrigger>
                       <SelectValue placeholder="Select time" />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent className="max-h-60 overflow-y-auto">
                       {generateTimeOptions().map((time) => (
                         <SelectItem key={time.value} value={time.value}>
                           {time.label}
@@ -1381,7 +1384,7 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
                     <SelectTrigger>
                       <SelectValue placeholder="Select time" />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent className="max-h-60 overflow-y-auto">
                       {generateTimeOptions()
                         .filter((time) => !bookingTimeFrom || time.value > bookingTimeFrom)
                         .map((time) => (

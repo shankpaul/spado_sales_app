@@ -281,7 +281,7 @@ const Dashboard = () => {
               <Skeleton className="h-20 w-full rounded-2xl" />
             </div>
           ) : completedOrders.length > 0 ? (
-            <div className="space-y-3 max-h-96 overflow-y-auto pr-1">
+            <div className="space-y-3 max-h-96 overflow-y-auto pr-1 pb-2">
               {completedOrders.map((order) => (
                 <BookingItem
                   key={order.id}

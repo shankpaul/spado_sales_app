@@ -398,6 +398,7 @@ const Orders = () => {
       red: 'destructive',
       yellow: 'warning',
       purple: 'outline',
+      amber: 'warning',
     };
 
     return variantMap[color] || 'secondary';
@@ -920,7 +921,7 @@ const Orders = () => {
 
       {/* Order Detail Sheet */}
       <Sheet open={!!selectedOrderId} onOpenChange={(open) => !open && handleCloseOrderDetail()}>
-        <SheetContent side="right" className="w-full sm:max-w-4xl p-0 overflow-y-auto">
+        <SheetContent side="right" className="w-full sm:max-w-3/4 p-0 overflow-y-auto">
           {selectedOrderId && (
             <OrderDetail
               orderId={selectedOrderId}

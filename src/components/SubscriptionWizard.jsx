@@ -966,7 +966,7 @@ const SubscriptionWizard = ({ open, onOpenChange, onSuccess, customerId = null, 
                         className="pl-10"
                       />
                       {showCustomerSuggestions && (
-                        <Card className="absolute z-10 w-full mt-1 max-h-60 overflow-y-auto">
+                        <Card className="absolute bg-white z-10 w-full mt-1 max-h-60 overflow-y-auto">
                           {customerSearchLoading ? (
                             <div className="p-4 text-center">
                               <Loader2 className="h-6 w-6 animate-spin mx-auto" />

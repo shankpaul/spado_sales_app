@@ -131,6 +131,7 @@ export const ORDER_STATUSES = [
   { value: 'confirmed', label: 'Confirmed', color: 'blue' },
   { value: 'completed', label: 'Completed', color: 'green' },
   { value: 'cancelled', label: 'Cancelled', color: 'red' },
+  { value: 'in_progress', label: 'In Progress', color: 'amber' },
 ];
 
 // Payment Status Constants

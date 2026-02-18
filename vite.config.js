@@ -9,12 +9,12 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.ico', 'robots.txt', 'apple-touch-icon.png'],
+      includeAssets: ['spadologo.png', 'spadologo.svg'],
       manifest: {
         name: 'Spado Car Wash Management',
-        short_name: 'Spado Car Wash',
+        short_name: 'Spado',
         description: 'Professional car wash business management system',
-        theme_color: '#4169E1',
+        theme_color: '#0846c1',
         background_color: '#ffffff',
         display: 'standalone',
         orientation: 'portrait',
@@ -25,13 +25,19 @@ export default defineConfig({
             src: 'pwa-192x192.png',
             sizes: '192x192',
             type: 'image/png',
-            purpose: 'any maskable'
+            purpose: 'any'
           },
           {
             src: 'pwa-512x512.png',
             sizes: '512x512',
             type: 'image/png',
-            purpose: 'any maskable'
+            purpose: 'any'
+          },
+          {
+            src: 'maskable-icon.png',
+            sizes: '512x512',
+            type: 'image/png',
+            purpose: 'maskable'
           }
         ]
       },
@@ -39,7 +45,7 @@ export default defineConfig({
         // Cache strategy
         runtimeCaching: [
           {
-            urlPattern: /^https:\/\/api\.yourdomain\.com\/.*$/i,
+            urlPattern: /^http:\/\/192\.168\.1\.3:3000\/api\/v1\/.*$/i,
             handler: 'NetworkFirst',
             options: {
               cacheName: 'api-cache',

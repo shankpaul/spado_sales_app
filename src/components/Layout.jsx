@@ -25,7 +25,10 @@ import {
   User,
   KeyRound,
   ChevronDown,
+  Smartphone,
+  Download,
 } from 'lucide-react';
+import usePWAInstall from '../hooks/usePWAInstall';
 import Logo from './Logo';
 import {
   Breadcrumb,
@@ -52,6 +55,7 @@ const Layout = ({ children }) => {
   const { user } = useAuthStore();
   const location = useLocation();
   const navigate = useNavigate();
+  const { isInstallable, handleInstallClick } = usePWAInstall();
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
 
@@ -77,8 +81,7 @@ const Layout = ({ children }) => {
         { name: 'Customers', href: '/customers', icon: Users },
         { name: 'Orders', href: '/orders', icon: Calendar },
         { name: 'Subscriptions', href: '/subscriptions', icon: Calendar },
-        { name: 'Services', href: '/services', icon: Car },
-        { name: 'Staff', href: '/staff', icon: UserCircle },
+        { name: 'Staff', href: '/users', icon: UserCircle },
         { name: 'Reports', href: '/reports', icon: BarChart3 },
         { name: 'Financials', href: '/financials', icon: DollarSign },
         { name: 'Settings', href: '/settings', icon: Settings },
@@ -209,6 +212,19 @@ const Layout = ({ children }) => {
             {navigationItems.map((item) => (
               <NavItem key={item.name} item={item} mobile={true} collapsed={sidebarCollapsed} />
             ))}
+
+            {isInstallable && (
+              <div className="pt-4 mt-4 border-t border-gray-200">
+                <button
+                  onClick={handleInstallClick}
+                  className={`flex items-center gap-3 w-full rounded-lg transition-colors px-4 py-2 text-primary bg-primary/5 hover:bg-primary/10 border border-primary/20 font-medium ${sidebarCollapsed ? 'justify-center px-0' : ''}`}
+                  title="Install App"
+                >
+                  <Download className="h-5 w-5" />
+                  {!sidebarCollapsed && <span>Install App</span>}
+                </button>
+              </div>
+            )}
           </nav>
         </div>
       </aside>
@@ -354,6 +370,22 @@ const Layout = ({ children }) => {
                         </Link>
                       );
                     })}
+
+                  {isInstallable && (
+                    <>
+                      <div className="border-t my-1" />
+                      <button
+                        onClick={() => {
+                          setMoreMenuOpen(false);
+                          handleInstallClick();
+                        }}
+                        className="flex items-center gap-3 px-3 py-2 text-sm rounded-md transition-colors bg-primary/10 text-primary hover:bg-primary/20 font-medium"
+                      >
+                        <Download className="h-4 w-4" />
+                        <span>Install Spado App</span>
+                      </button>
+                    </>
+                  )}
                 </div>
               </PopoverContent>
             </Popover>
