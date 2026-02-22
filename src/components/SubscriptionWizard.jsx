@@ -22,6 +22,7 @@ import {
 } from './ui/select';
 import { Card } from './ui/card';
 import { Badge } from './ui/badge';
+import VehicleIcon from './VehicleIcon';
 import { ConfirmDialog } from './ui/confirm-dialog';
 import {
   AlertDialog,
@@ -44,6 +45,7 @@ import {
   DISCOUNT_TYPES,
   PAYMENT_METHODS,
   SUBSCRIPTION_PAYMENT_STATUSES,
+  GST_PERCENTAGE,
   generateTimeSlots,
   formatTimeDisplay,
 } from '../lib/constants';
@@ -744,13 +746,21 @@ const SubscriptionWizard = ({ open, onOpenChange, onSuccess, customerId = null, 
     const addonTotal = addonItems.reduce((sum, item) => sum + (item.price || 0), 0);
     // Package prices already include quantity (monthsDuration)
     // Addon prices already include selected wash count, no multiplication needed
-    const subscriptionTotal = packageTotal + addonTotal;
+    const subtotal = packageTotal + addonTotal;
+    const gst = (subtotal * GST_PERCENTAGE) / 100;
+    const totalBeforeRounding = subtotal + gst;
+    const roundedTotal = Math.round(totalBeforeRounding);
+    const roundOff = roundedTotal - totalBeforeRounding;
 
     return {
       packages: packageTotal,
       addons: addonTotal,
-      perMonth: (packageTotal / monthsDuration) + (addonTotal / monthsDuration),
-      total: subscriptionTotal,
+      subtotal,
+      gst,
+      gstPercentage: GST_PERCENTAGE,
+      roundOff,
+      perMonth: (roundedTotal / monthsDuration),
+      total: roundedTotal,
     };
   };
 
@@ -852,7 +862,13 @@ const SubscriptionWizard = ({ open, onOpenChange, onSuccess, customerId = null, 
   return (
     <>
       <Dialog open={open} onOpenChange={handleClose}>
-        <DialogContent className="max-w-4xl p-0 md:p-6 h-full md:h-auto md:max-h-[90vh] w-full rounded-none md:rounded-xl border-0 md:border overflow-hidden flex flex-col">
+        <DialogContent 
+          className="max-w-4xl p-0 md:p-6 h-full md:h-auto md:max-h-[90vh] w-full rounded-none md:rounded-xl border-0 md:border overflow-hidden flex flex-col"
+          onPointerDownOutside={(e) => {
+            // Prevent dialog from closing on outside clicks
+            e.preventDefault();
+          }}
+        >
           {/* Mobile Header */}
           <div className="md:hidden sticky top-0 z-20 bg-background border-b px-4 py-3 flex items-center justify-between">
             <Button
@@ -931,7 +947,7 @@ const SubscriptionWizard = ({ open, onOpenChange, onSuccess, customerId = null, 
 
             {/* Step 1: Customer & Duration */}
             {currentStep === 1 && (
-              <div className="space-y-6">
+              <div className="space-y-6 px-1">
                 {/* Customer Selection */}
                 <div>
                   <Label>Customer *</Label>
@@ -1042,18 +1058,18 @@ const SubscriptionWizard = ({ open, onOpenChange, onSuccess, customerId = null, 
                     </Button>
                   </div>
                   <div className="flex gap-2">
-                    {[{ type: 'hatchback', icon: Car }, { type: 'sedan', icon: Car }, { type: 'suv', icon: Truck }].map(({ type, icon: Icon }) => (
+                    {['hatchback', 'sedan', 'suv', 'luxury'].map((type) => (
                       <Button
                         key={type}
                         type="button"
                         variant={vehicleType === type ? 'default' : 'outline'}
                         size="sm"
-                        className={`flex-1 h-12 flex flex-col items-center justify-center gap-1 rounded-full transition-all active:scale-[0.95]
+                        className={`flex-1 h-12 flex flex-col md:flex-row items-center justify-center gap-0  md:gap-2 rounded-lg transition-all active:scale-[0.95]
                           }`}
                         onClick={() => setVehicleType(type)}
                       >
-                        <Icon className="h-5 w-5" />
-                        <span className="text-[10px] uppercase font-bold tracking-wider">{type}</span>
+                        <VehicleIcon vehicleType={type} size={32} className={vehicleType === type ? 'text-white' : 'text-black'} />
+                        <span className="text-xs capitalize font-semibold -mt-2 md:mt-0">{type}</span>
                       </Button>
                     ))}
                   </div>
@@ -1179,8 +1195,13 @@ const SubscriptionWizard = ({ open, onOpenChange, onSuccess, customerId = null, 
                               <Input
                                 type="number"
                                 min="0"
-                                value={item.discount_value}
-                                onChange={(e) => updatePackageItem(index, 'discount_value', parseFloat(e.target.value) || 0)}
+                                placeholder="0"
+                                value={item.discount_value || ''}
+                                onChange={(e) => {
+                                  const value = e.target.value;
+                                  const numValue = value === '' ? 0 : parseFloat(value);
+                                  updatePackageItem(index, 'discount_value', isNaN(numValue) ? 0 : numValue);
+                                }}
                                 className="h-8 text-sm"
                               />
                               <Select
@@ -1351,8 +1372,13 @@ const SubscriptionWizard = ({ open, onOpenChange, onSuccess, customerId = null, 
                                 <Input
                                   type="number"
                                   min="0"
-                                  value={item.discount_value}
-                                  onChange={(e) => updateAddonItem(index, 'discount_value', parseFloat(e.target.value) || 0)}
+                                  placeholder="0"
+                                  value={item.discount_value || ''}
+                                  onChange={(e) => {
+                                    const value = e.target.value;
+                                    const numValue = value === '' ? 0 : parseFloat(value);
+                                    updateAddonItem(index, 'discount_value', isNaN(numValue) ? 0 : numValue);
+                                  }}
                                   className="h-8 text-sm"
                                 />
                                 <Select
@@ -1735,9 +1761,28 @@ const SubscriptionWizard = ({ open, onOpenChange, onSuccess, customerId = null, 
                         </div>
                       )}
 
-                      <div className="flex justify-between text-lg font-bold mt-2 text-primary">
+                      <div className="flex justify-between text-sm border-t pt-2 mt-2">
+                        <span>Subtotal</span>
+                        <span>₹{totals.subtotal.toFixed(2)}</span>
+                      </div>
+
+                      <div className="flex justify-between text-sm">
+                        <span>GST ({totals.gstPercentage}%)</span>
+                        <span>₹{totals.gst.toFixed(2)}</span>
+                      </div>
+
+                      {totals.roundOff !== 0 && (
+                        <div className="flex justify-between text-sm">
+                          <span>Round Off</span>
+                          <span className={totals.roundOff >= 0 ? 'text-green-600' : 'text-red-600'}>
+                            {totals.roundOff >= 0 ? '+' : ''}₹{totals.roundOff.toFixed(2)}
+                          </span>
+                        </div>
+                      )}
+
+                      <div className="flex justify-between text-lg font-bold mt-2 text-primary border-t pt-2">
                         <span>Total Amount <span className='text-sm text-muted-foreground'>(For {monthsDuration} month{monthsDuration > 1 ? 's' : ''})</span></span>
-                        <span>₹{totals.total}</span>
+                        <span>₹{totals.total.toFixed(0)}</span>
                       </div>
                     </div>
                   </div>

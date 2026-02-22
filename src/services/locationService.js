@@ -45,87 +45,112 @@ export const INDIAN_STATES = [
 
 // Major Districts in Kerala
 export const KERALA_DISTRICTS = [
-  'Alappuzha',
+  // 'Alappuzha',
   'Ernakulam',
-  'Idukki',
-  'Kannur',
-  'Kasaragod',
-  'Kollam',
-  'Kottayam',
-  'Kozhikode',
-  'Malappuram',
-  'Palakkad',
-  'Pathanamthitta',
-  'Thiruvananthapuram',
+  // 'Idukki',
+  // 'Kannur',
+  // 'Kasaragod',
+  // 'Kollam',
+  // 'Kottayam',
+  // 'Kozhikode',
+  // 'Malappuram',
+  // 'Palakkad',
+  // 'Pathanamthitta',
+  // 'Thiruvananthapuram',
   'Thrissur',
-  'Wayanad',
+  // 'Wayanad',
 ];
 
-// Major Cities in Kerala
-export const KERALA_CITIES = [
-  'Thiruvananthapuram',
-  'Kochi',
-  'Kozhikode',
-  'Thrissur',
-  'Kollam',
-  'Palakkad',
-  'Alappuzha',
-  'Malappuram',
-  'Kannur',
-  'Kottayam',
-  'Manjeri',
-  'Thalassery',
-  'Ponnani',
-  'Vatakara',
-  'Kanhangad',
-  'Payyanur',
-  'Koyilandy',
-  'Parappanangadi',
-  'Kalamassery',
-  'Neyyattinkara',
-  'Tanur',
-  'Kayamkulam',
-  'Thrippunithura',
-  'Muvattupuzha',
-  'Kothamangalam',
-  'Pathanamthitta',
-  'Attingal',
-  'Cherthala',
-  'Perinthalmanna',
-  'Chalakudy',
-  'Payyoli',
-  'Kodungallur',
-  'Ottappalam',
-  'Tirur',
-  'Thodupuzha',
-  'Cherpulassery',
-  'Perumbavoor',
-  'Mattanur',
-  'Punalur',
-  'Nilambur',
-  'Chengannur',
-  'Kasaragod',
-  'Feroke',
-  'Taliparamba',
-  'Shornur',
-  'Pandalam',
-  'Kottakkal',
-  'Kunnamkulam',
-  'Ottapalam',
-  'Tiruvalla',
-  'Thalassery',
-  'Shoranur',
-  'Vatakara',
-  'Kalpetta',
-  'North Paravur',
-  'Haripad',
-  'Muvattupuzha',
-  'Pala',
-  'Changanassery',
-  'Guruvayur',
-  'Adoor',
-  'Varkala',
-];
+// Cities organized by district
+export const KERALA_CITIES_BY_DISTRICT = {
+  Alappuzha: [
+    'Alappuzha',
+    'Kayamkulam',
+    'Cherthala',
+    'Haripad',
+  ],
+  Ernakulam: [
+    'Kochi',
+    'Kalamassery',
+    'Thrippunithura',
+    'Muvattupuzha',
+    'Kothamangalam',
+    'Perumbavoor',
+    'North Paravur',
+  ],
+  Idukki: [
+    'Thodupuzha',
+  ],
+  Kannur: [
+    'Kannur',
+    'Thalassery',
+    'Payyanur',
+    'Mattanur',
+  ],
+  Kasaragod: [
+    'Kasaragod',
+    'Kanhangad',
+  ],
+  Kollam: [
+    'Kollam',
+    'Punalur',
+  ],
+  Kottayam: [
+    'Kottayam',
+    'Changanassery',
+    'Pala',
+  ],
+  Kozhikode: [
+    'Kozhikode',
+    'Vatakara',
+    'Koyilandy',
+    'Feroke',
+  ],
+  Malappuram: [
+    'Malappuram',
+    'Manjeri',
+    'Ponnani',
+    'Parappanangadi',
+    'Perinthalmanna',
+    'Tanur',
+    'Tirur',
+    'Nilambur',
+    'Kottakkal',
+  ],
+  Palakkad: [
+    'Palakkad',
+    'Ottappalam',
+    'Cherpulassery',
+    'Shornur',
+    'Ottapalam',
+    'Shoranur',
+  ],
+  Pathanamthitta: [
+    'Pathanamthitta',
+    'Pandalam',
+    'Tiruvalla',
+    'Adoor',
+  ],
+  Thiruvananthapuram: [
+    'Thiruvananthapuram',
+    'Neyyattinkara',
+    'Attingal',
+    'Varkala',
+  ],
+  Thrissur: [
+    'Thrissur',
+    'Chalakudy',
+    'Kodungallur',
+    'Kunnamkulam',
+    'Guruvayur',
+  ],
+  Wayanad: [
+    'Kalpetta',
+  ],
+};
+
+// All Kerala cities (flat list for backward compatibility)
+export const KERALA_CITIES = Object.values(KERALA_CITIES_BY_DISTRICT).flat();
 
 const locationService = {
   /**
@@ -154,6 +179,9 @@ const locationService = {
    */
   getCities: (state, district = null) => {
     if (state === 'Kerala') {
+      if (district && KERALA_CITIES_BY_DISTRICT[district]) {
+        return KERALA_CITIES_BY_DISTRICT[district];
+      }
       return KERALA_CITIES;
     }
     // For other states, return empty for now
@@ -182,6 +210,31 @@ const locationService = {
       return [];
     } catch (error) {
       console.error('Error fetching pincode data:', error);
+      return [];
+    }
+  },
+
+  /**
+   * Get unique areas from existing customers based on state and district
+   * Uses backend API to fetch from database
+   */
+  getAreas: async (state, district = null) => {
+    try {
+      const { default: apiClient } = await import('./apiClient');
+      
+      const params = new URLSearchParams({ state });
+      if (district) {
+        params.append('district', district);
+      }
+      
+      const response = await apiClient.get(`/utilities/areas?${params.toString()}`);
+      
+      if (response.data.success && response.data.areas) {
+        return response.data.areas;
+      }
+      return [];
+    } catch (error) {
+      console.error('Error fetching areas:', error);
       return [];
     }
   },

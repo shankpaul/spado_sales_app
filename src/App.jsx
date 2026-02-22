@@ -16,6 +16,7 @@ const OrderDetail = lazy(() => import('./pages/OrderDetail'));
 const Subscriptions = lazy(() => import('./pages/Subscriptions'));
 const SubscriptionDetail = lazy(() => import('./pages/SubscriptionDetail'));
 const Users = lazy(() => import('./pages/Users'));
+const Employees = lazy(() => import('./pages/Employees'));
 
 // Loading fallback component
 const LoadingFallback = () => (
@@ -41,7 +42,7 @@ function App() {
         {/* Toast notifications */}
         <Toaster 
           position="top-right"
-          // richColors
+          richColors
           // closeButton
           duration={4000}
         />
@@ -139,6 +140,17 @@ function App() {
               <ProtectedRoute allowedRoles={['admin']}>
                 <Layout>
                   <Users />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/employees"
+            element={
+              <ProtectedRoute allowedRoles={['admin']}>
+                <Layout>
+                  <Employees />
                 </Layout>
               </ProtectedRoute>
             }

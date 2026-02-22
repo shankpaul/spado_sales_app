@@ -43,6 +43,7 @@ import {
   TableRow,
 } from '../components/ui/table';
 import { DatePicker } from '../components/ui/date-picker';
+import VehicleIcon from '../components/VehicleIcon';
 import { toast } from 'sonner';
 import subscriptionService from '../services/subscriptionService';
 import {
@@ -70,6 +71,7 @@ import {
   CheckCircle,
   Eye,
   MoreVertical,
+  Repeat,
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import CustomerContact from '@/components/CustomerContact';
@@ -316,10 +318,10 @@ const SubscriptionDetail = () => {
             {/* Bottom Row: Badges */}
             <div className="flex items-center gap-2 mt-1 sm:mt-0 px-1 sm:px-0 flex-wrap sm:ml-12">
               <Badge2 variant={getBadgeVariant(subscription.status)} className="text-[10px] sm:text-xs h-5 px-2">
-                {getStatusLabel(subscription.status, SUBSCRIPTION_STATUSES)}
+               <Repeat size={12} /> {getStatusLabel(subscription.status, SUBSCRIPTION_STATUSES)}
               </Badge2>
               <Badge2 variant={getBadgeVariant(subscription.payment_status, 'payment')} className="text-[10px] sm:text-xs h-5 px-2">
-                {getStatusLabel(subscription.payment_status, SUBSCRIPTION_PAYMENT_STATUSES)}
+                <IndianRupee size={12} /> {getStatusLabel(subscription.payment_status, SUBSCRIPTION_PAYMENT_STATUSES)}
               </Badge2>
             </div>
           </div>
@@ -328,37 +330,7 @@ const SubscriptionDetail = () => {
 
       <div className="p-4 md:p-6 space-y-6">
         {/* Prominent Action Buttons for Mobile */}
-        <div className="flex flex-col sm:flex-row gap-3">
-          {(subscription.status === 'active' || subscription.status === 'paused') && (
-            <>
-              <Button
-                variant="outline"
-                onClick={handlePauseResume}
-                className="flex-1"
-              >
-                {subscription.status === 'active' ? (
-                  <>
-                    <Pause className="h-4 w-4 mr-2" />
-                    Pause Subscription
-                  </>
-                ) : (
-                  <>
-                    <Play className="h-4 w-4 mr-2" />
-                    Resume Subscription
-                  </>
-                )}
-              </Button>
-              <Button
-                variant="destructive"
-                onClick={() => setIsCancelDialogOpen(true)}
-                className="flex-1"
-              >
-                <XCircle className="h-4 w-4 mr-2" />
-                Cancel Subscription
-              </Button>
-            </>
-          )}
-        </div>
+       
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {/* Main Content */}
@@ -412,7 +384,10 @@ const SubscriptionDetail = () => {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <p className="text-sm text-muted-foreground">Vehicle Type</p>
-                  <p className="font-medium capitalize">{subscription.vehicle_type}</p>
+                  <div className="flex items-center gap-2 mt-1">
+                    <VehicleIcon vehicleType={subscription.vehicle_type} size={24} />
+                    <p className="font-medium capitalize">{subscription.vehicle_type}</p>
+                  </div>
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Duration</p>
@@ -541,7 +516,7 @@ const SubscriptionDetail = () => {
               <div className="flex items-center justify-between p-4 border-b">
                 <h2 className="text-lg font-semibold">Payment Summary</h2>
                 {canUpdatePayment && (
-                  <Button size="sm" variant="outline" onClick={() => setIsPaymentDialogOpen(true)}>
+                  <Button size="sm" variant="info" onClick={() => setIsPaymentDialogOpen(true)}>
                     <Edit className="h-3 w-3 mr-1" />
                     Update
                   </Button>
@@ -557,6 +532,34 @@ const SubscriptionDetail = () => {
                   <span className="text-muted-foreground">Duration:</span>
                   <span className="font-medium">{subscription.months_duration} month(s)</span>
                 </div>
+                
+                {subscription.gst_amount > 0 && (
+                  <div className="border-t pt-2">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">
+                        Subtotal:
+                      </span>
+                      <span className="font-medium">
+                        {formatCurrency(subscriptionTotal - (subscription.gst_amount || 0) - (subscription.round_off || 0))}
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-sm mt-2">
+                      <span className="text-muted-foreground">
+                        GST {subscription.gst_percentage ? `(${subscription.gst_percentage}%)` : ''}:
+                      </span>
+                      <span className="font-medium">{formatCurrency(subscription.gst_amount)}</span>
+                    </div>
+                    {subscription.round_off != null && subscription.round_off !== 0 && (
+                      <div className="flex justify-between text-sm mt-2">
+                        <span className="text-muted-foreground">Round Off:</span>
+                        <span className={`font-medium ${subscription.round_off >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                          {subscription.round_off >= 0 ? '+' : ''}{formatCurrency(Math.abs(subscription.round_off))}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                )}
+                
                 <div className="border-t pt-3">
                   <div className="flex justify-between font-semibold">
                     <span>Total Amount:</span>

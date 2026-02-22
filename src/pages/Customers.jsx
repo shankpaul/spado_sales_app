@@ -375,39 +375,33 @@ const Customers = () => {
             <div className="hidden md:block overflow-x-auto">
               <table className="w-full">
                 <thead className="border-b">
-                  <tr className="text-left">
-                    <th className="px-4 py-3 font-medium">Name</th>
+                  <tr className="text-left text-sm">
+                    <th className="px-4 py-3 font-semibold">Name</th>
                     {/* <th className="px-4 py-3 font-medium">Phone</th> */}
-                    <th className="px-4 py-3 font-medium">Location</th>
-                    <th className="px-4 py-3 font-medium">Last Booked</th>
-                    <th className="px-4 py-3 font-medium">Actions</th>
+                    <th className="px-4 py-3 font-semibold">Location</th>
+                    <th className="px-4 py-3 font-semibold">Last Booked</th>
+                    <th className="px-4 py-3 font-semibold">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {customers.map((customer) => (
-                    <tr key={customer.id} className="border-b last:border-0 hover:bg-muted/50">
+                    <tr key={customer.id} className="border-b last:border-0 hover:bg-muted/50 text-sm" >
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2">
-                          <LetterAvatar name={customer.name} size="sm" />
+                          <LetterAvatar name={customer.name} size="xs" />
                           <button
                             onClick={() => handleViewDetails(customer)}
                             className="font-medium hover:text-primary hover:underline cursor-pointer transition-colors"
                           >
-                            {customer.name}
+                            {customer.name || customer.phone}
                           </button>
                         </div>
                       </td>
-                      {/* <td className="px-4 py-3">
-                        <div className="flex items-center gap-2">
-                          <Phone className="h-4 w-4 text-muted-foreground" />
-                          {customer.phone}
-                        </div>
-                      </td> */}
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2">
                           <MapPin className="h-4 w-4 text-muted-foreground" />
-                          <span className="text-sm">
-                            {customer.city || customer.area || customer.district || 'N/A'}
+                          <span className="text-sm capitalize">
+                            { [customer.area, customer.city, customer.district].filter(Boolean).join(', ') || 'N/A' }
                           </span>
                         </div>
                       </td>
@@ -418,25 +412,40 @@ const Customers = () => {
                         </div>
                       </td>
                       <td className="px-4 py-3">
-                        <div className="flex items-center gap-2">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleOpenForm(customer)}
-                          >
-                            <Edit2 className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => {
-                              setSelectedCustomer(customer);
-                              setIsDeleteOpen(true);
-                            }}
-                          >
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                          </Button>
-                        </div>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-8 w-8">
+                              <MoreVertical className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-48">
+                            <DropdownMenuItem onClick={() => handleViewDetails(customer)}>
+                              <Eye className="h-4 w-4 mr-2" />
+                              View Details
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => {
+                              setSelectedCustomerForOrder(customer.id);
+                              setIsOrderWizardOpen(true);
+                            }}>
+                              <ShoppingCart className="h-4 w-4 mr-2" />
+                              Create Order
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleOpenForm(customer)}>
+                              <Edit2 className="h-4 w-4 mr-2" />
+                              Edit Customer
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => {
+                                setSelectedCustomer(customer);
+                                setIsDeleteOpen(true);
+                              }}
+                              className="text-destructive focus:text-destructive"
+                            >
+                              <Trash2 className="h-4 w-4 mr-2" />
+                              Delete Customer
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </td>
                     </tr>
                   ))}
@@ -453,7 +462,7 @@ const Customers = () => {
                 >
                   <div className="flex items-center gap-4">
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between pb-4">
+                      <div className="flex items-center justify-between pb-2">
                         <div className='flex gap-2 items-center'>
                           <LetterAvatar name={customer.name} size="sm" />
                           <div>
@@ -462,12 +471,12 @@ const Customers = () => {
                               className="font-bold flex items-center gap-2 text-base truncate capitalize hover:text-primary transition-colors text-left"
                             >
 
-                              {customer.name}
+                              {customer.name || customer.phone}
                             </button>
-                            <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-                              <MapPin className="h-3 w-3" />
-                              <span className="truncate max-w-[120px] capitalize">
-                                {customer.area || customer.city || 'N/A'}
+                            <div className="flex items-bottom gap-1 text-xs text-muted-foreground">
+                              <MapPin size={14} strokeWidth={1.2} />
+                              <span className="truncate capitalize">
+                                {[customer.area, customer.city, customer.district].filter(Boolean).join(', ') || 'N/A'}
                               </span>
                             </div>
                           </div>
@@ -529,8 +538,7 @@ const Customers = () => {
                             size="sm"
                             className="flex items-center gap-1.5"
                           >
-                            <ShoppingCart className="h-3 w-3" />
-                            New
+                            Book Now
                           </Button>
                         </div>
                       </div>
@@ -673,9 +681,10 @@ const Customers = () => {
               ref={formRef}
               customer={selectedCustomer}
               showActions={false}
-              onSuccess={() => {
+              onSuccess={(result) => {
                 setIsFormOpen(false);
                 fetchCustomers();
+                toast.success(selectedCustomer ? 'Customer updated successfully' : 'Customer created successfully');
               }}
               onCancel={() => setIsFormOpen(false)}
             />
@@ -710,7 +719,6 @@ const Customers = () => {
         onSuccess={() => {
           setIsOrderWizardOpen(false);
           setSelectedCustomerForOrder(null);
-          toast.success('Order created successfully');
         }}
       />
 

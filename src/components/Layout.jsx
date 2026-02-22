@@ -27,6 +27,7 @@ import {
   ChevronDown,
   Smartphone,
   Download,
+  Briefcase,
 } from 'lucide-react';
 import usePWAInstall from '../hooks/usePWAInstall';
 import Logo from './Logo';
@@ -81,7 +82,8 @@ const Layout = ({ children }) => {
         { name: 'Customers', href: '/customers', icon: Users },
         { name: 'Orders', href: '/orders', icon: Calendar },
         { name: 'Subscriptions', href: '/subscriptions', icon: Calendar },
-        { name: 'Staff', href: '/users', icon: UserCircle },
+        { name: 'System Users', href: '/users', icon: UserCircle },
+        { name: 'Employees', href: '/employees', icon: Briefcase },
         { name: 'Reports', href: '/reports', icon: BarChart3 },
         { name: 'Financials', href: '/financials', icon: DollarSign },
         { name: 'Settings', href: '/settings', icon: Settings },
@@ -90,8 +92,6 @@ const Layout = ({ children }) => {
         { name: 'Customers', href: '/customers', icon: Users },
         { name: 'Orders', href: '/orders', icon: Calendar },
         { name: 'Subscriptions', href: '/subscriptions', icon: Calendar },
-        { name: 'Services', href: '/services', icon: Car },
-        { name: 'My Sales', href: '/my-sales', icon: BarChart3 },
       ],
       accountant: [
         { name: 'Transactions', href: '/transactions', icon: DollarSign },

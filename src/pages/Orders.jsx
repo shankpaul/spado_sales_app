@@ -407,8 +407,11 @@ const Orders = () => {
   // Handle wizard success
   const handleWizardSuccess = () => {
     setIsWizardOpen(false);
-    fetchOrders();
-    toast.success('Order created successfully');
+    // Reset to page 1 and refresh the list (important for mobile infinite scroll)
+    setPage(1);
+    setOrders([]);
+    setHasMore(true);
+    fetchOrders(true);
   };
 
   return (
@@ -695,7 +698,7 @@ const Orders = () => {
                           <span className="font-medium">#{order.order_number}</span>
                           {order.subscription_id && (
                             <Badge2
-                              variant="secondary"
+                              variant="info"
                               className="text-[9px] px-1 h-4 flex items-center gap-0.5"
                             >
                               <Repeat className="h-2.5 w-2.5" />
@@ -750,15 +753,15 @@ const Orders = () => {
             <div className="hidden md:block overflow-x-auto text-sm">
               <table className="w-full">
                 <thead className="border-b">
-                  <tr className="text-left">
-                    <th className="px-4 py-3 font-medium">Order #</th>
-                    <th className="px-4 py-3 font-medium">Customer</th>
-                    <th className="px-4 py-3 font-medium">Area</th>
-                    <th className="px-4 py-3 font-medium">Booking Date</th>
-                    <th className="px-4 py-3 font-medium">Status</th>
-                    <th className="px-4 py-3 font-medium">Payment</th>
-                    <th className="px-4 py-3 font-medium">Amount</th>
-                    <th className="px-4 py-3 font-medium">Agent</th>
+                  <tr className="text-left text-sm">
+                    <th className="px-4 py-3 font-semibold">Order #</th>
+                    <th className="px-4 py-3 font-semibold">Customer</th>
+                    <th className="px-4 py-3 font-semibold">Area</th>
+                    <th className="px-4 py-3 font-semibold">Booking Date</th>
+                    <th className="px-4 py-3 font-semibold">Status</th>
+                    <th className="px-4 py-3 font-semibold">Payment</th>
+                    <th className="px-4 py-3 font-semibold">Amount</th>
+                    <th className="px-4 py-3 font-semibold">Agent</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -798,7 +801,7 @@ const Orders = () => {
                           {formatCurrency(order.total_amount)}
                           {order.subscription_id && (
                             <Badge2
-                              variant="outline"
+                              variant="info"
                               className="w-fit text-[10px] px-1.5 h-5 flex items-center gap-1 cursor-pointer hover:bg-secondary/80"
                               onClick={(e) => {
                                 e.stopPropagation();
@@ -927,6 +930,10 @@ const Orders = () => {
               orderId={selectedOrderId}
               onClose={handleCloseOrderDetail}
               onUpdate={() => {
+                // Reset to page 1 and refresh the list (important for mobile infinite scroll)
+                setPage(1);
+                setOrders([]);
+                setHasMore(true);
                 fetchOrders(true);
               }}
             />

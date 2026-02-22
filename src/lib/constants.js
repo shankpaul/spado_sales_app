@@ -183,6 +183,9 @@ export const DISCOUNT_TYPES = {
 // Maximum Discount Percentage
 export const MAX_DISCOUNT_PERCENTAGE = 50;
 
+// GST Percentage (18% for car wash services)
+export const GST_PERCENTAGE = 18;
+
 /**
  * Get status color class
  * @param {string} status - Status value

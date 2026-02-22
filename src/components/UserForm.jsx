@@ -12,6 +12,7 @@ import {
 import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import officeService from '../services/officeService';
+import employeeService from '../services/employeeService';
 
 /**
  * User Form Component
@@ -20,6 +21,7 @@ import officeService from '../services/officeService';
 const UserForm = ({ user, onSubmit, onCancel }) => {
   const [loading, setLoading] = useState(false);
   const [offices, setOffices] = useState([]);
+  const [employees, setEmployees] = useState([]);
   const [avatarFile, setAvatarFile] = useState(null);
   const [avatarPreview, setAvatarPreview] = useState(null);
   const [formData, setFormData] = useState({
@@ -28,6 +30,7 @@ const UserForm = ({ user, onSubmit, onCancel }) => {
     phone: '',
     address: '',
     employee_number: '',
+    employee_id: '',
     role: 'agent',
     office_id: '',
     home_latitude: '',
@@ -38,7 +41,7 @@ const UserForm = ({ user, onSubmit, onCancel }) => {
 
   const [errors, setErrors] = useState({});
 
-  // Fetch offices on component mount
+  // Fetch offices and employees on component mount
   useEffect(() => {
     const fetchOffices = async () => {
       try {
@@ -49,7 +52,19 @@ const UserForm = ({ user, onSubmit, onCancel }) => {
         // Don't show error toast, just log it
       }
     };
+
+    const fetchEmployees = async () => {
+      try {
+        const response = await employeeService.getAllEmployees({ status: 'active' });
+        setEmployees(response.employees || []);
+      } catch (error) {
+        console.error('Error fetching employees:', error);
+        // Don't show error toast, just log it
+      }
+    };
+
     fetchOffices();
+    fetchEmployees();
   }, []);
 
   // Pre-fill form if editing
@@ -61,8 +76,9 @@ const UserForm = ({ user, onSubmit, onCancel }) => {
         phone: user.phone || '',
         address: user.address || '',
         employee_number: user.employee_number || '',
+        employee_id: user.employee_id ? user.employee_id.toString() : '',
         role: user.role || 'agent',
-        office_id: user.office_id || '',
+        office_id: user.office_id ? user.office_id.toString() : '',
         home_latitude: user.home_latitude || '',
         home_longitude: user.home_longitude || '',
         password: '',
@@ -96,6 +112,14 @@ const UserForm = ({ user, onSubmit, onCancel }) => {
     setFormData((prev) => ({
       ...prev,
       role: value,
+    }));
+  };
+
+  // Handle employee change
+  const handleEmployeeChange = (value) => {
+    setFormData((prev) => ({
+      ...prev,
+      employee_id: value,
     }));
   };
 
@@ -223,6 +247,7 @@ const UserForm = ({ user, onSubmit, onCancel }) => {
       if (formData.phone) submitData.append('phone', formData.phone.trim());
       if (formData.address) submitData.append('address', formData.address.trim());
       if (formData.employee_number) submitData.append('employee_number', formData.employee_number.trim());
+      if (formData.employee_id) submitData.append('employee_id', parseInt(formData.employee_id));
       if (formData.office_id) submitData.append('office_id', parseInt(formData.office_id));
       if (formData.home_latitude) submitData.append('home_latitude', parseFloat(formData.home_latitude));
       if (formData.home_longitude) submitData.append('home_longitude', parseFloat(formData.home_longitude));
@@ -382,6 +407,29 @@ const UserForm = ({ user, onSubmit, onCancel }) => {
         />
       </div>
 
+      {/* Employee Link */}
+      <div className="space-y-2">
+        <Label htmlFor="employee">Link to Employee Record (Optional)</Label>
+        <Select 
+          value={formData.employee_id || undefined} 
+          onValueChange={handleEmployeeChange}
+        >
+          <SelectTrigger>
+            <SelectValue placeholder="Select employee (optional)" />
+          </SelectTrigger>
+          <SelectContent>
+            {employees.map((employee) => (
+              <SelectItem key={employee.id} value={employee.id.toString()}>
+                {employee.name} ({employee.employee_number})
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <p className="text-xs text-gray-500">
+          Link this user account to an employee record for compensation tracking
+        </p>
+      </div>
+
       {/* Role */}
       <div className="space-y-2">
         <Label htmlFor="role">
@@ -404,7 +452,10 @@ const UserForm = ({ user, onSubmit, onCancel }) => {
       {/* Office */}
       <div className="space-y-2">
         <Label htmlFor="office">Office Location (Optional)</Label>
-        <Select value={formData.office_id} onValueChange={handleOfficeChange}>
+        <Select 
+          value={formData.office_id || undefined} 
+          onValueChange={handleOfficeChange}
+        >
           <SelectTrigger>
             <SelectValue placeholder="Select office" />
           </SelectTrigger>

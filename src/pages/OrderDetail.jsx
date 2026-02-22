@@ -71,6 +71,7 @@ import {
   Repeat,
 } from 'lucide-react';
 import MapPreview from '@/components/MapPreview';
+import VehicleIcon from '../components/VehicleIcon';
 import { formatDate, formatDateTime, formatTime, formatCurrency } from '../lib/utilities';
 import { Badge2 } from '@/components/ui/badge2';
 
@@ -318,8 +319,8 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
       fetchTimeline();
       fetchReassignments();
     } catch (error) {
-      console.error('Error reassigning agent:', error);
-      toast.error('Failed to reassign agent');
+      const errorMessage = error.response?.data?.errors.join('\n') || 'Failed to reassign agent';
+      toast.error(errorMessage);
     } finally {
       setReassigning(false);
     }
@@ -657,7 +658,7 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
 
             {/* Service Location */}
             <div className="py-4 px-4 bg-gray-50 rounded-lg border">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-y-3 gap-x-6 mb-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-y-3 gap-x-6">
                 <div className="flex items-start gap-3">
                   <div className="p-2 bg-primary/10 rounded-full flex-shrink-0">
                     <MapPin className="h-4 w-4 text-primary" />
@@ -682,7 +683,7 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
               </div>
 
               {/* Progress Bar */}
-              <div className="flex items-center gap-2 mb-4">
+              {/* <div className="flex items-center gap-2 mb-4">
                 {['Order Confirmed', 'In Progress', 'Completed'].map((stage, index) => {
                   // Map stages to order statuses
                   const stageStatusMap = ['confirmed', 'in_progress', 'completed'];
@@ -709,7 +710,7 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
                     </div>
                   );
                 })}
-              </div>
+              </div> */}
             </div>
 
             {/* Action Buttons */}
@@ -717,7 +718,7 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
               {isEditable && (
                 <>
                   {order.status === 'draft' && <Button
-                    variant="default"
+                    variant="success"
                     onClick={() => handleStatusChange('confirmed')}
                     className="flex-1"
                   >
@@ -798,7 +799,7 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
                         order.packages.map((item, index) => (
                           <div key={index} className="flex gap-4  border-b last:border-0">
                             <div className="w-20 h-20 bg-gray-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                              <Car className="h-10 w-10 text-gray-400" />
+                              <VehicleIcon vehicleType={item.vehicle_type} size={40} className="text-gray-600" />
                             </div>
                             <div className="flex-1 min-w-0">
                               <h4 className="font-medium mb-2">{item.package_name}</h4>
@@ -988,6 +989,15 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
                         GST {order.gst_percentage ? `(${order.gst_percentage}%)` : ''}
                       </span>
                       <span className="font-medium">{formatCurrency(order.gst_amount)}</span>
+                    </div>
+                  )}
+
+                  {order.round_off != null && order.round_off !== 0 && (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Round Off</span>
+                      <span className={`font-medium ${order.round_off >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        {order.round_off >= 0 ? '+' : ''}{formatCurrency(Math.abs(order.round_off))}
+                      </span>
                     </div>
                   )}
 

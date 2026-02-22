@@ -5,6 +5,7 @@ import {
   SheetContent,
 } from './ui/sheet';
 import { Button } from './ui/button';
+import { calculateBookingDuration, reverseGeocode } from '../lib/utilities';
 import CustomerForm from './CustomerForm';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
@@ -30,6 +31,7 @@ import {
 } from './ui/alert-dialog';
 import { ConfirmDialog } from './ui/confirm-dialog';
 import { Card } from './ui/card';
+import VehicleIcon from './VehicleIcon';
 import { toast } from 'sonner';
 import orderService from '../services/orderService';
 import customerService from '../services/customerService';
@@ -39,6 +41,7 @@ import {
   DRAFT_EXPIRY_HOURS,
   MAX_DISCOUNT_PERCENTAGE,
   DISCOUNT_TYPES,
+  GST_PERCENTAGE,
 } from '../lib/constants';
 import {
   ChevronLeft,
@@ -84,6 +87,7 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
   const [editCustomerData, setEditCustomerData] = useState({ phone: '', area: '', city: '' });
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  const [mapLinkLoading, setMapLinkLoading] = useState(false);
 
   // Form refs
   const customerFormRef = useRef(null);
@@ -188,6 +192,42 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, [showCustomerSuggestions]);
+
+  // Handle map link changes with reverse geocoding
+  useEffect(() => {
+    if (!address.map_link || address.map_link.trim() === '') {
+      return;
+    }
+
+    const timeoutId = setTimeout(async () => {
+      setMapLinkLoading(true);
+      try {
+        // Backend API handles parsing (including shortened URLs), expansion, and geocoding
+        const addressDetails = await reverseGeocode(address.map_link);
+        
+        if (addressDetails) {
+          // Update address fields with geocoded data
+          setAddress(prev => ({
+            ...prev,
+            area: addressDetails.area || prev.area,
+            city: addressDetails.city || prev.city,
+            district: addressDetails.district || prev.district,
+            state: addressDetails.state || prev.state,
+          }));
+          
+          toast.success('Address details populated from map link');
+          saveDraft();
+        }
+      } catch (error) {
+        console.error('Error processing map link:', error);
+        toast.error('Failed to process map link');
+      } finally {
+        setMapLinkLoading(false);
+      }
+    }, 1000); // 1 second debounce to avoid processing while user is typing
+
+    return () => clearTimeout(timeoutId);
+  }, [address.map_link]);
 
   // Load draft with expiry check
   const loadDraft = () => {
@@ -401,7 +441,6 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
         // Set notes
         setNotes(order.notes || '');
 
-        toast.success('Order data loaded');
       }
     } catch (error) {
       console.error('Error fetching order:', error);
@@ -602,10 +641,20 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
   const calculateTotals = () => {
     const packageTotal = packageItems.reduce((sum, item) => sum + calculateLineTotal(item), 0);
     const addonTotal = addonItems.reduce((sum, item) => sum + calculateLineTotal(item), 0);
+    const subtotal = packageTotal + addonTotal;
+    const gst = (subtotal * GST_PERCENTAGE) / 100;
+    const totalBeforeRounding = subtotal + gst;
+    const roundedTotal = Math.round(totalBeforeRounding);
+    const roundOff = roundedTotal - totalBeforeRounding;
+    
     return {
       packages: packageTotal,
       addons: addonTotal,
-      total: packageTotal + addonTotal,
+      subtotal,
+      gst,
+      gstPercentage: GST_PERCENTAGE,
+      roundOff,
+      total: roundedTotal,
     };
   };
 
@@ -915,14 +964,24 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
 
         <div>
           <Label className="text-xs">Map Link</Label>
-          <Input
-            value={address.map_link}
-            onChange={(e) => {
-              setAddress({ ...address, map_link: e.target.value });
-              saveDraft();
-            }}
-            placeholder="Google Maps link"
-          />
+          <div className="relative">
+            <Input
+              value={address.map_link}
+              onChange={(e) => {
+                setAddress({ ...address, map_link: e.target.value });
+              }}
+              placeholder="Google Maps link"
+              disabled={mapLinkLoading}
+            />
+            {mapLinkLoading && (
+              <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                <div className="h-4 w-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+              </div>
+            )}
+          </div>
+          <p className="text-xs text-muted-foreground mt-1">
+            Paste Google Maps link to auto-fill address details
+          </p>
         </div>
 
         <div>
@@ -1005,7 +1064,7 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
           </Button>
         </Card>
       ) : (
-        <div className="space-y-4 max-h-96 overflow-y-auto">
+        <div className="space-y-4">
           {packageItems.map((item, index) => {
             const hasError = errors[`package_${index}_vehicle_type`] || errors[`package_${index}_package`];
             return (
@@ -1052,17 +1111,17 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
                   <div className="grid grid-cols-2 gap-3">
                     <div className="col-span-2">
                       <div className={`flex gap-2 `}>
-                        {[{ type: 'hatchback', icon: Car }, { type: 'sedan', icon: Car }, { type: 'suv', icon: Truck }].map(({ type, icon: Icon }) => (
+                        {['hatchback', 'sedan', 'suv', 'luxury'].map((type) => (
                           <Button
                             key={type}
                             type="button"
                             variant={item.vehicle_type === type ? 'default' : 'outline'}
                             size="sm"
-                            className="flex-1 h-12 flex flex-col items-center justify-center gap-1 rounded-xl cursor-pointer active:scale-[0.95] transition-all"
+                            className="flex-1 h-12 flex flex-col md:flex-row items-center justify-center gap-0  md:gap-2 rounded-lg cursor-pointer active:scale-[0.95] transition-all"
                             onClick={() => updatePackageItem(index, 'vehicle_type', type)}
                           >
-                            <Icon className="h-5 w-5" />
-                            <span className="text-[10px] capitalize font-semibold">{type}</span>
+                            <VehicleIcon vehicleType={type} size={32} className={item.vehicle_type === type ? 'text-white' : 'text-black'} />
+                            <span className="text-xs capitalize font-semibold -mt-2 md:mt-0">{type}</span>
                           </Button>
                         ))}
                       </div>
@@ -1133,8 +1192,13 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
                         <Input
                           type="number"
                           min="0"
-                          value={item.discount_value}
-                          onChange={(e) => updatePackageItem(index, 'discount_value', parseFloat(e.target.value) || 0)}
+                          placeholder="0"
+                          value={item.discount_value || ''}
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            const numValue = value === '' ? 0 : parseFloat(value);
+                            updatePackageItem(index, 'discount_value', isNaN(numValue) ? 0 : numValue);
+                          }}
                           className="h-8 text-sm"
                         />
                         <Select
@@ -1192,7 +1256,7 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
           </Button>
         </Card>
       ) : (
-        <div className="space-y-4 max-h-96 overflow-y-auto">
+        <div className="space-y-4">
           {addonItems.map((item, index) => {
             const hasError = errors[`addon_${index}_addon`];
             return (
@@ -1281,8 +1345,13 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
                         <Input
                           type="number"
                           min="0"
-                          value={item.discount_value}
-                          onChange={(e) => updateAddonItem(index, 'discount_value', parseFloat(e.target.value) || 0)}
+                          placeholder="0"
+                          value={item.discount_value || ''}
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            const numValue = value === '' ? 0 : parseFloat(value);
+                            updateAddonItem(index, 'discount_value', isNaN(numValue) ? 0 : numValue);
+                          }}
                           className="h-8 text-sm"
                         />
                         <Select
@@ -1325,7 +1394,7 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className='space-y-4'>
             <div className='flex gap-2'>
-              <div className='w-50'>
+              <div className='w-35 md:w-50'>
                 <Label>Booking Date *</Label>
                 <DatePicker
                   value={bookingDate}
@@ -1345,12 +1414,12 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
                     onValueChange={(value) => {
                       setBookingTimeFrom(value);
 
-                      // Auto-calculate toTime (30 minutes later)
+                      // Auto-calculate toTime (60 minutes later)
                       if (value) {
                         const [hours, minutes] = value.split(':').map(Number);
                         const fromDate = new Date();
                         fromDate.setHours(hours, minutes);
-                        fromDate.setMinutes(fromDate.getMinutes() + 30);
+                        fromDate.setMinutes(fromDate.getMinutes() + 60);
                         const toHours = String(fromDate.getHours()).padStart(2, '0');
                         const toMinutes = String(fromDate.getMinutes()).padStart(2, '0');
                         setBookingTimeTo(`${toHours}:${toMinutes}`);
@@ -1362,11 +1431,38 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
                       <SelectValue placeholder="Select time" />
                     </SelectTrigger>
                     <SelectContent className="max-h-60 overflow-y-auto">
-                      {generateTimeOptions().map((time) => (
-                        <SelectItem key={time.value} value={time.value}>
-                          {time.label}
-                        </SelectItem>
-                      ))}
+                      {(() => {
+                        // Check if booking date is today
+                        const today = new Date();
+                        const todayStr = today.toISOString().split('T')[0];
+                        const isToday = bookingDate === todayStr;
+                        
+                        if (!isToday) {
+                          // Not today - show all times
+                          return generateTimeOptions().map((time) => (
+                            <SelectItem key={time.value} value={time.value}>
+                              {time.label}
+                            </SelectItem>
+                          ));
+                        }
+                        
+                        // Today - filter times after current time
+                        const currentHour = today.getHours();
+                        const currentMinute = today.getMinutes();
+                        const currentTimeInMinutes = currentHour * 60 + currentMinute;
+                        
+                        return generateTimeOptions()
+                          .filter((time) => {
+                            const [hours, minutes] = time.value.split(':').map(Number);
+                            const timeInMinutes = hours * 60 + minutes;
+                            return timeInMinutes > currentTimeInMinutes;
+                          })
+                          .map((time) => (
+                            <SelectItem key={time.value} value={time.value}>
+                              {time.label}
+                            </SelectItem>
+                          ));
+                      })()}
                     </SelectContent>
                   </Select>
                   {errors.bookingTimeFrom && <p className="text-sm text-destructive mt-1">{errors.bookingTimeFrom}</p>}
@@ -1385,13 +1481,38 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
                       <SelectValue placeholder="Select time" />
                     </SelectTrigger>
                     <SelectContent className="max-h-60 overflow-y-auto">
-                      {generateTimeOptions()
-                        .filter((time) => !bookingTimeFrom || time.value > bookingTimeFrom)
-                        .map((time) => (
-                          <SelectItem key={time.value} value={time.value}>
-                            {time.label}
-                          </SelectItem>
-                        ))}
+                      {(() => {
+                        // Check if booking date is today
+                        const today = new Date();
+                        const todayStr = today.toISOString().split('T')[0];
+                        const isToday = bookingDate === todayStr;
+                        const currentHour = today.getHours();
+                        const currentMinute = today.getMinutes();
+                        const currentTimeInMinutes = currentHour * 60 + currentMinute;
+                        
+                        return generateTimeOptions()
+                          .filter((time) => {
+                            const [hours, minutes] = time.value.split(':').map(Number);
+                            const timeInMinutes = hours * 60 + minutes;
+                            
+                            // Must be after the "From" time
+                            if (bookingTimeFrom) {
+                              const [fromHours, fromMinutes] = bookingTimeFrom.split(':').map(Number);
+                              const fromTimeInMinutes = fromHours * 60 + fromMinutes;
+                              if (timeInMinutes <= fromTimeInMinutes) return false;
+                            }
+                            
+                            // If today, must be after current time
+                            if (isToday && timeInMinutes <= currentTimeInMinutes) return false;
+                            
+                            return true;
+                          })
+                          .map((time) => (
+                            <SelectItem key={time.value} value={time.value}>
+                              {time.label}
+                            </SelectItem>
+                          ));
+                      })()}
                     </SelectContent>
                   </Select>
                   {errors.bookingTimeTo && <p className="text-sm text-destructive mt-1">{errors.bookingTimeTo}</p>}
@@ -1399,6 +1520,11 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
               </div>
 
             </div>
+            {bookingTimeFrom && bookingTimeTo && (
+              <div className='text-blue-500 text-sm font-medium'>
+                {calculateBookingDuration(bookingTimeFrom, bookingTimeTo)}
+              </div>
+            )}
 
             <div>
               <Label>Assign Agent (Optional)</Label>
@@ -1430,7 +1556,7 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
                 }}
                 placeholder="Additional notes..."
                 className="flex-grow resize-none"
-                rows={8}
+                rows={isMobile ? 3 : 8}
               />
             </div>
           </div>
@@ -1444,9 +1570,25 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
                 <span>Add-ons Total:</span>
                 <span className="font-medium">₹{totals.addons.toFixed(2)}</span>
               </div>
+              <div className="flex justify-between border-t pt-2">
+                <span>Subtotal:</span>
+                <span className="font-medium">₹{totals.subtotal.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>GST ({totals.gstPercentage}%):</span>
+                <span className="font-medium">₹{totals.gst.toFixed(2)}</span>
+              </div>
+              {totals.roundOff !== 0 && (
+                <div className="flex justify-between">
+                  <span>Round Off:</span>
+                  <span className={`font-medium ${totals.roundOff >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    {totals.roundOff >= 0 ? '+' : ''}₹{totals.roundOff.toFixed(2)}
+                  </span>
+                </div>
+              )}
               <div className="flex justify-between text-base font-bold border-t pt-2">
                 <span>Grand Total:</span>
-                <span>₹{totals.total.toFixed(2)}</span>
+                <span>₹{totals.total.toFixed(0)}</span>
               </div>
             </div>
           </Card>
@@ -1481,7 +1623,13 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
   return (
     <>
       <Dialog open={open} onOpenChange={handleClose}>
-        <DialogContent className="max-w-4xl p-0 md:p-6 h-full md:h-auto md:max-h-[90vh] w-full rounded-none md:rounded-xl border-0 md:border overflow-hidden flex flex-col">
+        <DialogContent 
+          className="max-w-4xl p-0 md:p-6 h-full md:h-auto md:max-h-[90vh] w-full rounded-none md:rounded-xl border-0 md:border overflow-hidden flex flex-col"
+          onPointerDownOutside={(e) => {
+            // Prevent dialog from closing on outside clicks
+            e.preventDefault();
+          }}
+        >
           {/* Mobile Header */}
           <div className="md:hidden sticky top-0 z-20 bg-background border-b px-4 py-3 flex items-center justify-between">
             <Button
@@ -1512,7 +1660,7 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
           </div>
 
           <div className="flex-1 overflow-y-auto p-4 md:p-0">
-            <div className="space-y-6">
+            <div className="space-y-6 px-1">
               {/* Desktop Header */}
               <div className="hidden md:flex items-center justify-between mb-2">
                 <div>
@@ -1840,7 +1988,6 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
                         map_link: customer.map_link || '',
                       });
                     }
-                    toast.success('Customer added and selected');
                   }}
                   onCancel={() => setShowCustomerForm(false)}
                 />

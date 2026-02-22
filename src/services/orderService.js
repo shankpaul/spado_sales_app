@@ -77,9 +77,16 @@ const orderService = {
   /**
    * Get all packages with optional vehicle type filter
    * @param {string} vehicleType - Optional vehicle type filter (Hatchback/Sedan/SUV)
+   * @param {boolean} subscription_enabled - Filter by subscription enabled status
    */
-  getPackages: async (vehicleType = null) => {
-    const params = vehicleType ? { vehicle_type: vehicleType } : {};
+  getPackages: async (vehicleType = null, subscription_enabled = null) => {
+    const params = {};
+    if (vehicleType) {
+      params.vehicle_type = vehicleType;
+    }
+    if (subscription_enabled !== null) {
+      params.subscription_enabled = subscription_enabled;
+    }
     const response = await apiClient.get('/packages', { params });
     return response.data;
   },
