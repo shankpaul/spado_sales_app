@@ -533,7 +533,6 @@ const Subscriptions = () => {
                     <th className="px-4 py-3 font-semibold">Status</th>
                     <th className="px-4 py-3 font-semibold">Payment</th>
                     <th className="px-4 py-3 font-semibold">Next Wash</th>
-                    <th className="px-4 py-3 font-semibold">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -612,25 +611,7 @@ const Subscriptions = () => {
                           {subscription.next_wash_date ? formatDate(subscription.next_wash_date) : 'N/A'}
                         </div>
                       </td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-2">
-                          {(subscription.status === 'active' || subscription.status === 'paused') && (
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className={cn(subscription.status === 'active' ? 'text-amber-500' : 'text-green-500', 'hover:bg-muted')}
-                              onClick={(e) => handleTogglePause(subscription, e)}
-                              title={subscription.status === 'active' ? 'Pause' : 'Resume'}
-                            >
-                              {subscription.status === 'active' ? (
-                                <Pause className="h-4 w-4" />
-                              ) : (
-                                <Play className="h-4 w-4" />
-                              )}
-                            </Button>
-                          )}
-                        </div>
-                      </td>
+                      
                     </tr>
                   ))}
                 </tbody>

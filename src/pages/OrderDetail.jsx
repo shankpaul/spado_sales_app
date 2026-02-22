@@ -33,6 +33,12 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '../components/ui/alert-dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '../components/ui/dialog';
 import { Textarea } from '../components/ui/textarea';
 import { toast } from 'sonner';
 import orderService from '../services/orderService';
@@ -69,6 +75,12 @@ import {
   Star,
   Calendar1Icon,
   Repeat,
+  Image as ImageIcon,
+  ZoomIn,
+  ZoomOut,
+  X as XIcon,
+  ChevronLeft,
+  Paperclip,
 } from 'lucide-react';
 import MapPreview from '@/components/MapPreview';
 import VehicleIcon from '../components/VehicleIcon';
@@ -87,7 +99,16 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
 
   // Tabs state
   const [activeTab, setActiveTab] = useState('packages');
-  const tabsList = ['packages', 'timeline', 'reassignments'];
+  const tabsList = ['packages', 'images', 'timeline', 'reassignments'];
+
+  // Image viewer state
+  const [imageViewerOpen, setImageViewerOpen] = useState(false);
+  const [currentImageType, setCurrentImageType] = useState(null); // 'before', 'after', 'payment_proof', 'google_review'
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [imageZoom, setImageZoom] = useState(1);
+  const [imagePosition, setImagePosition] = useState({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
 
   // Swipe logic for tabs
   const [touchStart, setTouchStart] = useState(null);
@@ -765,12 +786,18 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
                 onValueChange={setActiveTab}
                 className="space-y-6"
               >
-                <TabsList className="grid w-full grid-cols-3 bg-transparent border-b rounded-none h-auto p-0">
+                <TabsList className="grid w-full grid-cols-4 bg-transparent border-b rounded-none h-auto p-0">
                   <TabsTrigger
                     value="packages"
                     className="rounded-none border-b-2 cursor-pointer border-transparent data-[state=active]:border-foreground data-[state=active]:bg-transparent"
                   >
-                    Packages & Addons
+                    Packages
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="images"
+                    className="rounded-none border-b-2 cursor-pointer border-transparent data-[state=active]:border-foreground data-[state=active]:bg-transparent"
+                  >
+                    Images
                   </TabsTrigger>
                   <TabsTrigger
                     value="timeline"
@@ -782,7 +809,7 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
                     value="reassignments"
                     className="rounded-none border-b-2 cursor-pointer border-transparent data-[state=active]:border-foreground data-[state=active]:bg-transparent"
                   >
-                    Reassignments
+                    Agents
                   </TabsTrigger>
                 </TabsList>
 
@@ -872,6 +899,91 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
 
                 </TabsContent>
 
+                {/* Images Tab */}
+                <TabsContent value="images" className="space-y-6 mt-6">
+                  {/* Before Images */}
+                  <div>
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="font-semibold text-lg">Before Images</h3>
+                      <Badge2 variant="outline" className="text-xs">
+                        {order.before_images?.length || 0} images
+                      </Badge2>
+                    </div>
+                    {order.before_images && order.before_images.length > 0 ? (
+                      <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
+                        {order.before_images.map((image, index) => (
+                          <button
+                            key={index}
+                            onClick={() => {
+                              setCurrentImageType('before');
+                              setCurrentImageIndex(index);
+                              setImageViewerOpen(true);
+                              setImageZoom(1);
+                              setImagePosition({ x: 0, y: 0 });
+                            }}
+                            className="relative aspect-square rounded-lg overflow-hidden border border-gray-200 hover:border-primary transition-colors group cursor-pointer"
+                          >
+                            <img
+                              src={image.thumbnail_url}
+                              alt={`Before ${index + 1}`}
+                              className="w-full h-full object-cover"
+                            />
+                            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
+                              <ImageIcon className="h-6 w-6 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="py-12 text-center text-muted-foreground border border-dashed rounded-lg">
+                        <ImageIcon className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                        <p>No before images</p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* After Images */}
+                  <div>
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="font-semibold text-lg">After Images</h3>
+                      <Badge2 variant="outline" className="text-xs">
+                        {order.after_images?.length || 0} images
+                      </Badge2>
+                    </div>
+                    {order.after_images && order.after_images.length > 0 ? (
+                      <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
+                        {order.after_images.map((image, index) => (
+                          <button
+                            key={index}
+                            onClick={() => {
+                              setCurrentImageType('after');
+                              setCurrentImageIndex(index);
+                              setImageViewerOpen(true);
+                              setImageZoom(1);
+                              setImagePosition({ x: 0, y: 0 });
+                            }}
+                            className="relative aspect-square rounded-lg overflow-hidden border border-gray-200 hover:border-primary transition-colors group cursor-pointer"
+                          >
+                            <img
+                              src={image.thumbnail_url}
+                              alt={`After ${index + 1}`}
+                              className="w-full h-full object-cover"
+                            />
+                            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
+                              <ImageIcon className="h-6 w-6 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="py-12 text-center text-muted-foreground border border-dashed rounded-lg">
+                        <ImageIcon className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                        <p>No after images</p>
+                      </div>
+                    )}
+                  </div>
+                </TabsContent>
+
                 {/* Timeline Tab */}
                 <TabsContent value="timeline" className="mt-6">
                   <div className="space-y-6">
@@ -956,6 +1068,7 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
               <div >
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="font-semibold text-lg">Payment Details</h3>
+                  
                   <div className="flex items-center gap-2">
                     {order.payment_method && (
                       <Badge2 variant="outline" className="text-xs uppercase">
@@ -1006,8 +1119,30 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
                     <span className="text-2xl font-bold">{formatCurrency(order.total_amount)}</span>
                   </div>
                 </div>
+
+                {/* Payment Proof */}
+                {order.payment_proof && (
+                  <div className="mt-4 pt-4 border-t">
+                    <button
+                      onClick={() => {
+                        setCurrentImageType('payment_proof');
+                        setCurrentImageIndex(0);
+                        setImageViewerOpen(true);
+                        setImageZoom(1);
+                        setImagePosition({ x: 0, y: 0 });
+                      }}
+                      className="flex items-center gap-2 text-sm text-primary hover:text-primary/80 transition-colors"
+                    >
+                      <Paperclip className="h-4 w-4" />
+                      <span className="underline">Payment Proof Attached</span>
+                      <ImageIcon className="h-3 w-3" />
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
+
+
 
             {/* Customer Feedback */}
             {(order.rating || order.feedback_comments) && (
@@ -1050,6 +1185,36 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
                       Submitted on {formatDateTime(order.feedback_submitted_at)}
                     </div>
                   )}
+                </div>
+              </div>
+            )}
+
+            {/* Google Review Image */}
+            {order.google_review_image && (
+              <div className="border rounded-lg">
+                <div className="p-4 border-b">
+                  <h3 className="font-semibold">Google Review</h3>
+                </div>
+                <div className="p-4">
+                  <button
+                    onClick={() => {
+                      setCurrentImageType('google_review');
+                      setCurrentImageIndex(0);
+                      setImageViewerOpen(true);
+                      setImageZoom(1);
+                      setImagePosition({ x: 0, y: 0 });
+                    }}
+                    className="relative w-full max-w-md rounded-lg overflow-hidden border border-gray-200 hover:border-primary transition-colors group cursor-pointer"
+                  >
+                    <img
+                      src={order.google_review_image.thumbnail_url}
+                      alt="Google Review"
+                      className="w-full h-auto object-cover"
+                    />
+                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
+                      <ImageIcon className="h-8 w-8 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                    </div>
+                  </button>
                 </div>
               </div>
             )}
@@ -1458,6 +1623,182 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Image Viewer Dialog */}
+      <Dialog open={imageViewerOpen} onOpenChange={setImageViewerOpen}>
+        <DialogContent className="max-w-7xl h-[90vh] p-0 bg-black border-0">
+          <div className="relative w-full h-full flex flex-col">
+            {/* Header */}
+            <div className="absolute top-0 left-0 right-0 z-10 bg-gradient-to-b from-black/80 to-transparent p-4">
+              <div className="flex items-center justify-between text-white">
+                <div className="text-sm">
+                  {currentImageType === 'before' && `Before Image ${currentImageIndex + 1} of ${order.before_images?.length || 0}`}
+                  {currentImageType === 'after' && `After Image ${currentImageIndex + 1} of ${order.after_images?.length || 0}`}
+                  {currentImageType === 'payment_proof' && 'Payment Proof'}
+                  {currentImageType === 'google_review' && 'Google Review'}
+                </div>
+                <button
+                  onClick={() => setImageViewerOpen(false)}
+                  className="p-2 hover:bg-white/20 rounded-full transition-colors"
+                >
+                  <XIcon className="h-5 w-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Image Container */}
+            <div className="flex-1 flex items-center justify-center overflow-hidden">
+              <div
+                className="relative cursor-move"
+                style={{
+                  transform: `scale(${imageZoom}) translate(${imagePosition.x}px, ${imagePosition.y}px)`,
+                  transition: isDragging ? 'none' : 'transform 0.2s ease-out',
+                }}
+                onMouseDown={(e) => {
+                  if (imageZoom > 1) {
+                    setIsDragging(true);
+                    setDragStart({ x: e.clientX - imagePosition.x, y: e.clientY - imagePosition.y });
+                  }
+                }}
+                onMouseMove={(e) => {
+                  if (isDragging) {
+                    setImagePosition({
+                      x: e.clientX - dragStart.x,
+                      y: e.clientY - dragStart.y,
+                    });
+                  }
+                }}
+                onMouseUp={() => setIsDragging(false)}
+                onMouseLeave={() => setIsDragging(false)}
+                onTouchStart={(e) => {
+                  if (imageZoom > 1 && e.touches.length === 1) {
+                    setIsDragging(true);
+                    setDragStart({
+                      x: e.touches[0].clientX - imagePosition.x,
+                      y: e.touches[0].clientY - imagePosition.y,
+                    });
+                  }
+                }}
+                onTouchMove={(e) => {
+                  if (isDragging && e.touches.length === 1) {
+                    setImagePosition({
+                      x: e.touches[0].clientX - dragStart.x,
+                      y: e.touches[0].clientY - dragStart.y,
+                    });
+                  }
+                }}
+                onTouchEnd={() => setIsDragging(false)}
+              >
+                {currentImageType === 'before' && order.before_images?.[currentImageIndex] && (
+                  <img
+                    src={order.before_images[currentImageIndex].url}
+                    alt={`Before ${currentImageIndex + 1}`}
+                    className="max-h-[80vh] max-w-[90vw] object-contain"
+                    draggable={false}
+                  />
+                )}
+                {currentImageType === 'after' && order.after_images?.[currentImageIndex] && (
+                  <img
+                    src={order.after_images[currentImageIndex].url}
+                    alt={`After ${currentImageIndex + 1}`}
+                    className="max-h-[80vh] max-w-[90vw] object-contain"
+                    draggable={false}
+                  />
+                )}
+                {currentImageType === 'payment_proof' && order.payment_proof && (
+                  <img
+                    src={order.payment_proof.url}
+                    alt="Payment Proof"
+                    className="max-h-[80vh] max-w-[90vw] object-contain"
+                    draggable={false}
+                  />
+                )}
+                {currentImageType === 'google_review' && order.google_review_image && (
+                  <img
+                    src={order.google_review_image.url}
+                    alt="Google Review"
+                    className="max-h-[80vh] max-w-[90vw] object-contain"
+                    draggable={false}
+                  />
+                )}
+              </div>
+            </div>
+
+            {/* Controls */}
+            <div className="absolute bottom-0 left-0 right-0 z-10 bg-gradient-to-t from-black/80 to-transparent p-4">
+              <div className="flex items-center justify-center gap-6">
+                {/* Navigation - only show for arrays */}
+                {(currentImageType === 'before' || currentImageType === 'after') && (
+                  <>
+                    <button
+                      onClick={() => {
+                        const images = currentImageType === 'before' ? order.before_images : order.after_images;
+                        if (currentImageIndex > 0) {
+                          setCurrentImageIndex(currentImageIndex - 1);
+                          setImageZoom(1);
+                          setImagePosition({ x: 0, y: 0 });
+                        }
+                      }}
+                      disabled={currentImageIndex === 0}
+                      className="p-2 text-white hover:bg-white/20 rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <ChevronLeft className="h-6 w-6" />
+                    </button>
+                  </>
+                )}
+
+                {/* Zoom Controls */}
+                <button
+                  onClick={() => setImageZoom(Math.max(1, imageZoom - 0.5))}
+                  disabled={imageZoom <= 1}
+                  className="p-2 text-white hover:bg-white/20 rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <ZoomOut className="h-5 w-5" />
+                </button>
+                <span className="text-white text-sm min-w-[3rem] text-center">{Math.round(imageZoom * 100)}%</span>
+                <button
+                  onClick={() => setImageZoom(Math.min(3, imageZoom + 0.5))}
+                  disabled={imageZoom >= 3}
+                  className="p-2 text-white hover:bg-white/20 rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <ZoomIn className="h-5 w-5" />
+                </button>
+                {imageZoom > 1 && (
+                  <button
+                    onClick={() => {
+                      setImageZoom(1);
+                      setImagePosition({ x: 0, y: 0 });
+                    }}
+                    className="text-white text-sm hover:bg-white/20 px-3 py-2 rounded transition-colors"
+                  >
+                    Reset
+                  </button>
+                )}
+
+                {/* Navigation - only show for arrays */}
+                {(currentImageType === 'before' || currentImageType === 'after') && (
+                  <>
+                    <button
+                      onClick={() => {
+                        const images = currentImageType === 'before' ? order.before_images : order.after_images;
+                        if (currentImageIndex < images.length - 1) {
+                          setCurrentImageIndex(currentImageIndex + 1);
+                          setImageZoom(1);
+                          setImagePosition({ x: 0, y: 0 });
+                        }
+                      }}
+                      disabled={currentImageIndex >= (currentImageType === 'before' ? order.before_images?.length : order.after_images?.length) - 1}
+                      className="p-2 text-white hover:bg-white/20 rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <ChevronRight className="h-6 w-6" />
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Cancel Dialog */}
       <AlertDialog open={isCancelDialogOpen} onOpenChange={setIsCancelDialogOpen}>

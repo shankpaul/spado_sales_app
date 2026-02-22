@@ -139,9 +139,7 @@ const Dashboard = () => {
         setLoadingOrders(true);
         const today = format(new Date(), 'yyyy-MM-dd');
         const response = await orderService.getAllOrders({
-          date_from: today,
-          date_to: today,
-          bookin_date: today,
+          booking_date: today,
           per_page: 100 // Increased per_page to ensure we get all today's orders
         });
 
