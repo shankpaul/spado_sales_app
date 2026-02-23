@@ -13,6 +13,7 @@ import {
 } from '../components/ui/select';
 import { toast } from 'sonner';
 import orderService from '../services/orderService';
+import useOrderStore from '../store/orderStore';
 import OrderWizard from '../components/OrderWizard';
 import OrderDetail from './OrderDetail';
 import {
@@ -48,6 +49,7 @@ import {
 } from '../components/ui/sheet';
 import { Badge2 } from '@/components/ui/badge2';
 import { Skeleton } from '../components/ui/skeleton';
+import AssigneeResponseTick from '../components/AssigneeResponseTick';
 
 /**
  * Orders Page Component
@@ -55,6 +57,26 @@ import { Skeleton } from '../components/ui/skeleton';
  */
 const Orders = () => {
   const navigate = useNavigate();
+  
+  // Use order store
+  const {
+    orders,
+    isLoading: loading,
+    hasMore,
+    page: storePage,
+    perPage,
+    totalPages,
+    totalCount,
+    filters,
+    agents,
+    setFilters,
+    fetchOrders,
+    fetchPage,
+    updateOrder,
+    resetPagination,
+    fetchAgents,
+  } = useOrderStore();
+  
   // Load persisted state from localStorage
   const loadPersistedState = () => {
     try {
@@ -70,10 +92,7 @@ const Orders = () => {
 
   const persistedState = loadPersistedState();
 
-  const [orders, setOrders] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [agents, setAgents] = useState([]);
 
   // Filter states
   const [searchQuery, setSearchQuery] = useState(persistedState?.searchQuery || '');
@@ -92,13 +111,6 @@ const Orders = () => {
   const [tempAgentId, setTempAgentId] = useState(persistedState?.agentId || 'all');
 
   // Pagination states
-  const [page, setPage] = useState(persistedState?.page || 1);
-  const [perPage] = useState(10);
-  const [totalPages, setTotalPages] = useState(1);
-  const [totalItems, setTotalItems] = useState(0);
-
-  // Infinite scroll states (for mobile)
-  const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const observerTarget = useRef(null);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
@@ -134,10 +146,10 @@ const Orders = () => {
       dateFrom,
       dateTo,
       agentId,
-      page
+      page: storePage
     };
     localStorage.setItem('ordersFilters', JSON.stringify(filterState));
-  }, [searchQuery, status, paymentStatus, dateFrom, dateTo, agentId, page]);
+  }, [searchQuery, status, paymentStatus, dateFrom, dateTo, agentId, storePage]);
 
   // Detect mobile/desktop resize
   useEffect(() => {
@@ -146,79 +158,33 @@ const Orders = () => {
       if (isMobile !== mobile) {
         setIsMobile(mobile);
         // Reset pagination when switching between mobile/desktop
-        setPage(1);
-        setOrders([]);
+        resetPagination();
       }
     };
 
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
-  }, [isMobile]);
+  }, [isMobile, resetPagination]);
 
-  // Fetch agents for filter
+  // Fetch agents for filter (fire-and-forget, non-blocking, cached in store)
   useEffect(() => {
-    const fetchAgents = async () => {
-      try {
-        const response = await orderService.getUsersByRole('agent');
-        setAgents(response.users || []);
-      } catch (error) {
-        console.error('Error fetching agents:', error);
-      }
-    };
-    fetchAgents();
-  }, []);
-
-  // Fetch orders (for desktop pagination)
-  const fetchOrders = async (resetList = false) => {
-    if (resetList) {
-      setLoading(true);
-    } else {
-      setLoadingMore(true);
+    // Only fetch if agents not already loaded
+    if (agents.length === 0) {
+      fetchAgents();
     }
-    setError(null);
-    try {
-      const params = {
-        page,
-        per_page: perPage,
-      };
+  }, [agents.length, fetchAgents]);
 
-      // Search query can match order number or phone
-      if (searchQuery) {
-        params.search = searchQuery;
-      }
-      if (status && status !== 'all') params.status = status;
-      if (paymentStatus && paymentStatus !== 'all') params.payment_status = paymentStatus;
-      if (dateFrom) params.date_from = dateFrom;
-      if (dateTo) params.date_to = dateTo;
-      if (agentId && agentId !== 'all') params.agent_id = agentId;
-
-      const response = await orderService.getAllOrders(params);
-      const newOrders = response.orders || [];
-
-      if (isMobile && !resetList) {
-        // Append for infinite scroll
-        setOrders(prev => [...prev, ...newOrders]);
-      } else {
-        // Replace for desktop pagination
-        setOrders(newOrders);
-      }
-
-      setTotalPages(response.pagination?.total_pages || 1);
-      setTotalItems(response.pagination?.total_count || 0);
-      setHasMore(page < (response.pagination?.total_pages || 1));
-    } catch (error) {
-      console.error('Error fetching orders:', error);
-      const errorMessage = error.response?.data?.message || error.message || 'Failed to load orders';
-      setError(errorMessage);
-      toast.error(errorMessage);
-      if (resetList) {
-        setOrders([]);
-      }
-    } finally {
-      setLoading(false);
-      setLoadingMore(false);
-    }
-  };
+  // Update store filters when local filters change
+  useEffect(() => {
+    setFilters({
+      search: searchQuery,
+      status: status !== 'all' ? status : '',
+      payment_status: paymentStatus !== 'all' ? paymentStatus : '',
+      date_from: dateFrom,
+      date_to: dateTo,
+      assigned_to_id: agentId !== 'all' ? agentId : '',
+    });
+  }, [searchQuery, status, paymentStatus, dateFrom, dateTo, agentId, setFilters]);
 
   // Fetch orders with proper reset logic
   useEffect(() => {
@@ -232,29 +198,17 @@ const Orders = () => {
       return;
     }
 
-    // Reset to page 1 and clear orders when filters change (but not page)
-    setPage(1);
-    setOrders([]);
-    setHasMore(true);
-    // Fetch with reset when filters change
+    // Reset and fetch when filters change
     fetchOrders(true);
-  }, [searchQuery, status, paymentStatus, dateFrom, dateTo, agentId]);
-
-  useEffect(() => {
-    // Fetch when page changes after initial mount
-    if (hasInitiallyFetched.current && !isFirstMount.current) {
-      const resetList = !isMobile; // For desktop, always reset; for mobile, append
-      fetchOrders(resetList);
-    }
-  }, [page]);
+  }, [searchQuery, status, paymentStatus, dateFrom, dateTo, agentId, fetchOrders]);
 
   // Infinite scroll observer callback
   const handleObserver = useCallback((entries) => {
     const [target] = entries;
     if (target.isIntersecting && hasMore && !loadingMore && !loading && isMobile) {
-      setPage(prev => prev + 1);
+      fetchOrders(); // Fetch next page
     }
-  }, [hasMore, loadingMore, loading, isMobile]);
+  }, [hasMore, loadingMore, loading, isMobile, fetchOrders]);
 
   // Setup intersection observer for infinite scroll
   useEffect(() => {
@@ -307,7 +261,6 @@ const Orders = () => {
     setTempDateFrom('');
     setTempDateTo('');
     setTempAgentId('all');
-    setPage(1);
   };
 
   // Apply filters from temporary states
@@ -340,7 +293,6 @@ const Orders = () => {
   // Clear search input and query
   const clearSearch = () => {
     setSearchInput('');
-    setPage(1);
     setSearchQuery('');
   };
 
@@ -407,10 +359,7 @@ const Orders = () => {
   // Handle wizard success
   const handleWizardSuccess = () => {
     setIsWizardOpen(false);
-    // Reset to page 1 and refresh the list (important for mobile infinite scroll)
-    setPage(1);
-    setOrders([]);
-    setHasMore(true);
+    // Refresh the list from the beginning
     fetchOrders(true);
   };
 
@@ -725,6 +674,9 @@ const Orders = () => {
                       <div className="flex items-center gap-1">
                         <User className="h-3 w-3" />
                         {order.assigned_agent_name?.split(' ')[0] || 'Unassigned'}
+                        {order.assigned_agent_name && (
+                          <AssigneeResponseTick status={order.assignee_response} size="xs" />
+                        )}
                       </div>
                     </div>
                     <Badge2 variant={getBadgeVariant(order.status, 'order')} className="px-2">
@@ -744,7 +696,7 @@ const Orders = () => {
               {/* End of list message */}
               {!hasMore && orders.length > 0 && (
                 <div className="text-center py-6 text-sm text-muted-foreground">
-                  You've reached the end of the list ({totalItems} orders)
+                  You've reached the end of the list ({totalCount} orders)
                 </div>
               )}
             </div>
@@ -819,6 +771,7 @@ const Orders = () => {
                           <div className="flex items-center gap-2">
                             <LetterAvatar name={order.assigned_agent_name} size="xs" />
                             <div className="font-medium">{order.assigned_agent_name}</div>
+                            <AssigneeResponseTick status={order.assignee_response} size="sm" />
                           </div>
                         ) : (
                           <Badge2 variant="danger">Unassigned</Badge2>
@@ -837,14 +790,14 @@ const Orders = () => {
       {!isMobile && totalPages > 1 && (
         <div className="flex items-center justify-between">
           <p className="text-sm text-muted-foreground">
-            Showing {Math.min((page - 1) * perPage + 1, totalItems)} to {Math.min(page * perPage, totalItems)} of {totalItems} orders
+            Showing {Math.min((storePage - 1) * perPage + 1, totalCount)} to {Math.min(storePage * perPage, totalCount)} of {totalCount} orders
           </p>
           <div className="flex items-center gap-2">
             <Button
               variant="outline"
               size="sm"
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-              disabled={page === 1 || loading}
+              onClick={() => fetchPage(Math.max(1, storePage - 1))}
+              disabled={storePage === 1 || loading}
             >
               <ChevronLeft className="h-4 w-4" />
             </Button>
@@ -852,30 +805,30 @@ const Orders = () => {
             {/* Page numbers */}
             <div className="flex gap-1">
               {/* First page */}
-              {page > 3 && (
+              {storePage > 3 && (
                 <>
                   <Button
-                    variant={page === 1 ? "default" : "outline"}
+                    variant={storePage === 1 ? "default" : "outline"}
                     size="sm"
-                    onClick={() => setPage(1)}
+                    onClick={() => fetchPage(1)}
                     className="min-w-[40px]"
                   >
                     1
                   </Button>
-                  {page > 4 && <span className="px-2 flex items-center text-muted-foreground">...</span>}
+                  {storePage > 4 && <span className="px-2 flex items-center text-muted-foreground">...</span>}
                 </>
               )}
 
               {/* Pages around current */}
               {Array.from({ length: totalPages }, (_, i) => i + 1)
-                .filter(p => p === page || p === page - 1 || p === page + 1 || p === page - 2 || p === page + 2)
+                .filter(p => p === storePage || p === storePage - 1 || p === storePage + 1 || p === storePage - 2 || p === storePage + 2)
                 .filter(p => p > 0 && p <= totalPages)
                 .map(p => (
                   <Button
                     key={p}
-                    variant={page === p ? "default" : "outline"}
+                    variant={storePage === p ? "default" : "outline"}
                     size="sm"
-                    onClick={() => setPage(p)}
+                    onClick={() => fetchPage(p)}
                     disabled={loading}
                     className="min-w-[40px]"
                   >
@@ -884,13 +837,13 @@ const Orders = () => {
                 ))}
 
               {/* Last page */}
-              {page < totalPages - 2 && (
+              {storePage < totalPages - 2 && (
                 <>
-                  {page < totalPages - 3 && <span className="px-2 flex items-center text-muted-foreground">...</span>}
+                  {storePage < totalPages - 3 && <span className="px-2 flex items-center text-muted-foreground">...</span>}
                   <Button
-                    variant={page === totalPages ? "default" : "outline"}
+                    variant={storePage === totalPages ? "default" : "outline"}
                     size="sm"
-                    onClick={() => setPage(totalPages)}
+                    onClick={() => fetchPage(totalPages)}
                     className="min-w-[40px]"
                   >
                     {totalPages}
@@ -902,8 +855,8 @@ const Orders = () => {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-              disabled={page === totalPages || loading}
+              onClick={() => fetchPage(Math.min(totalPages, storePage + 1))}
+              disabled={storePage === totalPages || loading}
             >
               <ChevronRight className="h-4 w-4" />
             </Button>
@@ -929,12 +882,9 @@ const Orders = () => {
             <OrderDetail
               orderId={selectedOrderId}
               onClose={handleCloseOrderDetail}
-              onUpdate={() => {
-                // Reset to page 1 and refresh the list (important for mobile infinite scroll)
-                setPage(1);
-                setOrders([]);
-                setHasMore(true);
-                fetchOrders(true);
+              onUpdate={(updatedOrder) => {
+                // Use store's updateOrder to sync across all components
+                updateOrder(updatedOrder);
               }}
             />
           )}

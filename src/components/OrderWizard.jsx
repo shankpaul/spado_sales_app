@@ -35,6 +35,7 @@ import VehicleIcon from './VehicleIcon';
 import { toast } from 'sonner';
 import orderService from '../services/orderService';
 import customerService from '../services/customerService';
+import useOrderStore from '../store/orderStore';
 import { getBrands, getModelsByBrand, getVehicleType, getVehicleTypes } from '../lib/vehicleData';
 import {
   STORAGE_KEYS,
@@ -63,6 +64,7 @@ import {
   Phone,
   PenIcon,
   ArrowLeft,
+  LoaderCircle,
 } from 'lucide-react';
 
 /**
@@ -71,6 +73,9 @@ import {
  * Props: open, onOpenChange, onSuccess, customerId, orderId
  */
 const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId = null }) => {
+  // Get agents from store
+  const { agents, fetchAgents } = useOrderStore();
+
   const [currentStep, setCurrentStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [showDraftDialog, setShowDraftDialog] = useState(false);
@@ -88,6 +93,7 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [mapLinkLoading, setMapLinkLoading] = useState(false);
+  const [mapLinkError, setMapLinkError] = useState(false);
 
   // Form refs
   const customerFormRef = useRef(null);
@@ -96,7 +102,6 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
   const [customers, setCustomers] = useState([]);
   const [packages, setPackages] = useState([]);
   const [addons, setAddons] = useState([]);
-  const [agents, setAgents] = useState([]);
 
   // Form states
   const [selectedCustomer, setSelectedCustomer] = useState(null);
@@ -201,6 +206,7 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
 
     const timeoutId = setTimeout(async () => {
       setMapLinkLoading(true);
+      setMapLinkError(false);
       try {
         // Backend API handles parsing (including shortened URLs), expansion, and geocoding
         const addressDetails = await reverseGeocode(address.map_link);
@@ -216,11 +222,13 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
           }));
           
           toast.success('Address details populated from map link');
+          setMapLinkError(false);
           saveDraft();
         }
       } catch (error) {
         console.error('Error processing map link:', error);
-        toast.error('Failed to process map link');
+        toast.error('Failed to process map link. Please enter area manually.');
+        setMapLinkError(true);
       } finally {
         setMapLinkLoading(false);
       }
@@ -309,14 +317,16 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
   // Fetch initial data
   const fetchInitialData = async () => {
     try {
-      const [packagesRes, addonsRes, agentsRes] = await Promise.all([
+      const [packagesRes, addonsRes] = await Promise.all([
         orderService.getPackages(),
         orderService.getAddons(),
-        orderService.getUsersByRole('agent'),
       ]);
       setPackages(packagesRes.packages || packagesRes || []);
       setAddons(addonsRes.addons || addonsRes || []);
-      setAgents(agentsRes.users || []);
+      // Fetch agents from store if not already loaded
+      if (agents.length === 0) {
+        fetchAgents();
+      }
     } catch (error) {
       console.error('Error fetching data:', error);
       toast.error('Failed to load data');
@@ -985,15 +995,24 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
         </div>
 
         <div>
-          <Label className="text-xs">Area</Label>
+          <Label className="text-xs flex items-center">Area
+            
+          </Label>
           <Input
             value={address.area}
             onChange={(e) => {
               setAddress({ ...address, area: e.target.value });
+              setMapLinkError(false); // Clear error when user manually edits
               saveDraft();
             }}
             placeholder="Area or locality"
           />
+          {mapLinkLoading && (
+              <span className="text-blue-500 text-xs flex items-center gap-1 mt-2"><LoaderCircle className="h-3 w-3 mr-1 animate-spin" /> Identifying the Area from map link</span>
+            )}
+            {mapLinkError && !mapLinkLoading && (
+              <span className="text-amber-500 text-xs mt-2">Sorry!! Unable to find the location, please update manually</span>
+            )}
           {errors.area && <p className="text-sm text-destructive mt-1">{errors.area}</p>}
         </div>
 

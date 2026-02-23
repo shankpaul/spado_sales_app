@@ -86,6 +86,8 @@ import MapPreview from '@/components/MapPreview';
 import VehicleIcon from '../components/VehicleIcon';
 import { formatDate, formatDateTime, formatTime, formatCurrency } from '../lib/utilities';
 import { Badge2 } from '@/components/ui/badge2';
+import LetterAvatar from '@/components/LetterAvatar';
+import useOrderStore from '../store/orderStore';
 
 /**
  * Order Detail Page
@@ -96,6 +98,9 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
   const routeParams = useParams();
   const id = orderId || routeParams.id;
   const navigate = useNavigate();
+
+  // Get agents from store
+  const { agents, fetchAgents } = useOrderStore();
 
   // Tabs state
   const [activeTab, setActiveTab] = useState('packages');
@@ -147,7 +152,6 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
   const [loading, setLoading] = useState(true);
   const [timeline, setTimeline] = useState([]);
   const [reassignments, setReassignments] = useState([]);
-  const [agents, setAgents] = useState([]);
   const [editingNote, setEditingNote] = useState(false);
   const [noteText, setNoteText] = useState('');
 
@@ -180,22 +184,37 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
   // Feedback comments view dialog
   const [isFeedbackViewOpen, setIsFeedbackViewOpen] = useState(false);
 
-  // Fetch order details
+  // Fetch order details - prioritize main order data
   useEffect(() => {
     if (id) {
+      // Load main order data first (blocks UI until loaded)
       fetchOrderDetails();
-      fetchTimeline();
-      fetchReassignments();
-      fetchAgents();
+      
+      // Load secondary data in background (non-blocking)
+      // These run independently and don't affect the loading state
+     
     }
   }, [id]);
 
-  const fetchOrderDetails = async () => {
+  const fetchOrderDetails = async (shouldCallUpdate = false) => {
     setLoading(true);
     try {
       const data = await orderService.getOrderById(id);
       setOrder(data.order);
       setNoteText(data.notes || '');
+       setTimeout(() => {
+        fetchTimeline();
+        fetchReassignments();
+        // Only fetch agents if not already loaded in store
+        if (agents.length === 0) {
+          fetchAgents();
+        }
+      }, 10);
+      // If this is called after an update, notify parent with the updated order
+      if (shouldCallUpdate && onUpdate) {
+        onUpdate(data.order);
+      }
+      
     } catch (error) {
       console.error('Error fetching order:', error);
       toast.error('Failed to load order details');
@@ -211,6 +230,7 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
       setTimeline(data.timeline || []);
     } catch (error) {
       console.error('Error fetching timeline:', error);
+      // Silently fail - this is background data
     }
   };
 
@@ -220,15 +240,7 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
       setReassignments(data.reassignments || []);
     } catch (error) {
       console.error('Error fetching reassignments:', error);
-    }
-  };
-
-  const fetchAgents = async () => {
-    try {
-      const response = await orderService.getUsersByRole('agent');
-      setAgents(response.users || []);
-    } catch (error) {
-      console.error('Error fetching agents:', error);
+      // Silently fail - this is background data
     }
   };
 
@@ -251,10 +263,10 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
     try {
       await orderService.updateOrderStatus(id, newStatus);
       toast.success('Status updated successfully');
-      fetchOrderDetails();
-      fetchTimeline();
+      await fetchOrderDetails(true); // Pass true to trigger onUpdate
+      // Fetch timeline in background without blocking
+      setTimeout(() => fetchTimeline(), 0);
       setIsStatusConfirmOpen(false);
-      if (onUpdate) onUpdate();
     } catch (error) {
       console.error('Error updating status:', error);
       toast.error('Failed to update status');
@@ -277,8 +289,9 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
       await orderService.cancelOrder(id, reason);
       toast.success('Order cancelled successfully');
       setIsCancelDialogOpen(false);
-      fetchOrderDetails();
-      fetchTimeline();
+      await fetchOrderDetails(true); // Pass true to trigger onUpdate
+      // Fetch timeline in background without blocking
+      setTimeout(() => fetchTimeline(), 0);
     } catch (error) {
       console.error('Error cancelling order:', error);
       toast.error('Failed to cancel order');
@@ -336,9 +349,12 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
       await orderService.reassignOrder(id, agentIdToSend);
       toast.success(newAgentId === 'unassigned' ? 'Agent unassigned successfully' : 'Agent reassigned successfully');
       setIsReassignDialogOpen(false);
-      fetchOrderDetails();
-      fetchTimeline();
-      fetchReassignments();
+      await fetchOrderDetails(true); // Pass true to trigger onUpdate
+      // Fetch timeline and reassignments in background without blocking
+      setTimeout(() => {
+        fetchTimeline();
+        fetchReassignments();
+      }, 0);
     } catch (error) {
       const errorMessage = error.response?.data?.errors.join('\n') || 'Failed to reassign agent';
       toast.error(errorMessage);
@@ -353,7 +369,7 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
       await orderService.updateOrderNote(id, noteText);
       toast.success('Note updated successfully');
       setEditingNote(false);
-      fetchOrderDetails();
+      await fetchOrderDetails(true); // Pass true to trigger onUpdate
     } catch (error) {
       console.error('Error updating note:', error);
       toast.error('Failed to update note');
@@ -377,7 +393,7 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
       setIsFeedbackDialogOpen(false);
       setFeedbackRating(0);
       setFeedbackComment('');
-      fetchOrderDetails();
+      await fetchOrderDetails(true); // Pass true to trigger onUpdate
     } catch (error) {
       console.error('Error submitting feedback:', error);
       toast.error('Failed to submit feedback');
@@ -910,7 +926,7 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
                       </Badge2>
                     </div>
                     {order.before_images && order.before_images.length > 0 ? (
-                      <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
+                      <div className="grid grid-cols-4 sm:grid-cols-8 gap-2">
                         {order.before_images.map((image, index) => (
                           <button
                             key={index}
@@ -924,7 +940,7 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
                             className="relative aspect-square rounded-lg overflow-hidden border border-gray-200 hover:border-primary transition-colors group cursor-pointer"
                           >
                             <img
-                              src={image.thumbnail_url}
+                              src={image.url}
                               alt={`Before ${index + 1}`}
                               className="w-full h-full object-cover"
                             />
@@ -951,7 +967,7 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
                       </Badge2>
                     </div>
                     {order.after_images && order.after_images.length > 0 ? (
-                      <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
+                      <div className="grid grid-cols-4 sm:grid-cols-8 gap-2">
                         {order.after_images.map((image, index) => (
                           <button
                             key={index}
@@ -965,7 +981,7 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
                             className="relative aspect-square rounded-lg overflow-hidden border border-gray-200 hover:border-primary transition-colors group cursor-pointer"
                           >
                             <img
-                              src={image.thumbnail_url}
+                              src={image.url}
                               alt={`After ${index + 1}`}
                               className="w-full h-full object-cover"
                             />
@@ -986,33 +1002,29 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
 
                 {/* Timeline Tab */}
                 <TabsContent value="timeline" className="mt-6">
-                  <div className="space-y-6">
+                  <div className="space-y-2">
                     {timeline.length > 0 ? (
                       timeline.map((event, index) => (
                         <div key={index} className="flex gap-4">
                           <div className="flex flex-col items-center">
-                            <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${event.type === 'created' || event.type === 'status_changed'
-                              ? 'bg-primary text-primary-foreground'
-                              : 'bg-gray-100 text-gray-600'
-                              }`}>
+                            <div className="w-5 h-5 text-muted-foreground rounded-full flex items-center justify-center flex-shrink-0 ">
                               {event.type === 'status_changed' ? (
-                                <CheckCircle2 className="h-5 w-5" />
+                                <CheckCircle2  size={14} />
                               ) : event.type === 'cancelled' ? (
-                                <XCircle className="h-5 w-5" />
+                                <XCircle  size={14} />
                               ) : (
-                                <Clock className="h-5 w-5" />
+                                <Clock  size={14} />
                               )}
                             </div>
                             {index < timeline.length - 1 && (
-                              <div className="w-0.5 flex-1 bg-gray-200 mt-2" style={{ minHeight: '3rem' }} />
+                              <div className="w-0.5 flex-1 bg-gray-200 mt-2" style={{ minHeight: '1rem' }} />
                             )}
                           </div>
-                          <div className="flex-1 pb-6">
-                            <div className="font-medium mb-1">{event.title}</div>
-                            <div className="text-sm text-muted-foreground mb-2">{event.description}</div>
+                          <div className="flex-1 pb-4">
+                            <div className="text-sm mb-1">{event.description}</div>
                             <div className="text-xs text-muted-foreground">
-                              {formatDateTime(event.created_at)}
-                              {event.user_name && ` • by ${event.user_name}`}
+                              {formatDateTime(event.changed_at)}
+                              {` • by ${event.changed_by || event.assigned_by}`}
                             </div>
                           </div>
                         </div>
@@ -1028,17 +1040,22 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
 
                 {/* Reassignments Tab */}
                 <TabsContent value="reassignments" className="mt-6">
-                  <div className="space-y-4">
+                  <div className="space-y-2">
                     {reassignments.length > 0 ? (
                       reassignments.map((item, index) => (
-                        <div key={index} className="flex items-start gap-4 py-4 border-b last:border-0">
-                          <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                            <User className="h-5 w-5 text-primary" />
-                          </div>
+                        <div key={index} className="flex items-start gap-3 py-2 border-b last:border-0">
+                            <LetterAvatar name={item.assigned_to} size="sm" className="text-primary" />
                           <div className="flex-1">
-                            <div className="font-medium mb-1">{item.agent_name}</div>
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="font-medium">{item.assigned_to}</span>
+                              {item.assigned_to === order.assigned_to?.name && (
+                                <Badge2 variant="default" className="text-[10px] h-5 px-1.5">
+                                  Current
+                                </Badge2>
+                              )}
+                            </div>
                             <div className="text-sm text-muted-foreground">
-                              Assigned by {item.assigned_by_name}
+                              Assigned by {item.assigned_by}
                             </div>
                             {item.notes && (
                               <div className="text-sm text-muted-foreground mt-2 p-3 bg-gray-50 rounded-lg">
@@ -1150,6 +1167,7 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
                 <div className="p-4 border-b">
                   <h3 className="font-semibold">Customer Feedback</h3>
                 </div>
+               
                 <div className="p-4 space-y-4">
                   {order.rating && (
                     <div>
@@ -1189,36 +1207,6 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
               </div>
             )}
 
-            {/* Google Review Image */}
-            {order.google_review_image && (
-              <div className="border rounded-lg">
-                <div className="p-4 border-b">
-                  <h3 className="font-semibold">Google Review</h3>
-                </div>
-                <div className="p-4">
-                  <button
-                    onClick={() => {
-                      setCurrentImageType('google_review');
-                      setCurrentImageIndex(0);
-                      setImageViewerOpen(true);
-                      setImageZoom(1);
-                      setImagePosition({ x: 0, y: 0 });
-                    }}
-                    className="relative w-full max-w-md rounded-lg overflow-hidden border border-gray-200 hover:border-primary transition-colors group cursor-pointer"
-                  >
-                    <img
-                      src={order.google_review_image.thumbnail_url}
-                      alt="Google Review"
-                      className="w-full h-auto object-cover"
-                    />
-                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
-                      <ImageIcon className="h-8 w-8 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
-                    </div>
-                  </button>
-                </div>
-              </div>
-            )}
-
           </div>
 
           {/* Right Column - Sidebar */}
@@ -1230,9 +1218,7 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
               </div>
               <div className="p-4 space-y-3">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                    <User className="h-5 w-5 text-primary" />
-                  </div>
+                  <LetterAvatar name={order.assigned_to?.name} size="md" className="text-primary" />
                   <div className="flex-1 min-w-0">
                     <div className="font-medium text-sm">
                       {order.assigned_to?.name || 'Unassigned'}
@@ -1281,19 +1267,14 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
             <div className="border rounded-lg">
               <div className="p-4 border-b flex items-center justify-between">
                 <h3 className="font-semibold">Customer</h3>
-                <Button variant="ghost" size="icon" className="h-8 w-8">
-                  <MessageSquare className="h-4 w-4" />
-                </Button>
-              </div>
+                </div>
               <div className="p-4">
                 <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white font-semibold">
-                    {order.customer?.name?.charAt(0).toUpperCase()}
-                  </div>
+                  <LetterAvatar name={order.customer?.name} size="md" className="text-primary" />
                   <div className="flex-1">
                     <div className="font-medium">{order.customer?.name}</div>
-                    <div className="text-sm text-muted-foreground">
-                      Total: {order.customer?.total_orders || 0} order{order.customer?.total_orders !== 1 ? 's' : ''}
+                    <div className="text-xs text-muted-foreground">
+                      {order.customer?.phone}
                     </div>
                   </div>
                 </div>
@@ -1303,10 +1284,7 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
               <div>
                 <div className="p-4 border-b flex items-center justify-between">
                   <h3 className="font-semibold">Service Address</h3>
-                  <Button variant="ghost" size="icon" className="h-8 w-8">
-                    <Edit className="h-4 w-4" />
-                  </Button>
-                </div>
+                 </div>
                 <div className="p-4">
                   {order.latitude && order.longitude ? (
                     <div className="mb-4 rounded-sm overflow-hidden border">
@@ -1348,10 +1326,7 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
               <div>
                 <div className="p-4 border-b flex items-center justify-between">
                   <h3 className="font-semibold">Contact Information</h3>
-                  <Button variant="ghost" size="icon" className="h-8 w-8">
-                    <Edit className="h-4 w-4" />
-                  </Button>
-                </div>
+                  </div>
                 <div className="p-4 space-y-2">
                   {order.customer?.email && (
                     <Badge2
@@ -1422,12 +1397,12 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
         open={isWizardOpen}
         onOpenChange={setIsWizardOpen}
         orderId={id}
-        onSuccess={() => {
+        onSuccess={async () => {
           setIsWizardOpen(false);
-          fetchOrderDetails();
-          fetchTimeline();
+          await fetchOrderDetails(true); // Pass true to trigger onUpdate
+          // Fetch timeline in background without blocking
+          setTimeout(() => fetchTimeline(), 0);
           toast.success('Order updated successfully');
-          if (onUpdate) onUpdate();
         }}
       />
 
@@ -1549,6 +1524,39 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
                 Submitted on {formatDateTime(order.feedback_submitted_at)}
               </div>
             )}
+
+            {order.google_review_image && (
+              <div className="pt-4 border-t">
+                <label className="text-sm font-medium mb-2 block">Google Review Proof</label>
+                <button
+                  onClick={() => {
+                    setCurrentImageType('google_review');
+                    setCurrentImageIndex(0);
+                    setImageViewerOpen(true);
+                    setImageZoom(1);
+                    setImagePosition({ x: 0, y: 0 });
+                    setIsFeedbackViewOpen(false);
+                  }}
+                  className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border border-gray-200 hover:border-primary transition-colors group w-full"
+                >
+                  <div className="relative w-16 h-16 rounded overflow-hidden flex-shrink-0 border border-gray-300">
+                    <img
+                      src={order.google_review_image.thumbnail_url}
+                      alt="Google Review Proof"
+                      className="w-full h-full object-cover"
+                    />
+                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-center justify-center">
+                      <ImageIcon className="h-4 w-4 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                    </div>
+                  </div>
+                  <div className="flex-1 text-left">
+                    <div className="text-sm font-medium">Proof Attached</div>
+                    <div className="text-xs text-muted-foreground">Click to view full image</div>
+                  </div>
+                  <ExternalLink className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
+                </button>
+              </div>
+            )}
           </div>
 
           <AlertDialogFooter>
@@ -1599,15 +1607,48 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
             </div>
 
             <div>
-              <label className="text-sm font-medium mb-2 block">Feedback *</label>
+              <label className="text-sm font-medium mb-2 block">Feedback (Optional)</label>
               <Textarea
                 value={feedbackComment}
                 onChange={(e) => setFeedbackComment(e.target.value)}
-                placeholder="Share your feedback about the service quality, agent, timeliness, etc..."
+                placeholder="Add customer feedback about the service quality, agent, timeliness, etc... (Optional)"
                 rows={4}
                 className="resize-none"
               />
             </div>
+
+            {order.google_review_image && (
+              <div className="pt-4 border-t">
+                <label className="text-sm font-medium mb-2 block">Google Review Proof</label>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCurrentImageType('google_review');
+                    setCurrentImageIndex(0);
+                    setImageViewerOpen(true);
+                    setImageZoom(1);
+                    setImagePosition({ x: 0, y: 0 });
+                  }}
+                  className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border border-gray-200 hover:border-primary transition-colors group w-full"
+                >
+                  <div className="relative w-16 h-16 rounded overflow-hidden flex-shrink-0 border border-gray-300">
+                    <img
+                      src={order.google_review_image.thumbnail_url}
+                      alt="Google Review Proof"
+                      className="w-full h-full object-cover"
+                    />
+                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-center justify-center">
+                      <ImageIcon className="h-4 w-4 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                    </div>
+                  </div>
+                  <div className="flex-1 text-left">
+                    <div className="text-sm font-medium">Proof Attached</div>
+                    <div className="text-xs text-muted-foreground">Click to view full image</div>
+                  </div>
+                  <ExternalLink className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
+                </button>
+              </div>
+            )}
           </div>
 
           <AlertDialogFooter>

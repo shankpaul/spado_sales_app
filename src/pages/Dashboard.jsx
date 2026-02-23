@@ -25,6 +25,7 @@ import {
 } from '../components/ui/select';
 import OrderDetail from './OrderDetail';
 import useAuthStore from '../store/authStore';
+import useOrderStore from '../store/orderStore';
 import orderService from '../services/orderService';
 import { format, isToday, parseISO } from 'date-fns';
 import {
@@ -80,9 +81,15 @@ const Dashboard = () => {
   const { user } = useAuthStore();
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(true);
-  const [upcomingOrders, setUpcomingOrders] = useState([]);
-  const [completedOrders, setCompletedOrders] = useState([]);
-  const [loadingOrders, setLoadingOrders] = useState(true);
+  
+  // Use order store instead of local state
+  const {
+    upcomingOrders,
+    completedOrders,
+    isLoading: loadingOrders,
+    fetchTodayOrders,
+    updateOrder,
+  } = useOrderStore();
 
   // Quick Links Dialog States
   const [vehicleIdentifierOpen, setVehicleIdentifierOpen] = useState(false);
@@ -132,47 +139,10 @@ const Dashboard = () => {
     return () => clearTimeout(timer);
   }, []);
 
-  // Fetch today's orders
+  // Fetch today's orders from store
   useEffect(() => {
-    const fetchTodayOrders = async () => {
-      try {
-        setLoadingOrders(true);
-        const today = format(new Date(), 'yyyy-MM-dd');
-        const response = await orderService.getAllOrders({
-          booking_date: today,
-          per_page: 100 // Increased per_page to ensure we get all today's orders
-        });
-
-        const allTodayOrders = response.orders || [];
-
-        // Filter for confirmed or in_progress orders (Upcoming)
-        const upcoming = allTodayOrders
-          .filter(order => order.status === 'confirmed' || order.status === 'in_progress')
-          .sort((a, b) => {
-            // Sort by booking_time_from, earliest first
-            const timeA = new Date(a.booking_time_from).getTime();
-            const timeB = new Date(b.booking_time_from).getTime();
-            return timeA - timeB;
-          });
-
-        // Filter for completed orders
-        const completed = allTodayOrders.filter(
-          order => order.status === 'completed'
-        );
-
-        setUpcomingOrders(upcoming);
-        setCompletedOrders(completed);
-      } catch (error) {
-        console.error('Error fetching today orders:', error);
-        setUpcomingOrders([]);
-        setCompletedOrders([]);
-      } finally {
-        setLoadingOrders(false);
-      }
-    };
-
     fetchTodayOrders();
-  }, []);
+  }, [fetchTodayOrders]);
 
   // Handle vehicle identification
   const handleIdentifyVehicle = () => {
@@ -660,43 +630,9 @@ const Dashboard = () => {
               <OrderDetail
                 orderId={selectedOrderId}
                 onClose={handleCloseOrderDetail}
-                onUpdate={() => {
-                  // Refresh today's orders after update
-                  const fetchTodayOrders = async () => {
-                    try {
-                      setLoadingOrders(true);
-                      const today = format(new Date(), 'yyyy-MM-dd');
-                      const response = await orderService.getAllOrders({
-                        date_from: today,
-                        date_to: today,
-                        per_page: 100
-                      });
-                      
-                      const allTodayOrders = response.orders || [];
-                      
-                      // Filter and sort upcoming orders by booking time
-                      const upcoming = allTodayOrders
-                        .filter(order => order.status === 'confirmed' || order.status === 'in_progress')
-                        .sort((a, b) => {
-                          const timeA = new Date(a.booking_time_from).getTime();
-                          const timeB = new Date(b.booking_time_from).getTime();
-                          return timeA - timeB;
-                        });
-                      
-                      // Filter completed orders
-                      const completed = allTodayOrders.filter(
-                        order => order.status === 'completed'
-                      );
-                      
-                      setUpcomingOrders(upcoming);
-                      setCompletedOrders(completed);
-                    } catch (error) {
-                      console.error('Error fetching today orders:', error);
-                    } finally {
-                      setLoadingOrders(false);
-                    }
-                  };
-                  fetchTodayOrders();
+                onUpdate={(updatedOrder) => {
+                  // Use store's updateOrder to sync across all components
+                  updateOrder(updatedOrder);
                 }}
               />
             )}
