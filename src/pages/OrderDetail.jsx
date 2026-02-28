@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { Button } from '../components/ui/button';
 import { Card } from '../components/ui/card';
@@ -38,8 +38,19 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
 } from '../components/ui/dialog';
+import {
+  Drawer,
+  DrawerContent,
+  DrawerHeader,
+  DrawerTitle,
+  DrawerDescription,
+} from '../components/ui/drawer';
 import { Textarea } from '../components/ui/textarea';
+import { Checkbox } from '../components/ui/checkbox';
+import { DatePicker } from '../components/ui/date-picker';
+import { Label } from '../components/ui/label';
 import { toast } from 'sonner';
 import orderService from '../services/orderService';
 import OrderWizard from '../components/OrderWizard';
@@ -81,6 +92,8 @@ import {
   X as XIcon,
   ChevronLeft,
   Paperclip,
+  AlertTriangle,
+  CalendarClock,
 } from 'lucide-react';
 import MapPreview from '@/components/MapPreview';
 import VehicleIcon from '../components/VehicleIcon';
@@ -168,6 +181,26 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
   const [isStatusConfirmOpen, setIsStatusConfirmOpen] = useState(false);
   const [pendingStatus, setPendingStatus] = useState(null);
   const [changingStatus, setChangingStatus] = useState(false);
+  const [paymentReceived, setPaymentReceived] = useState(false);
+
+  // Quick booking edit dialog state
+  const [isBookingEditOpen, setIsBookingEditOpen] = useState(false);
+  const [bookingDate, setBookingDate] = useState('');
+  const [bookingTimeFrom, setBookingTimeFrom] = useState('');
+  const [bookingTimeTo, setBookingTimeTo] = useState('');
+  const [updatingBooking, setUpdatingBooking] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+
+  // Ref for scrolling to assigned agent section
+  const assignedAgentRef = useRef(null);
+
+  // Track screen size for responsive drawer/dialog
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 768);
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   // Reassign agent dialog state
   const [isReassignDialogOpen, setIsReassignDialogOpen] = useState(false);
@@ -183,6 +216,34 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
 
   // Feedback comments view dialog
   const [isFeedbackViewOpen, setIsFeedbackViewOpen] = useState(false);
+
+  // Helper: Generate time options in 30-minute intervals (6 AM to 8:30 PM)
+  const generateTimeOptions = () => {
+    const times = [];
+    for (let hour = 6; hour <= 20; hour++) {
+      for (let minute of [0, 30]) {
+        const timeValue = `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+        const displayHour = hour === 12 ? 12 : hour > 12 ? hour - 12 : hour;
+        const period = hour < 12 ? 'AM' : 'PM';
+        const displayTime = `${displayHour}:${String(minute).padStart(2, '0')} ${period}`;
+        times.push({ value: timeValue, label: displayTime });
+      }
+    }
+    return times;
+  };
+
+  // Helper: Extract time in HH:MM format from datetime string
+  const extractTimeFromDateTime = (dateTimeString) => {
+    if (!dateTimeString) return '';
+    try {
+      const date = new Date(dateTimeString);
+      const hours = String(date.getHours()).padStart(2, '0');
+      const minutes = String(date.getMinutes()).padStart(2, '0');
+      return `${hours}:${minutes}`;
+    } catch {
+      return '';
+    }
+  };
 
   // Fetch order details - prioritize main order data
   useEffect(() => {
@@ -246,9 +307,16 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
 
   // Handle status change
   const handleStatusChange = async (newStatus) => {
+    // Validate assignee for in_progress and completed status
+    if ((newStatus === 'in_progress' || newStatus === 'completed') && !order?.assigned_to) {
+      toast.error('Please assign an agent before changing status to ' + (newStatus === 'in_progress' ? 'In Progress' : 'Completed'));
+      return;
+    }
+
     // If changing to completed, show confirmation dialog
     if (newStatus === 'completed') {
       setPendingStatus(newStatus);
+      setPaymentReceived(false); // Reset checkbox
       setIsStatusConfirmOpen(true);
       return;
     }
@@ -267,11 +335,61 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
       // Fetch timeline in background without blocking
       setTimeout(() => fetchTimeline(), 0);
       setIsStatusConfirmOpen(false);
+      setPaymentReceived(false); // Reset checkbox
     } catch (error) {
       console.error('Error updating status:', error);
       toast.error('Failed to update status');
     } finally {
       setChangingStatus(false);
+    }
+  };
+
+  // Open booking edit dialog with current values
+  const handleOpenBookingEdit = () => {
+    setBookingDate(order?.booking_date || '');
+    setBookingTimeFrom(extractTimeFromDateTime(order?.booking_time_from));
+    setBookingTimeTo(extractTimeFromDateTime(order?.booking_time_to));
+    setIsBookingEditOpen(true);
+  };
+
+  // Save booking changes
+  const handleSaveBooking = async () => {
+    // Validate booking fields
+    if (!bookingDate) {
+      toast.error('Please select a booking date');
+      return;
+    }
+    if (!bookingTimeFrom) {
+      toast.error('Please select start time');
+      return;
+    }
+    if (!bookingTimeTo) {
+      toast.error('Please select end time');
+      return;
+    }
+
+    setUpdatingBooking(true);
+    try {
+      // Convert to ISO format for API
+      const bookingDateISO = new Date(bookingDate).toISOString().split('T')[0];
+      const bookingTimeFromISO = new Date(`${bookingDateISO}T${bookingTimeFrom}:00`).toISOString();
+      const bookingTimeToISO = new Date(`${bookingDateISO}T${bookingTimeTo}:00`).toISOString();
+
+      await orderService.updateOrder(id, {
+        booking_date: bookingDateISO,
+        booking_time_from: bookingTimeFromISO,
+        booking_time_to: bookingTimeToISO,
+      });
+
+      toast.success('Booking time updated successfully');
+      setIsBookingEditOpen(false);
+      await fetchOrderDetails(true);
+      setTimeout(() => fetchTimeline(), 0);
+    } catch (error) {
+      console.error('Error updating booking:', error);
+      toast.error('Failed to update booking time');
+    } finally {
+      setUpdatingBooking(false);
     }
   };
 
@@ -345,7 +463,7 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
 
     setReassigning(true);
     try {
-      const agentIdToSend = newAgentId === 'unassigned' ? null : newAgentId;
+      const agentIdToSend = newAgentId === 'unassigned' ? null : parseInt(newAgentId, 10);
       await orderService.reassignOrder(id, agentIdToSend);
       toast.success(newAgentId === 'unassigned' ? 'Agent unassigned successfully' : 'Agent reassigned successfully');
       setIsReassignDialogOpen(false);
@@ -597,14 +715,20 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
                           </DropdownMenuItem>
 
                           {order.status === 'confirmed' && (
-                            <DropdownMenuItem onClick={() => handleStatusChange('in_progress')}>
+                            <DropdownMenuItem 
+                              onClick={() => handleStatusChange('in_progress')}
+                              disabled={!order?.assigned_to}
+                            >
                               <Clock className="h-4 w-4 mr-2" />
                               Mark as In Progress
                             </DropdownMenuItem>
                           )}
 
                           {(order.status === 'confirmed' || order.status === 'in_progress') && (
-                            <DropdownMenuItem onClick={() => handleStatusChange('completed')}>
+                            <DropdownMenuItem 
+                              onClick={() => handleStatusChange('completed')}
+                              disabled={!order?.assigned_to}
+                            >
                               <CheckCircle2 className="h-4 w-4 mr-2" />
                               Mark as Completed
                             </DropdownMenuItem>
@@ -662,6 +786,33 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
         </div>
       </div>
 
+      {/* Unassigned Alert */}
+      {!order.assigned_to && (
+        <div className="mx-4 sm:mx-6 mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="h-5 w-5 text-yellow-600 flex-shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <h3 className="text-sm font-semibold text-yellow-900 mb-1">Order Unassigned</h3>
+              <p className="text-sm text-yellow-800">
+                This order has not been assigned to any agent yet. Please assign an agent to proceed with the order.
+              </p>
+              {isMobile && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    assignedAgentRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                  }}
+                  className="mt-3 bg-white hover:bg-yellow-100 text-yellow-900 border-yellow-300"
+                >
+                  Assign Now
+                </Button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Main Content */}
       <div className="px-4 sm:px-6 py-6">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -702,20 +853,33 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
                   </div>
                   <div className="flex flex-col">
                     <span className="text-xs uppercase tracking-wider font-bold text-muted-foreground opacity-70">Service Location</span>
-                    <span className="text-sm font-semibold capitalize text-foreground">{order.area || 'N/A'}, {order.city || 'N/A'}</span>
+                    <span className="text-sm font-semibold capitalize text-foreground">{order.address.area || 'N/A'}, {order.address.city || 'N/A'}</span>
                   </div>
                 </div>
 
-                <div className="flex items-start gap-3">
-                  <div className="p-2 bg-blue-50 rounded-full flex-shrink-0">
-                    <Calendar1Icon className="h-4 w-4 text-blue-600" />
+                <div className="flex items-start gap-3 justify-between">
+                  <div className="flex items-start gap-3">
+                    <div className="p-2 bg-blue-50 rounded-full flex-shrink-0">
+                      <Calendar1Icon className="h-4 w-4 text-blue-600" />
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="text-xs uppercase tracking-wider font-bold text-muted-foreground opacity-70">Scheduled Time</span>
+                      <span className="text-sm font-semibold text-foreground">
+                        {formatDate(order.booking_date)} at {formatTime(order.booking_time_from)} - {formatTime(order.booking_time_to)}
+                      </span>
+                    </div>
                   </div>
-                  <div className="flex flex-col">
-                    <span className="text-xs uppercase tracking-wider font-bold text-muted-foreground opacity-70">Scheduled Time</span>
-                    <span className="text-sm font-semibold text-foreground">
-                      {formatDate(order.booking_date)} at {formatTime(order.booking_time_from)} - {formatTime(order.booking_time_to)}
-                    </span>
-                  </div>
+                  {isEditable && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleOpenBookingEdit}
+                      className="h-8 -mt-1"
+                    >
+                      <CalendarClock className="h-4 w-4 mr-1" />
+                      <span className=" md:inline">Edit</span>
+                    </Button>
+                  )}
                 </div>
               </div>
 
@@ -825,7 +989,7 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
                     value="reassignments"
                     className="rounded-none border-b-2 cursor-pointer border-transparent data-[state=active]:border-foreground data-[state=active]:bg-transparent"
                   >
-                    Agents
+                    Assignments
                   </TabsTrigger>
                 </TabsList>
 
@@ -845,9 +1009,9 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
                               <VehicleIcon vehicleType={item.vehicle_type} size={40} className="text-gray-600" />
                             </div>
                             <div className="flex-1 min-w-0">
-                              <h4 className="font-medium mb-2">{item.package_name}</h4>
+                              <h4 className="font-semibold text-sm mb-2">{item.package_name}</h4>
                               <div className="text-sm  space-y-1">
-                                <div>{item.package.name}</div>
+                                <div>{item.description}</div>
                                 <div className="flex items-center gap-2 flex-wrap">
                                   <span className="capitalize">{item.vehicle_type}</span>
                                   {item.brand && item.model && (
@@ -1080,7 +1244,7 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
               </Tabs>
             </div>
 
-            <div className="p-4 border rounded-lg">
+            <div className="p-4 border rounded-lg bg-slate-50">
               {/* Payment Details */}
               <div >
                 <div className="flex items-center justify-between mb-4">
@@ -1212,7 +1376,7 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
           {/* Right Column - Sidebar */}
           <div className="space-y-6">
             {/* Assigned Agent */}
-            <div className="border rounded-lg">
+            <div ref={assignedAgentRef} className="border rounded-lg">
               <div className="p-4 border-b">
                 <h3 className="font-semibold">Assigned Agent</h3>
               </div>
@@ -1352,8 +1516,11 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
             <div className="border rounded-lg">
               <div className="p-4 border-b flex items-center justify-between">
                 <h3 className="font-semibold">Order Note</h3>
-                {!editingNote ? (
-                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setEditingNote(true)}>
+                {isEditable && !editingNote ? (
+                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => {
+                    setNoteText(order.notes || '');
+                    setEditingNote(true);
+                  }}>
                     <Edit className="h-4 w-4" />
                   </Button>
                 ) : null}
@@ -1381,7 +1548,7 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
                     </div>
                   </div>
                 ) : (
-                  <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+                  <p className="text-sm font-mono whitespace-pre-wrap">
                     {order.notes || 'No notes added'}
                   </p>
                 )}
@@ -1402,7 +1569,6 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
           await fetchOrderDetails(true); // Pass true to trigger onUpdate
           // Fetch timeline in background without blocking
           setTimeout(() => fetchTimeline(), 0);
-          toast.success('Order updated successfully');
         }}
       />
 
@@ -1442,7 +1608,10 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
       </AlertDialog>
 
       {/* Status Change Confirmation Dialog */}
-      <AlertDialog open={isStatusConfirmOpen} onOpenChange={setIsStatusConfirmOpen}>
+      <AlertDialog open={isStatusConfirmOpen} onOpenChange={(open) => {
+        setIsStatusConfirmOpen(open);
+        if (!open) setPaymentReceived(false); // Reset checkbox when dialog closes
+      }}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Mark Order as Completed</AlertDialogTitle>
@@ -1451,7 +1620,7 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
             </AlertDialogDescription>
           </AlertDialogHeader>
 
-          <div className="py-4">
+          <div className="py-4 space-y-4">
             <div className="rounded-lg bg-yellow-50 border border-yellow-200 p-4">
               <div className="flex gap-3">
                 <div className="flex-shrink-0">
@@ -1467,13 +1636,35 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
                 </div>
               </div>
             </div>
+
+            <div className="rounded-lg bg-blue-50 border border-blue-200 p-4">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium text-blue-900">Order Amount:</span>
+                <span className="text-lg font-bold text-blue-900">{formatCurrency(order?.total_amount || 0)}</span>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-3 p-4 border rounded-lg bg-white">
+              <Checkbox
+                id="payment-received"
+                checked={paymentReceived}
+                onCheckedChange={setPaymentReceived}
+                disabled={changingStatus}
+              />
+              <label
+                htmlFor="payment-received"
+                className="text-sm font-medium leading-none cursor-pointer select-none"
+              >
+                I confirm that the payment of {formatCurrency(order?.total_amount || 0)} has been received for this order
+              </label>
+            </div>
           </div>
 
           <AlertDialogFooter>
             <AlertDialogCancel disabled={changingStatus}>Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => performStatusChange(pendingStatus)}
-              disabled={changingStatus}
+              disabled={changingStatus || !paymentReceived}
               className="bg-green-600 hover:bg-green-700"
             >
               {changingStatus && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
@@ -1482,6 +1673,218 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Quick Booking Edit - Mobile (Drawer) */}
+      <Drawer open={isBookingEditOpen && isMobile} onOpenChange={setIsBookingEditOpen}>
+        <DrawerContent className="max-h-[85vh]">
+          <DrawerHeader className="px-4">
+            <DrawerTitle>Edit Booking Time</DrawerTitle>
+            <DrawerDescription>
+              Update the scheduled date and time for this order
+            </DrawerDescription>
+          </DrawerHeader>
+
+          <div className="px-4 pb-4 space-y-4 overflow-y-auto">
+            <div>
+              <Label className="mb-2">Booking Date *</Label>
+              <DatePicker
+                value={bookingDate}
+                onChange={setBookingDate}
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label className="mb-2">From *</Label>
+                <Select
+                  value={bookingTimeFrom}
+                  onValueChange={(value) => {
+                    setBookingTimeFrom(value);
+                    // Auto-calculate toTime (60 minutes later)
+                    if (value) {
+                      const [hours, minutes] = value.split(':').map(Number);
+                      const fromDate = new Date();
+                      fromDate.setHours(hours, minutes);
+                      fromDate.setMinutes(fromDate.getMinutes() + 60);
+                      const toHours = String(fromDate.getHours()).padStart(2, '0');
+                      const toMinutes = String(fromDate.getMinutes()).padStart(2, '0');
+                      setBookingTimeTo(`${toHours}:${toMinutes}`);
+                    }
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select time">
+                      {bookingTimeFrom ? generateTimeOptions().find(t => t.value === bookingTimeFrom)?.label || bookingTimeFrom : "Select time"}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent className="max-h-60 overflow-y-auto">
+                    {generateTimeOptions().map((time) => (
+                      <SelectItem key={time.value} value={time.value}>
+                        {time.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label className="mb-2">To *</Label>
+                <Select
+                  value={bookingTimeTo}
+                  onValueChange={setBookingTimeTo}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select time">
+                      {bookingTimeTo ? generateTimeOptions().find(t => t.value === bookingTimeTo)?.label || bookingTimeTo : "Select time"}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent className="max-h-60 overflow-y-auto">
+                    {generateTimeOptions()
+                      .filter((time) => {
+                        if (!bookingTimeFrom) return true;
+                        const [hours, minutes] = time.value.split(':').map(Number);
+                        const [fromHours, fromMinutes] = bookingTimeFrom.split(':').map(Number);
+                        const timeInMinutes = hours * 60 + minutes;
+                        const fromTimeInMinutes = fromHours * 60 + fromMinutes;
+                        return timeInMinutes > fromTimeInMinutes;
+                      })
+                      .map((time) => (
+                        <SelectItem key={time.value} value={time.value}>
+                          {time.label}
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="flex gap-2 pt-2">
+              <Button
+                variant="outline"
+                onClick={() => setIsBookingEditOpen(false)}
+                disabled={updatingBooking}
+                className="flex-1"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleSaveBooking}
+                disabled={updatingBooking}
+                className="flex-1"
+              >
+                {updatingBooking && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                Save Changes
+              </Button>
+            </div>
+          </div>
+        </DrawerContent>
+      </Drawer>
+
+      {/* Quick Booking Edit - Desktop (Dialog) */}
+      <Dialog open={isBookingEditOpen && !isMobile} onOpenChange={setIsBookingEditOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit Booking Time</DialogTitle>
+            <DialogDescription>
+              Update the scheduled date and time for this order
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            <div>
+              <Label className="mb-2">Booking Date *</Label>
+              <DatePicker
+                value={bookingDate}
+                onChange={setBookingDate}
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label className="mb-2">From *</Label>
+                <Select
+                  value={bookingTimeFrom}
+                  onValueChange={(value) => {
+                    setBookingTimeFrom(value);
+                    // Auto-calculate toTime (60 minutes later)
+                    if (value) {
+                      const [hours, minutes] = value.split(':').map(Number);
+                      const fromDate = new Date();
+                      fromDate.setHours(hours, minutes);
+                      fromDate.setMinutes(fromDate.getMinutes() + 60);
+                      const toHours = String(fromDate.getHours()).padStart(2, '0');
+                      const toMinutes = String(fromDate.getMinutes()).padStart(2, '0');
+                      setBookingTimeTo(`${toHours}:${toMinutes}`);
+                    }
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select time">
+                      {bookingTimeFrom ? generateTimeOptions().find(t => t.value === bookingTimeFrom)?.label || bookingTimeFrom : "Select time"}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent className="max-h-60 overflow-y-auto">
+                    {generateTimeOptions().map((time) => (
+                      <SelectItem key={time.value} value={time.value}>
+                        {time.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label className="mb-2">To *</Label>
+                <Select
+                  value={bookingTimeTo}
+                  onValueChange={setBookingTimeTo}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select time">
+                      {bookingTimeTo ? generateTimeOptions().find(t => t.value === bookingTimeTo)?.label || bookingTimeTo : "Select time"}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent className="max-h-60 overflow-y-auto">
+                    {generateTimeOptions()
+                      .filter((time) => {
+                        if (!bookingTimeFrom) return true;
+                        const [hours, minutes] = time.value.split(':').map(Number);
+                        const [fromHours, fromMinutes] = bookingTimeFrom.split(':').map(Number);
+                        const timeInMinutes = hours * 60 + minutes;
+                        const fromTimeInMinutes = fromHours * 60 + fromMinutes;
+                        return timeInMinutes > fromTimeInMinutes;
+                      })
+                      .map((time) => (
+                        <SelectItem key={time.value} value={time.value}>
+                          {time.label}
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="flex gap-2 pt-2">
+              <Button
+                variant="outline"
+                onClick={() => setIsBookingEditOpen(false)}
+                disabled={updatingBooking}
+                className="flex-1"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleSaveBooking}
+                disabled={updatingBooking}
+                className="flex-1"
+              >
+                {updatingBooking && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                Save Changes
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Feedback Comments View Dialog */}
       <AlertDialog open={isFeedbackViewOpen} onOpenChange={setIsFeedbackViewOpen}>

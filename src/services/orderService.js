@@ -153,6 +153,16 @@ const orderService = {
   },
 
   /**
+   * Update order note
+   * @param {string} id - Order ID
+   * @param {string} notes - Order notes
+   */
+  updateOrderNote: async (id, notes) => {
+    const response = await apiClient.put(`/orders/${id}`, { notes });
+    return response.data;
+  },
+
+  /**
    * Helper: Get vehicle type from brand and model
    * @param {string} brand - Car brand
    * @param {string} model - Car model

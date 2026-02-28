@@ -106,7 +106,6 @@ apiClient.interceptors.response.use(
 
       switch (status) {
         case 400:
-          toast.error(message || 'Bad request');
           break;
         case 403:
           toast.error('You do not have permission to perform this action');

@@ -167,7 +167,7 @@ const SubscriptionDetail = () => {
     try {
       await subscriptionService.updatePayment(id, {
         payment_amount: parseFloat(paymentAmount),
-        payment_date: paymentDate || new Date().toISOString().split('T')[0],
+        payment_date: paymentDate ? new Date(paymentDate + 'T00:00:00Z').toISOString() : null,
         payment_method: paymentMethod,
       });
       toast.success('Payment updated successfully');

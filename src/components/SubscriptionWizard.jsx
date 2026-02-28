@@ -78,6 +78,7 @@ const SubscriptionWizard = ({ open, onOpenChange, onSuccess, customerId = null, 
   const [currentStep, setCurrentStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [showCustomerForm, setShowCustomerForm] = useState(false);
+  const [newCustomerInitialData, setNewCustomerInitialData] = useState(null);
   const [customerSearchTerm, setCustomerSearchTerm] = useState('');
   const [customerSearchLoading, setCustomerSearchLoading] = useState(false);
   const [showCustomerSuggestions, setShowCustomerSuggestions] = useState(false);
@@ -771,14 +772,14 @@ const SubscriptionWizard = ({ open, onOpenChange, onSuccess, customerId = null, 
     setLoading(true);
     try {
       const subscriptionData = {
-        customer_id: selectedCustomer.id,
+        customer_id: parseInt(selectedCustomer.id, 10),
         vehicle_type: vehicleType,
         start_date: startDate,
         months_duration: monthsDuration,
         area: address.area,
         map_url: address.map_url,
         packages: packageItems.map(item => ({
-          package_id: item.package_id,
+          package_id: parseInt(item.package_id, 10),
           quantity: item.quantity,
           unit_price: item.unit_price,
           price: item.price,
@@ -790,7 +791,7 @@ const SubscriptionWizard = ({ open, onOpenChange, onSuccess, customerId = null, 
         })),
 
         addons: addonItems.map(item => ({
-          addon_id: item.addon_id,
+          addon_id: parseInt(item.addon_id, 10),
           quantity: 1, // Always 1, pricing based on wash count instead
           unit_price: item.unit_price,
           price: item.price, // Already calculated: unit_price × wash_count - discount
@@ -1022,6 +1023,16 @@ const SubscriptionWizard = ({ open, onOpenChange, onSuccess, customerId = null, 
                                 size="sm"
                                 onClick={() => {
                                   setShowCustomerSuggestions(false);
+                                  // Check if search term looks like a phone number (digits, spaces, +, -, parentheses)
+                                  const phonePattern = /^[\d\s+\-()]+$/;
+                                  const isPhone = phonePattern.test(customerSearchTerm.trim());
+                                  
+                                  if (isPhone) {
+                                    // Prefill phone number
+                                    setNewCustomerInitialData({ phone: customerSearchTerm.trim() });
+                                  } else {
+                                    setNewCustomerInitialData(null);
+                                  }
                                   setShowCustomerForm(true);
                                 }}
                                 className="gap-2"
@@ -1932,7 +1943,12 @@ const SubscriptionWizard = ({ open, onOpenChange, onSuccess, customerId = null, 
 
           {/* Nested Sub-dialogs */}
           {/* Customer Form Sheet - App Page Feel on Mobile */}
-          <Sheet open={showCustomerForm} onOpenChange={setShowCustomerForm}>
+          <Sheet open={showCustomerForm} onOpenChange={(open) => {
+            setShowCustomerForm(open);
+            if (!open) {
+              setNewCustomerInitialData(null);
+            }
+          }}>
             <SheetContent
               side={isMobile ? "bottom" : "right"}
               className={`w-full ${isMobile ? 'h-full' : 'sm:max-w-xl'} p-0 flex flex-col bg-gray-50 border-none z-50`}
@@ -1964,9 +1980,11 @@ const SubscriptionWizard = ({ open, onOpenChange, onSuccess, customerId = null, 
               <div className="flex-1 overflow-y-auto p-4 pb-20">
                 <CustomerForm
                   ref={customerFormRef}
+                  customer={newCustomerInitialData}
                   showActions={false}
                   onSuccess={(newCustomer) => {
                     setShowCustomerForm(false);
+                    setNewCustomerInitialData(null);
                     // Auto-select the new customer
                     if (newCustomer && newCustomer.customer) {
                       const customer = newCustomer.customer;
@@ -1987,7 +2005,10 @@ const SubscriptionWizard = ({ open, onOpenChange, onSuccess, customerId = null, 
                     setCustomerSearchTerm('');
                     toast.success('Customer added and selected');
                   }}
-                  onCancel={() => setShowCustomerForm(false)}
+                  onCancel={() => {
+                    setShowCustomerForm(false);
+                    setNewCustomerInitialData(null);
+                  }}
                 />
               </div>
             </SheetContent>

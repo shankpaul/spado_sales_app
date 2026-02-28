@@ -632,11 +632,11 @@ const Orders = () => {
                   className="bg-white shadow-sm border border-gray-100 rounded-xl p-4 active:scale-[0.98] active:bg-gray-50 transition-all duration-200"
                 >
                   <div className="flex items-center gap-4">
-                    <LetterAvatar name={order.customer_name} size="sm" />
+                    <LetterAvatar name={order.customer?.name} size="sm" />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between">
                         <div className="font-bold text-base truncate capitalize">
-                          {order.customer_name}
+                          {order.customer?.name}
                         </div>
                         <div className="font-bold text-primary whitespace-nowrap">
                           {formatCurrency(order.total_amount)}
@@ -730,8 +730,8 @@ const Orders = () => {
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2">
-                          <LetterAvatar name={order.customer_name} size="xs" />
-                          <div className="font-medium capitalize">{order.customer_name}</div>
+                          <LetterAvatar name={order.customer?.name} size="xs" />
+                          <div className="font-medium capitalize">{order.customer?.name}</div>
                         </div>
                       </td>
                       <td className="px-4 py-3">

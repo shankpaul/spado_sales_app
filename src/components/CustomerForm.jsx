@@ -236,9 +236,9 @@ const CustomerForm = forwardRef(({ customer = null, onSuccess, onCancel, showAct
     // if (!formData.name.trim()) {
     //   errors.name = 'Name is required';
     // }
-    if (!formData.area || !formData.area.trim()) {
-      errors.area = 'Area / Locality is required';
-    }
+    // if (!formData.area || !formData.area.trim()) {
+    //   errors.area = 'Area / Locality is required';
+    // }
 
     if (!formData.phone.trim()) {
       errors.phone = 'Phone number is required';
@@ -418,9 +418,6 @@ const CustomerForm = forwardRef(({ customer = null, onSuccess, onCancel, showAct
               emptyText={formData.state ? 'No districts' : 'Select state first'}
             />
           </div>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="space-y-2">
             <Label className="flex items-center gap-2">
               <MapPin className="h-4 w-4 text-primary/70" />
@@ -434,10 +431,14 @@ const CustomerForm = forwardRef(({ customer = null, onSuccess, onCancel, showAct
               emptyText={formData.state ? 'No cities' : 'Select state first'}
             />
           </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          
           <div className="space-y-2">
             <Label htmlFor="area" className="flex items-center gap-2">
               <MapPin className="h-4 w-4 text-primary/70" />
-              Area / Locality <span className="text-destructive">*</span>
+              Area / Locality
             </Label>
             <div className="relative">
               <Input
@@ -503,7 +504,7 @@ const CustomerForm = forwardRef(({ customer = null, onSuccess, onCancel, showAct
               )}
             </div>
             <p className="text-[10px] text-muted-foreground italic px-1">
-              Type to search areas from OpenStreetMap or select from suggestions
+              Type customer location or select from suggestions
             </p>
             {formErrors.area && (
               <p className="text-xs text-destructive font-medium pl-1">{formErrors.area}</p>

@@ -65,6 +65,7 @@ import {
   PenIcon,
   ArrowLeft,
   LoaderCircle,
+  AlertCircle,
 } from 'lucide-react';
 
 /**
@@ -84,6 +85,7 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
   const [identifyModel, setIdentifyModel] = useState('');
   const [deletePackageDialog, setDeletePackageDialog] = useState({ open: false, index: null });
   const [showCustomerForm, setShowCustomerForm] = useState(false);
+  const [newCustomerInitialData, setNewCustomerInitialData] = useState(null);
   const [customerSearchTerm, setCustomerSearchTerm] = useState('');
   const [customerSearchLoading, setCustomerSearchLoading] = useState(false);
   const [showCustomerSuggestions, setShowCustomerSuggestions] = useState(false);
@@ -124,6 +126,7 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
 
   // Validation errors
   const [errors, setErrors] = useState({});
+  const [submitError, setSubmitError] = useState('');
 
   // Load draft from localStorage on mount
   useEffect(() => {
@@ -371,6 +374,20 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
     }
   };
 
+  // Extract date in YYYY-MM-DD format from datetime string
+  const extractDateFromDateTime = (dateTimeString) => {
+    if (!dateTimeString) return '';
+    try {
+      const date = new Date(dateTimeString);
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    } catch {
+      return '';
+    }
+  };
+
   // Fetch and prefill order data for editing
   const fetchOrderData = async () => {
     setLoading(true);
@@ -405,8 +422,8 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
 
         // Set packages with all necessary fields
         const orderPackages = order.packages?.map(pkg => ({
-          package_id: String(pkg.package.id), // Convert to string for Select component
-          package_name: pkg.package.name,
+          package_id: String(pkg.package_id), // Convert to string for Select component
+          package_name: pkg.package_name || pkg.name,
           vehicle_type: pkg.vehicle_type,
           quantity: pkg.quantity || 1,
           unit_price: parseFloat(pkg.price) || 0,
@@ -414,13 +431,13 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
           discount_type: pkg.discount_type,
           total_price: parseFloat(pkg.total_price) || 0,
           notes: pkg.notes || '',
-          package: pkg.package, // Include full package details
+          package: pkg, // Include full package details
         })) || [];
         setPackageItems(orderPackages);
 
         // Set addons
         const orderAddons = order.addons?.map(addon => ({
-          addon_id: String(addon.addon.id), // Convert to string for Select component
+          addon_id: String(addon.addon_id), // Convert to string for Select component
           addon_name: addon.addon_name,
           quantity: addon.quantity || 1,
           unit_price: parseFloat(addon.price) || 0,
@@ -432,20 +449,20 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
         setAddonItems(orderAddons);
 
         // Set booking details
-        setBookingDate(order.booking_date || '');
+        setBookingDate(extractDateFromDateTime(order.booking_date));
         setBookingTimeFrom(extractTimeFromDateTime(order.booking_time_from));
         setBookingTimeTo(extractTimeFromDateTime(order.booking_time_to));
 
         // Set agent
         setSelectedAgent(order.assigned_to?.id?.toString() || '');
 
-        // Set address
+        // Set address from order.address object
         setAddress({
-          area: order.area || '',
-          city: order.city || '',
-          district: order.district || '',
-          state: order.state || '',
-          map_link: order.map_link || '',
+          area: order.address?.area || '',
+          city: order.address?.city || '',
+          district: order.address?.district || '',
+          state: order.address?.state || '',
+          map_link: order.address?.map_link || '',
         });
 
         // Set notes
@@ -499,6 +516,7 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
     setAddress({ area: '', city: '', district: '', state: '', map_link: '' });
     setNotes('');
     setOrderStatus('');
+    setSubmitError('');
     setErrors({});
   };
 
@@ -567,6 +585,7 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
 
   const handleBack = () => {
     setCurrentStep(currentStep - 1);
+    setSubmitError(''); // Clear submit errors when navigating back
   };
 
   // Package item handlers
@@ -703,37 +722,45 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
 
   // Submit handlers
   const handleSubmit = async (status = null) => {
-    if (!validateStep(4)) return;
+    setSubmitError(''); // Clear previous errors
+    const isValid = validateStep(4);
+    if (!isValid) {
+      return;
+    }
     // If no status provided and in edit mode, keep current status
     const finalStatus = status || orderStatus || 'draft';
-    console.log('Submitting order with status:', finalStatus);
     setLoading(true);
     try {
+      // Convert time to ISO 8601 datetime format with timezone (RFC3339)
+      const bookingDateISO = bookingDate ? `${bookingDate}T00:00:00Z` : null;
+      const bookingTimeFromISO = bookingTimeFrom ? `${bookingDate}T${bookingTimeFrom}:00Z` : null;
+      const bookingTimeToISO = bookingTimeTo ? `${bookingDate}T${bookingTimeTo}:00Z` : null;
+
       const orderData = {
-        customer_id: selectedCustomer.id,
-        customer_phone: customerPhone || selectedCustomer.phone, // Order-specific phone
+        customer_id: parseInt(selectedCustomer.id, 10),
+        contact_phone: customerPhone || selectedCustomer.phone, // Order-specific phone
         status: finalStatus,
-        booking_date: bookingDate,
-        booking_time_from: bookingTimeFrom,
-        booking_time_to: bookingTimeTo,
-        agent_id: selectedAgent,
+        booking_date: bookingDateISO,
+        booking_time_from: bookingTimeFromISO,
+        booking_time_to: bookingTimeToISO,
+        assigned_to_id: selectedAgent && selectedAgent !== 'unassigned' ? parseInt(selectedAgent, 10) : null,
         notes,
         packages: packageItems.map((item) => ({
-          package_id: item.package_id,
+          package_id: parseInt(item.package_id, 10),
           // brand: item.brand,
           // model: item.model,
           vehicle_type: item.vehicle_type,
           quantity: item.quantity,
-          unit_price: item.unit_price,
+          price: item.unit_price,
           discount_type: item.discount_type,
-          discount_value: item.discount_value,
+          discount: item.discount_value || 0,
         })),
         addons: addonItems.map((item) => ({
-          addon_id: item.addon_id,
+          addon_id: parseInt(item.addon_id, 10),
           quantity: item.quantity,
-          unit_price: item.unit_price,
+          price: item.unit_price,
           discount_type: item.discount_type,
-          discount_value: item.discount_value,
+          discount: item.discount_value || 0,
         })),
         ...address
       };
@@ -751,7 +778,9 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
       onSuccess();
     } catch (error) {
       console.error('Error saving order:', error);
-      toast.error(error.response?.data?.message || 'Failed to save order');
+      const errorMessage = error.response?.data?.message || error.message || 'Failed to save order';
+      setSubmitError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -857,6 +886,16 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
                     size="sm"
                     onClick={() => {
                       setShowCustomerSuggestions(false);
+                      // Check if search term looks like a phone number (digits, spaces, +, -, parentheses)
+                      const phonePattern = /^[\d\s+\-()]+$/;
+                      const isPhone = phonePattern.test(customerSearchTerm.trim());
+                      
+                      if (isPhone) {
+                        // Prefill phone number
+                        setNewCustomerInitialData({ phone: customerSearchTerm.trim() });
+                      } else {
+                        setNewCustomerInitialData(null);
+                      }
                       setShowCustomerForm(true);
                     }}
                     className="gap-2"
@@ -1410,6 +1449,23 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
 
     return (
       <div className="space-y-4">
+        {submitError && (
+          <div className="flex items-start gap-3 p-4 bg-destructive/10 border border-destructive/20 rounded-lg">
+            <AlertCircle className="h-5 w-5 text-destructive mt-0.5 flex-shrink-0" />
+            <div className="flex-1">
+              <p className="text-sm font-medium text-destructive">Error submitting order</p>
+              <p className="text-sm text-destructive/90 mt-1">{submitError}</p>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 w-6 p-0 hover:bg-destructive/20"
+              onClick={() => setSubmitError('')}
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+        )}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className='space-y-4'>
             <div className='flex gap-2'>
@@ -1952,7 +2008,12 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
           </Dialog>
 
           {/* Customer Form Sheet - App Page Feel on Mobile */}
-          <Sheet open={showCustomerForm} onOpenChange={setShowCustomerForm}>
+          <Sheet open={showCustomerForm} onOpenChange={(open) => {
+            setShowCustomerForm(open);
+            if (!open) {
+              setNewCustomerInitialData(null);
+            }
+          }}>
             <SheetContent
               side={isMobile ? "bottom" : "right"}
               className={`w-full ${isMobile ? 'h-full' : 'sm:max-w-xl'} p-0 flex flex-col bg-gray-50 border-none z-50`}
@@ -1984,9 +2045,11 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
               <div className="flex-1 overflow-y-auto p-4 pb-20">
                 <CustomerForm
                   ref={customerFormRef}
+                  customer={newCustomerInitialData}
                   showActions={false}
                   onSuccess={(newCustomer) => {
                     setShowCustomerForm(false);
+                    setNewCustomerInitialData(null);
                     // Auto-select the new customer
                     if (newCustomer && newCustomer.customer) {
                       const customer = newCustomer.customer;
@@ -2008,7 +2071,10 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
                       });
                     }
                   }}
-                  onCancel={() => setShowCustomerForm(false)}
+                  onCancel={() => {
+                    setShowCustomerForm(false);
+                    setNewCustomerInitialData(null);
+                  }}
                 />
               </div>
             </SheetContent>

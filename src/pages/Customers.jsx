@@ -85,6 +85,7 @@ const Customers = () => {
 
   // Dialog states
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [newCustomerInitialData, setNewCustomerInitialData] = useState(null);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [isOrderWizardOpen, setIsOrderWizardOpen] = useState(false);
@@ -201,8 +202,9 @@ const Customers = () => {
   }, [isMobile, loadMore]);
 
   // Open form for add/edit
-  const handleOpenForm = (customer = null) => {
+  const handleOpenForm = (customer = null, initialData = null) => {
     setSelectedCustomer(customer);
+    setNewCustomerInitialData(initialData);
     setIsFormOpen(true);
   };
 
@@ -366,8 +368,42 @@ const Customers = () => {
         ) : customers.length === 0 ? (
           <div className="text-center py-20 bg-white rounded-xl border border-dashed border-gray-200">
             <Users className="h-12 w-12 mx-auto mb-3 text-gray-300" />
-            <p className="text-muted-foreground font-medium">No customers found</p>
-            <Button variant="link" onClick={() => { setSearchTerm(''); setDateFilter('all'); }}>Clear filters</Button>
+            {searchTerm ? (
+              <>
+                <p className="text-muted-foreground font-medium mb-1">No customers found</p>
+                <p className="text-sm text-muted-foreground mb-4">No results for "{searchTerm}"</p>
+                <div className="flex items-center justify-center gap-2">
+                  <Button 
+                    variant="outline" 
+                    onClick={() => { setSearchTerm(''); setDateFilter('all'); }}
+                  >
+                    Clear Search
+                  </Button>
+                  <Button 
+                    onClick={() => {
+                      // Check if search term looks like a phone number
+                      const phonePattern = /^[\d\s+\-()]+$/;
+                      const isPhone = phonePattern.test(searchTerm.trim());
+                      
+                      if (isPhone) {
+                        handleOpenForm(null, { phone: searchTerm.trim() });
+                      } else {
+                        handleOpenForm(null, null);
+                      }
+                    }}
+                    className="gap-2"
+                  >
+                    <Plus className="h-4 w-4" />
+                    Create New Customer
+                  </Button>
+                </div>
+              </>
+            ) : (
+              <>
+                <p className="text-muted-foreground font-medium">No customers found</p>
+                <Button variant="link" onClick={() => { setSearchTerm(''); setDateFilter('all'); }}>Clear filters</Button>
+              </>
+            )}
           </div>
         ) : (
           <>
@@ -391,7 +427,7 @@ const Customers = () => {
                           <LetterAvatar name={customer.name} size="xs" />
                           <button
                             onClick={() => handleViewDetails(customer)}
-                            className="font-medium hover:text-primary hover:underline cursor-pointer transition-colors"
+                            className="font-medium capitalize hover:text-primary hover:underline cursor-pointer transition-colors"
                           >
                             {customer.name || customer.phone}
                           </button>
@@ -642,7 +678,12 @@ const Customers = () => {
       )}
 
       {/* Customer Form Sheet - App Page Feel on Mobile */}
-      <Sheet open={isFormOpen} onOpenChange={setIsFormOpen}>
+      <Sheet open={isFormOpen} onOpenChange={(open) => {
+        setIsFormOpen(open);
+        if (!open) {
+          setNewCustomerInitialData(null);
+        }
+      }}>
         <SheetContent
           side={isMobile ? "bottom" : "right"}
           className={`w-full ${isMobile ? 'h-full' : 'sm:max-w-2xl'} p-0 flex flex-col bg-gray-50 border-none`}
@@ -679,14 +720,17 @@ const Customers = () => {
           <div className="flex-1 overflow-y-auto p-4 pb-20">
             <CustomerForm
               ref={formRef}
-              customer={selectedCustomer}
+              customer={selectedCustomer || newCustomerInitialData}
               showActions={false}
               onSuccess={(result) => {
                 setIsFormOpen(false);
+                setNewCustomerInitialData(null);
                 fetchCustomers();
-                toast.success(selectedCustomer ? 'Customer updated successfully' : 'Customer created successfully');
               }}
-              onCancel={() => setIsFormOpen(false)}
+              onCancel={() => {
+                setIsFormOpen(false);
+                setNewCustomerInitialData(null);
+              }}
             />
           </div>
         </SheetContent>

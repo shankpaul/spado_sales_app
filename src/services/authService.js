@@ -20,9 +20,10 @@ const authService = {
       const { user } = response.data;
       
       // Extract token from Authorization header
-      const authHeader = response.headers['authorization'];
-      const accessToken = authHeader?.replace('Bearer ', '');
+      // const authHeader = response.headers['authorization'];
+      // const accessToken = authHeader?.replace('Bearer ', '');
 
+      const accessToken = response.data.access_token; // Assuming token is returned in response body
       if (!accessToken) {
         throw new Error('No token received from server');
       }
