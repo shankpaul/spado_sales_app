@@ -47,7 +47,7 @@ const CustomerContact = ({
       >
         <span>{phone}</span>
         {showIcon && (
-          <Phone className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+          <Phone className="h-3 w-3 transition-opacity" />
         )}
       </Badge>
 

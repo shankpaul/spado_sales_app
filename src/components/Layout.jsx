@@ -28,6 +28,7 @@ import {
   Smartphone,
   Download,
   Briefcase,
+  PackageOpen,
 } from 'lucide-react';
 import usePWAInstall from '../hooks/usePWAInstall';
 import Logo from './Logo';
@@ -80,6 +81,7 @@ const Layout = ({ children }) => {
     const roleBasedItems = {
       admin: [
         { name: 'Customers', href: '/customers', icon: Users },
+        { name: 'Enquiries', href: '/enquiries', icon: PackageOpen },
         { name: 'Orders', href: '/orders', icon: Calendar },
         { name: 'Subscriptions', href: '/subscriptions', icon: Calendar },
         { name: 'System Users', href: '/users', icon: UserCircle },
@@ -90,6 +92,7 @@ const Layout = ({ children }) => {
       ],
       sales_executive: [
         { name: 'Customers', href: '/customers', icon: Users },
+        { name: 'Enquiries', href: '/enquiries', icon: PackageOpen },
         { name: 'Orders', href: '/orders', icon: Calendar },
         { name: 'Subscriptions', href: '/subscriptions', icon: Calendar },
       ],

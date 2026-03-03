@@ -15,6 +15,8 @@ const Orders = lazy(() => import('./pages/Orders'));
 const OrderDetail = lazy(() => import('./pages/OrderDetail'));
 const Subscriptions = lazy(() => import('./pages/Subscriptions'));
 const SubscriptionDetail = lazy(() => import('./pages/SubscriptionDetail'));
+const Enquiries = lazy(() => import('./pages/Enquiries'));
+const EnquiryDetail = lazy(() => import('./pages/EnquiryDetail'));
 const Users = lazy(() => import('./pages/Users'));
 const Employees = lazy(() => import('./pages/Employees'));
 
@@ -115,6 +117,28 @@ function App() {
               <ProtectedRoute allowedRoles={['admin', 'sales_executive']}>
                 <Layout>
                   <SubscriptionDetail />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/enquiries"
+            element={
+              <ProtectedRoute allowedRoles={['admin', 'sales_executive']}>
+                <Layout>
+                  <Enquiries />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/enquiries/:id"
+            element={
+              <ProtectedRoute allowedRoles={['admin', 'sales_executive']}>
+                <Layout>
+                  <EnquiryDetail />
                 </Layout>
               </ProtectedRoute>
             }

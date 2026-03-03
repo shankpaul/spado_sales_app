@@ -14,10 +14,7 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
   timeout: 60000, // Increased to 60 seconds
-  headers: {
-    'Content-Type': 'application/json',
-    'Accept': 'application/json',
-  },
+  // Don't set default headers - let interceptor handle it based on request type
   // Retry configuration
   retry: 2,
   retryDelay: 1000,
@@ -44,10 +41,23 @@ apiClient.interceptors.request.use(
     const token = useAuthStore.getState().accessToken;
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
-    // Ensure JSON headers are always set
-    config.headers['Content-Type'] = 'application/json';
-    config.headers['Accept'] = 'application/json';
     }
+    
+    // Set appropriate headers based on request data type
+    if (config.data instanceof FormData) {
+      console.log('🎯 FormData detected - letting Axios set multipart headers');
+      // For FormData, Axios will automatically set Content-Type with boundary
+      // Just ensure we accept JSON responses
+      config.headers['Accept'] = 'application/json';
+    } else {
+      console.log('📝 Regular request - setting JSON headers');
+      // For regular requests, set JSON headers
+      config.headers['Content-Type'] = 'application/json';
+      config.headers['Accept'] = 'application/json';
+    }
+    
+    console.log('Request headers:', config.headers);
+    
     return config;
   },
   (error) => {
