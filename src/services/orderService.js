@@ -207,6 +207,74 @@ const orderService = {
     const maxDiscount = subtotal * 0.5;
     return discount >= 0 && discount <= maxDiscount;
   },
+
+  /**
+   * Update order with images
+   * @param {string} id - Order ID
+   * @param {Object} orderData - Order data to update (optional, can be null)
+   * @param {Object} images - Image files object
+   * @param {File[]} images.beforeImages - Before service images (multiple files)
+   * @param {File[]} images.afterImages - After service images (multiple files)
+   * @param {File} images.customerSignature - Customer signature (single file)
+   * @param {File} images.paymentProof - Payment proof (single file)
+   * @param {File} images.googleReviewImage - Google review screenshot (single file)
+   * @returns {Promise} Response with updated order including image URLs
+   * 
+   * @example
+   * // Upload images with order data
+   * await orderService.updateOrderWithImages('123', 
+   *   { notes: 'Service completed', payment_status: 'paid' },
+   *   { beforeImages: [file1, file2], afterImages: [file3] }
+   * );
+   * 
+   * @example
+   * // Upload only images without order data
+   * await orderService.updateOrderWithImages('123', null, { 
+   *   paymentProof: file 
+   * });
+   */
+  updateOrderWithImages: async (id, orderData = null, images = {}) => {
+    const formData = new FormData();
+
+    // Add JSON data as string in 'data' field (optional)
+    if (orderData && Object.keys(orderData).length > 0) {
+      formData.append('data', JSON.stringify(orderData));
+    }
+
+    // Add before images - IMPORTANT: Use 'before_images' NOT 'before_images[]'
+    // Multiple files are appended with the same field name
+    if (images.beforeImages && images.beforeImages.length > 0) {
+      images.beforeImages.forEach((file) => {
+        formData.append('before_images', file);
+      });
+    }
+
+    // Add after images - IMPORTANT: Use 'after_images' NOT 'after_images[]'
+    // Multiple files are appended with the same field name
+    if (images.afterImages && images.afterImages.length > 0) {
+      images.afterImages.forEach((file) => {
+        formData.append('after_images', file);
+      });
+    }
+
+    // Add single file uploads
+    if (images.customerSignature) {
+      formData.append('customer_signature', images.customerSignature);
+    }
+
+    if (images.paymentProof) {
+      formData.append('payment_proof', images.paymentProof);
+    }
+
+    if (images.googleReviewImage) {
+      formData.append('google_review_image', images.googleReviewImage);
+    }
+
+    // Send as multipart/form-data
+    // Note: Content-Type header will be set automatically by axios/fetch with the correct boundary
+    const response = await apiClient.put(`/orders/${id}`, formData);
+    return response.data;
+  },
 };
 
 export default orderService;

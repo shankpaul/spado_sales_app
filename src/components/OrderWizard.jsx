@@ -127,11 +127,19 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
   // Validation errors
   const [errors, setErrors] = useState({});
   const [submitError, setSubmitError] = useState('');
+  const [otherStepErrors, setOtherStepErrors] = useState([]);
+  const [submitAttempted, setSubmitAttempted] = useState(false);
 
   // Load draft from localStorage on mount
   useEffect(() => {
     if (open && !orderId) {
       loadDraft();
+    }
+    // Reset submit attempted state when dialog opens/closes
+    if (!open) {
+      setSubmitAttempted(false);
+      setErrors({});
+      setOtherStepErrors([]);
     }
   }, [open, orderId]);
 
@@ -518,6 +526,8 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
     setOrderStatus('');
     setSubmitError('');
     setErrors({});
+    setOtherStepErrors([]);
+    setSubmitAttempted(false);
   };
 
   // Close handler
@@ -529,63 +539,142 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
     onOpenChange(false);
   };
 
-  // Step validation
-  const validateStep = (step) => {
-    const newErrors = {};
+  // Get validation errors for a specific step (without setting state)
+  const getStepErrors = (step) => {
+    const stepErrors = {};
 
     if (step === 1) {
       if (!selectedCustomer) {
-        newErrors.customer = 'Please select a customer';
+        stepErrors.customer = 'Please select a customer';
       }
     }
 
     if (step === 2) {
       if (packageItems.length === 0) {
-        newErrors.packages = 'Please add at least one package';
+        stepErrors.packages = 'Please add at least one package';
       }
       packageItems.forEach((item, index) => {
-        if (!item.vehicle_type) newErrors[`package_${index}_vehicle_type`] = 'Required';
-        if (!item.package_id) newErrors[`package_${index}_package`] = 'Required';
-        if (!item.quantity || item.quantity < 1) newErrors[`package_${index}_quantity`] = 'Required';
+        if (!item.vehicle_type) stepErrors[`package_${index}_vehicle_type`] = 'Required';
+        if (!item.package_id) stepErrors[`package_${index}_package`] = 'Required';
+        if (!item.quantity || item.quantity < 1) stepErrors[`package_${index}_quantity`] = 'Required';
       });
     }
 
     if (step === 3) {
       // Validate addons if any are added
       addonItems.forEach((item, index) => {
-        if (!item.addon_id) newErrors[`addon_${index}_addon`] = 'Required';
-        if (!item.quantity || item.quantity < 1) newErrors[`addon_${index}_quantity`] = 'Required';
+        if (!item.addon_id) stepErrors[`addon_${index}_addon`] = 'Required';
+        if (!item.quantity || item.quantity < 1) stepErrors[`addon_${index}_quantity`] = 'Required';
       });
     }
 
     if (step === 4) {
-      if (!bookingDate) newErrors.bookingDate = 'Required';
-      if (!bookingTimeFrom) newErrors.bookingTimeFrom = 'Required';
-      if (!bookingTimeTo) newErrors.bookingTimeTo = 'Required';
-      if (!address.area) newErrors.area = 'Area is required';
+      if (!bookingDate) stepErrors.bookingDate = 'Required';
+      if (!bookingTimeFrom) stepErrors.bookingTimeFrom = 'Required';
+      if (!bookingTimeTo) stepErrors.bookingTimeTo = 'Required';
+      if (!address.area) stepErrors.area = 'Area is required';
 
       // Validate time range
       if (bookingTimeFrom && bookingTimeTo && bookingTimeFrom >= bookingTimeTo) {
-        newErrors.bookingTimeTo = 'End time must be after start time';
+        stepErrors.bookingTimeTo = 'End time must be after start time';
       }
     }
 
-    setErrors(newErrors);
+    return stepErrors;
+  };
+
+  // Check errors in all other steps and collect them
+  const checkOtherStepsErrors = () => {
+    const errorMessages = [];
+    
+    for (let step = 1; step <= 4; step++) {
+      if (step === currentStep) continue; // Skip current step
+      
+      const stepErrors = getStepErrors(step);
+      const errorCount = Object.keys(stepErrors).length;
+      
+      if (errorCount > 0) {
+        const stepName = ['Customer', 'Packages', 'Add-ons', 'Booking Details'][step - 1];
+        errorMessages.push({
+          step,
+          stepName,
+          message: `Step ${step} (${stepName}) has ${errorCount} error${errorCount > 1 ? 's' : ''}`,
+        });
+      }
+    }
+    
+    setOtherStepErrors(errorMessages);
+  };
+
+  // Step validation (only validate without showing errors unless submit attempted)
+  const validateStep = (step, showErrors = false) => {
+    const newErrors = getStepErrors(step);
+    
+    if (showErrors) {
+      setErrors(newErrors);
+      
+      // Also check other steps for errors to display alerts
+      if (Object.keys(newErrors).length === 0) {
+        checkOtherStepsErrors();
+      }
+    }
+    
     return Object.keys(newErrors).length === 0;
+  };
+
+  // Validate all steps and show errors
+  const validateAllSteps = () => {
+    let allValid = true;
+    let firstInvalidStep = null;
+
+    // Check all steps
+    for (let step = 1; step <= 4; step++) {
+      const stepErrors = getStepErrors(step);
+      if (Object.keys(stepErrors).length > 0) {
+        allValid = false;
+        if (firstInvalidStep === null) {
+          firstInvalidStep = step;
+        }
+      }
+    }
+
+    // If invalid, show errors and navigate to first invalid step
+    if (!allValid && firstInvalidStep !== null) {
+      setCurrentStep(firstInvalidStep);
+      const currentStepErrors = getStepErrors(firstInvalidStep);
+      setErrors(currentStepErrors);
+      checkOtherStepsErrors();
+    }
+
+    return allValid;
   };
 
   // Navigation handlers
   const handleNext = () => {
-    if (validateStep(currentStep)) {
-      const nextStep = currentStep + 1;
-      setCurrentStep(nextStep);
-      saveDraft(nextStep);
+    // Allow navigation without validation unless submit has been attempted
+    const nextStep = currentStep + 1;
+    setCurrentStep(nextStep);
+    
+    // If submit was attempted, re-validate to show/update errors
+    if (submitAttempted) {
+      const currentStepErrors = getStepErrors(currentStep);
+      setErrors(currentStepErrors);
+      checkOtherStepsErrors();
     }
+    
+    saveDraft(nextStep);
   };
 
   const handleBack = () => {
     setCurrentStep(currentStep - 1);
     setSubmitError(''); // Clear submit errors when navigating back
+    
+    // If submit was attempted, re-validate to show/update errors for the new step
+    if (submitAttempted) {
+      const prevStepErrors = getStepErrors(currentStep - 1);
+      setErrors(prevStepErrors);
+      checkOtherStepsErrors();
+    }
   };
 
   // Package item handlers
@@ -723,8 +812,12 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
   // Submit handlers
   const handleSubmit = async (status = null) => {
     setSubmitError(''); // Clear previous errors
-    const isValid = validateStep(4);
-    if (!isValid) {
+    setSubmitAttempted(true); // Mark that submit has been attempted
+    
+    // Validate all steps and show errors if any
+    const allValid = validateAllSteps();
+    if (!allValid) {
+      toast.error('Please fix the errors before submitting');
       return;
     }
     // If no status provided and in edit mode, keep current status
@@ -802,9 +895,40 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
     }
   };
 
+  // Render alerts for errors in other steps (only if submit has been attempted)
+  const renderOtherStepErrors = () => {
+    if (!submitAttempted || otherStepErrors.length === 0) return null;
+
+    return (
+      <div className="mb-4 space-y-2">
+        {otherStepErrors.map((error, index) => (
+          <div
+            key={index}
+            className="flex items-start gap-3 p-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-900"
+          >
+            <AlertCircle className="h-5 w-5 text-amber-500 flex-shrink-0 mt-0.5" />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium">{error.message}</p>
+              <button
+                onClick={() => {
+                  setCurrentStep(error.step);
+                  setOtherStepErrors([]);
+                }}
+                className="text-xs text-amber-700 hover:text-amber-900 underline mt-1 font-medium"
+              >
+                Go to {error.stepName} →
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  };
+
   // Step 1: Customer Selection
   const renderStep1 = () => (
     <div className="space-y-4">
+      {renderOtherStepErrors()}
       <div>
         <Label>Select Customer *</Label>
         <div className="relative" ref={customerSearchRef}>
@@ -1101,6 +1225,7 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
   // Step 2: Package Selection (simplified for now)
   const renderStep2 = () => (
     <div className="space-y-4">
+      {renderOtherStepErrors()}
       <div className="flex justify-between items-center">
         <Label>Service Packages *</Label>
         <Button type="button" size="sm" onClick={addPackageItem}>
@@ -1293,6 +1418,7 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
   // Step 3: Add-ons (similar to packages but simpler)
   const renderStep3 = () => (
     <div className="space-y-4">
+      {renderOtherStepErrors()}
       <div className="flex justify-between items-center">
         <div>
           <Label>Add-on Services (Optional)</Label>
@@ -1449,6 +1575,7 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
 
     return (
       <div className="space-y-4">
+        {renderOtherStepErrors()}
         {submitError && (
           <div className="flex items-start gap-3 p-4 bg-destructive/10 border border-destructive/20 rounded-lg">
             <AlertCircle className="h-5 w-5 text-destructive mt-0.5 flex-shrink-0" />

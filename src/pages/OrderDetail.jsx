@@ -1086,12 +1086,12 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
                     <div className="flex items-center justify-between mb-4">
                       <h3 className="font-semibold text-lg">Before Images</h3>
                       <Badge2 variant="outline" className="text-xs">
-                        {order.before_images?.length || 0} images
+                        {order.image_urls?.before_images?.length || 0} images
                       </Badge2>
                     </div>
-                    {order.before_images && order.before_images.length > 0 ? (
+                    {order.image_urls?.before_images && order.image_urls.before_images.length > 0 ? (
                       <div className="grid grid-cols-4 sm:grid-cols-8 gap-2">
-                        {order.before_images.map((image, index) => (
+                        {order.image_urls.before_images.map((image, index) => (
                           <button
                             key={index}
                             onClick={() => {
@@ -1104,7 +1104,7 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
                             className="relative aspect-square rounded-lg overflow-hidden border border-gray-200 hover:border-primary transition-colors group cursor-pointer"
                           >
                             <img
-                              src={image.url}
+                              src={image}
                               alt={`Before ${index + 1}`}
                               className="w-full h-full object-cover"
                             />
@@ -1127,12 +1127,12 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
                     <div className="flex items-center justify-between mb-4">
                       <h3 className="font-semibold text-lg">After Images</h3>
                       <Badge2 variant="outline" className="text-xs">
-                        {order.after_images?.length || 0} images
+                        {order.image_urls?.after_images?.length || 0} images
                       </Badge2>
                     </div>
-                    {order.after_images && order.after_images.length > 0 ? (
+                    {order.image_urls?.after_images && order.image_urls.after_images.length > 0 ? (
                       <div className="grid grid-cols-4 sm:grid-cols-8 gap-2">
-                        {order.after_images.map((image, index) => (
+                        {order.image_urls.after_images.map((image, index) => (
                           <button
                             key={index}
                             onClick={() => {
@@ -1145,7 +1145,7 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
                             className="relative aspect-square rounded-lg overflow-hidden border border-gray-200 hover:border-primary transition-colors group cursor-pointer"
                           >
                             <img
-                              src={image.url}
+                              src={image}
                               alt={`After ${index + 1}`}
                               className="w-full h-full object-cover"
                             />
@@ -1302,7 +1302,7 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
                 </div>
 
                 {/* Payment Proof */}
-                {order.payment_proof && (
+                {order.image_urls?.payment_proof && (
                   <div className="mt-4 pt-4 border-t">
                     <button
                       onClick={() => {
@@ -1385,7 +1385,12 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
                   <LetterAvatar name={order.assigned_to?.name} size="md" className="text-primary" />
                   <div className="flex-1 min-w-0">
                     <div className="font-medium text-sm">
-                      {order.assigned_to?.name || 'Unassigned'}
+                      {
+                        order.assigned_to?.name ? <>
+                        {order.assigned_to?.name}
+                          <Badge2 variant="info" className="mx-2 capitalize">{order.assignee_response}</Badge2></>:
+                          'Unassigned'
+                      }
                     </div>
                     {order.assigned_to?.email && (
                       <div className="text-xs text-muted-foreground truncate">
@@ -1450,9 +1455,9 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
                   <h3 className="font-semibold">Service Address</h3>
                  </div>
                 <div className="p-4">
-                  {order.latitude && order.longitude ? (
+                  {order.address.latitude && order.address.longitude ? (
                     <div className="mb-4 rounded-sm overflow-hidden border">
-                      <MapPreview lat={order.latitude} lng={order.longitude} />
+                      <MapPreview lat={order.address.latitude} lng={order.address.longitude} />
                     </div>
                   ) : (
                     <div className="mb-4 rounded-lg overflow-hidden bg-gray-50 h-[200px] flex items-center justify-center border">
@@ -1465,9 +1470,9 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
                         <div className="font-medium">{order.customer.name}</div>
                       )}
 
-                      {order.map_link && (
+                      {order.address.map_link && (
                         <a
-                          href={order.map_link}
+                          href={order.address.map_link}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="text-primary text-sm underline flex items-center gap-1  inline-flex"
@@ -1928,7 +1933,7 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
               </div>
             )}
 
-            {order.google_review_image && (
+            {order.image_urls?.google_review_image && (
               <div className="pt-4 border-t">
                 <label className="text-sm font-medium mb-2 block">Google Review Proof</label>
                 <button
@@ -1944,7 +1949,7 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
                 >
                   <div className="relative w-16 h-16 rounded overflow-hidden flex-shrink-0 border border-gray-300">
                     <img
-                      src={order.google_review_image.thumbnail_url}
+                      src={order.image_urls.google_review_image}
                       alt="Google Review Proof"
                       className="w-full h-full object-cover"
                     />
@@ -2020,7 +2025,7 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
               />
             </div>
 
-            {order.google_review_image && (
+            {order.image_urls?.google_review_image && (
               <div className="pt-4 border-t">
                 <label className="text-sm font-medium mb-2 block">Google Review Proof</label>
                 <button
@@ -2036,7 +2041,7 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
                 >
                   <div className="relative w-16 h-16 rounded overflow-hidden flex-shrink-0 border border-gray-300">
                     <img
-                      src={order.google_review_image.thumbnail_url}
+                      src={order.image_urls.google_review_image}
                       alt="Google Review Proof"
                       className="w-full h-full object-cover"
                     />
@@ -2076,8 +2081,8 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
             <div className="absolute top-0 left-0 right-0 z-10 bg-gradient-to-b from-black/80 to-transparent p-4">
               <div className="flex items-center justify-between text-white">
                 <div className="text-sm">
-                  {currentImageType === 'before' && `Before Image ${currentImageIndex + 1} of ${order.before_images?.length || 0}`}
-                  {currentImageType === 'after' && `After Image ${currentImageIndex + 1} of ${order.after_images?.length || 0}`}
+                  {currentImageType === 'before' && `Before Image ${currentImageIndex + 1} of ${order.image_urls?.before_images?.length || 0}`}
+                  {currentImageType === 'after' && `After Image ${currentImageIndex + 1} of ${order.image_urls?.after_images?.length || 0}`}
                   {currentImageType === 'payment_proof' && 'Payment Proof'}
                   {currentImageType === 'google_review' && 'Google Review'}
                 </div>
@@ -2133,33 +2138,33 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
                 }}
                 onTouchEnd={() => setIsDragging(false)}
               >
-                {currentImageType === 'before' && order.before_images?.[currentImageIndex] && (
+                {currentImageType === 'before' && order.image_urls?.before_images?.[currentImageIndex] && (
                   <img
-                    src={order.before_images[currentImageIndex].url}
+                    src={order.image_urls.before_images[currentImageIndex]}
                     alt={`Before ${currentImageIndex + 1}`}
                     className="max-h-[80vh] max-w-[90vw] object-contain"
                     draggable={false}
                   />
                 )}
-                {currentImageType === 'after' && order.after_images?.[currentImageIndex] && (
+                {currentImageType === 'after' && order.image_urls?.after_images?.[currentImageIndex] && (
                   <img
-                    src={order.after_images[currentImageIndex].url}
+                    src={order.image_urls.after_images[currentImageIndex]}
                     alt={`After ${currentImageIndex + 1}`}
                     className="max-h-[80vh] max-w-[90vw] object-contain"
                     draggable={false}
                   />
                 )}
-                {currentImageType === 'payment_proof' && order.payment_proof && (
+                {currentImageType === 'payment_proof' && order.image_urls?.payment_proof && (
                   <img
-                    src={order.payment_proof.url}
+                    src={order.image_urls.payment_proof}
                     alt="Payment Proof"
                     className="max-h-[80vh] max-w-[90vw] object-contain"
                     draggable={false}
                   />
                 )}
-                {currentImageType === 'google_review' && order.google_review_image && (
+                {currentImageType === 'google_review' && order.image_urls?.google_review_image && (
                   <img
-                    src={order.google_review_image.url}
+                    src={order.image_urls.google_review_image}
                     alt="Google Review"
                     className="max-h-[80vh] max-w-[90vw] object-contain"
                     draggable={false}
@@ -2176,7 +2181,7 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
                   <>
                     <button
                       onClick={() => {
-                        const images = currentImageType === 'before' ? order.before_images : order.after_images;
+                        const images = currentImageType === 'before' ? order.image_urls?.before_images : order.image_urls?.after_images;
                         if (currentImageIndex > 0) {
                           setCurrentImageIndex(currentImageIndex - 1);
                           setImageZoom(1);
@@ -2224,14 +2229,14 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
                   <>
                     <button
                       onClick={() => {
-                        const images = currentImageType === 'before' ? order.before_images : order.after_images;
-                        if (currentImageIndex < images.length - 1) {
+                        const images = currentImageType === 'before' ? order.image_urls?.before_images : order.image_urls?.after_images;
+                        if (images && currentImageIndex < images.length - 1) {
                           setCurrentImageIndex(currentImageIndex + 1);
                           setImageZoom(1);
                           setImagePosition({ x: 0, y: 0 });
                         }
                       }}
-                      disabled={currentImageIndex >= (currentImageType === 'before' ? order.before_images?.length : order.after_images?.length) - 1}
+                      disabled={currentImageIndex >= (currentImageType === 'before' ? order.image_urls?.before_images?.length : order.image_urls?.after_images?.length) - 1}
                       className="p-2 text-white hover:bg-white/20 rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <ChevronRight className="h-6 w-6" />
