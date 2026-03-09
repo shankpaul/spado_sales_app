@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import ablyClient from '../services/ablyClient';
 
 /**
  * Authentication Store using Zustand
@@ -40,6 +41,9 @@ const useAuthStore = create(
       },
 
       logout: () => {
+        // Disconnect real-time updates
+        ablyClient.disconnect();
+        
         set({
           user: null,
           accessToken: null,

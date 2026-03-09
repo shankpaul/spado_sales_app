@@ -6,6 +6,7 @@ import { Label } from '../components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '../components/ui/card';
 import { toast } from 'sonner';
 import authService from '../services/authService';
+import pushNotificationService from '../services/pushNotifications';
 import { Loader2, Eye, EyeOff } from 'lucide-react';
 import Logo from '../components/Logo';
 
@@ -77,6 +78,11 @@ const Login = () => {
       
       toast.success('Login successful', {
         description: `Welcome back, ${response.user.name || response.user.email}!`,
+      });
+
+      // Initialize push notifications after successful login
+      pushNotificationService.initialize().catch(error => {
+        console.error('Error initializing push notifications:', error);
       });
 
       // Navigate to dashboard

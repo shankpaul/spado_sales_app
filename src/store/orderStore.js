@@ -1,11 +1,15 @@
 import { create } from 'zustand';
 import orderService from '../services/orderService';
 import { format } from 'date-fns';
+import ablyClient from '../services/ablyClient';
+import { toast } from 'sonner';
+import useAuthStore from './authStore';
 
 /**
  * Order Store using Zustand
  * Single source of truth for all order data across the application
  * Manages orders, filtering, and updates without redundant API calls
+ * Includes real-time updates via Ably WebSocket
  */
 
 const useOrderStore = create((set, get) => ({
@@ -16,6 +20,10 @@ const useOrderStore = create((set, get) => ({
   agents: [], // All agents (cached)
   isLoading: false,
   error: null,
+  
+  // Real-time connection state
+  realtimeConnected: false,
+  realtimeStatus: 'disconnected', // 'disconnected', 'connected', 'connecting', 'failed'
   
   // Filters
   filters: {
@@ -315,6 +323,155 @@ const useOrderStore = create((set, get) => ({
     page: 1,
     hasMore: true,
   }),
+
+  /**
+   * Initialize real-time updates via Ably
+   */
+  initializeRealtime: async () => {
+    console.log('='.repeat(80));
+    console.log('[OrderStore] ⚡ INITIALIZING REALTIME UPDATES - START');
+    console.log('='.repeat(80));
+    
+    try {
+      console.log('[OrderStore] Calling ablyClient.initialize()...');
+      
+      await ablyClient.initialize();
+      
+      console.log('[OrderStore] ✓ ablyClient.initialize() completed');
+      
+      // Subscribe to connection state changes
+      ablyClient.onConnectionStateChange((state) => {
+        console.log('[OrderStore] Ably connection state changed to:', state);
+        
+        const stateMap = {
+          initialized: 'connecting',
+          connecting: 'connecting',
+          connected: 'connected',
+          disconnected: 'disconnected',
+          suspended: 'connecting',
+          failed: 'failed',
+          closing: 'disconnected',
+          closed: 'disconnected',
+        };
+        
+        const mappedStatus = stateMap[state] || 'disconnected';
+        console.log('[OrderStore] Mapped status:', mappedStatus);
+        
+        set({ 
+          realtimeConnected: state === 'connected',
+          realtimeStatus: mappedStatus
+        });
+      });
+
+      console.log('[OrderStore] Subscribing to orders channel...');
+      
+      // Subscribe to all orders channel
+      ablyClient.subscribeToOrders((eventName, data) => {
+        get().handleRealtimeEvent(eventName, data);
+      });
+
+      console.log('[OrderStore] ✓ Ably subscriptions active');
+      console.log('='.repeat(80));
+    } catch (error) {
+      console.error('='.repeat(80));
+      console.error('[OrderStore] ❌ FAILED TO INITIALIZE ABLY');
+      console.error('[OrderStore] Error:', error);
+      console.error('[OrderStore] Error stack:', error.stack);
+      console.error('='.repeat(80));
+      set({ realtimeStatus: 'failed' });
+    }
+  },
+
+  /**
+   * Handle real-time events from Ably
+   */
+  handleRealtimeEvent: async (eventName, eventData) => {
+    console.log('[OrderStore] Received event:', eventName, eventData);
+    
+    const { order_id, data } = eventData;
+    
+    // Get current user to filter out self-triggered events
+    const currentUser = useAuthStore.getState().user;
+    const currentUserId = currentUser?.id;
+    
+    // Skip if this event was triggered by the current user
+    if (data?.changed_by_id && currentUserId && data.changed_by_id === currentUserId) {
+      console.log('[OrderStore] Skipping self-triggered event:', eventName, 'by user', currentUserId);
+      return;
+    }
+
+    switch (eventName) {
+      case 'order.created':
+        // Fetch the new order and add to store
+        try {
+          const order = await orderService.getOrder(order_id);
+          get().addOrder(order);
+          toast.success(`New order created: ${data.order_number || order_id}`);
+        } catch (error) {
+          console.error('[OrderStore] Error fetching new order:', error);
+        }
+        break;
+
+      case 'order.updated':
+      case 'order.status_changed':
+      case 'order.assigned':
+      case 'order.reassigned':
+      case 'order.feedback_added':
+      case 'order.assignee_response_updated':
+        // Fetch updated order and update in store
+        try {
+          const order = await orderService.getOrder(order_id);
+          get().updateOrder(order);
+          
+          // Show toast notification for status changes
+          if (eventName === 'order.status_changed') {
+            toast.info(`Order ${order.order_number} status: ${data.new_status}`);
+          } else if (eventName === 'order.assigned' || eventName === 'order.reassigned') {
+            toast.info(`Order ${order.order_number} ${eventName === 'order.assigned' ? 'assigned' : 'reassigned'}`);
+          } else if (eventName === 'order.assignee_response_updated') {
+            toast.info(`Order ${order.order_number} response: ${data.assignee_response}`);
+          }
+        } catch (error) {
+          console.error('[OrderStore] Error fetching updated order:', error);
+        }
+        break;
+
+      case 'order.cancelled':
+        // Remove from upcoming/completed, update in orders list
+        try {
+          const order = await orderService.getOrder(order_id);
+          get().updateOrder(order);
+          toast.warning(`Order ${order.order_number} cancelled: ${data.cancel_reason || ''}`);
+        } catch (error) {
+          console.error('[OrderStore] Error fetching cancelled order:', error);
+        }
+        break;
+
+      case 'order.journey_tracked':
+        // Fetch updated order (journey info updated)
+        try {
+          const order = await orderService.getOrder(order_id);
+          get().updateOrder(order);
+        } catch (error) {
+          console.error('[OrderStore] Error fetching order with journey:', error);
+        }
+        break;
+
+      default:
+        console.log('[OrderStore] Unhandled event:', eventName);
+    }
+  },
+
+  /**
+   * Disconnect real-time updates
+   */
+  disconnectRealtime: () => {
+    ablyClient.disconnect();
+    set({ 
+      realtimeConnected: false,
+      realtimeStatus: 'disconnected'
+    });
+  },
 }));
 
 export default useOrderStore;

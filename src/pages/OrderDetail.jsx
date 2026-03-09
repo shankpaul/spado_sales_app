@@ -101,10 +101,12 @@ import { formatDate, formatDateTime, formatTime, formatCurrency } from '../lib/u
 import { Badge2 } from '@/components/ui/badge2';
 import LetterAvatar from '@/components/LetterAvatar';
 import useOrderStore from '../store/orderStore';
+import ablyClient from '../services/ablyClient';
 
 /**
  * Order Detail Page
  * Shows comprehensive order information with tabs for overview, items, timeline, reassignments
+ * Real-time updates via Ably WebSocket for live order changes
  */
 const OrderDetail = ({ orderId, onClose, onUpdate }) => {
   // Use orderId prop instead of route params, but keep useParams as fallback for direct route access
@@ -256,6 +258,27 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
      
     }
   }, [id]);
+
+  // Subscribe to real-time updates for this specific order
+  useEffect(() => {
+    if (!id) return;
+
+    console.log(`[OrderDetail] Subscribing to order:${id} real-time updates`);
+    
+    // Subscribe to this specific order's channel
+    ablyClient.subscribeToOrder(id, (eventName, eventData) => {
+      console.log(`[OrderDetail] Received event for order ${id}:`, eventName);
+      
+      // Reload order data when updates come in
+      fetchOrderDetails(true); // true = should call onUpdate callback
+    });
+
+    // Cleanup subscription when component unmounts or orderId changes
+    return () => {
+      console.log(`[OrderDetail] Unsubscribing from order:${id}`);
+      ablyClient.unsubscribe(`orders:${id}`);
+    };
+  }, [id]); // Re-subscribe if orderId changes
 
   const fetchOrderDetails = async (shouldCallUpdate = false) => {
     setLoading(true);

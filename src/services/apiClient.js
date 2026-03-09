@@ -56,7 +56,6 @@ apiClient.interceptors.request.use(
       config.headers['Accept'] = 'application/json';
     }
     
-    console.log('Request headers:', config.headers);
     
     return config;
   },

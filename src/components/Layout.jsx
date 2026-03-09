@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import * as React from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Button } from './ui/button';
 import useAuthStore from '../store/authStore';
+import useOrderStore from '../store/orderStore';
 import authService from '../services/authService';
 import { toast } from 'sonner';
 import {
@@ -29,9 +30,12 @@ import {
   Download,
   Briefcase,
   PackageOpen,
+  Bell,
 } from 'lucide-react';
 import usePWAInstall from '../hooks/usePWAInstall';
 import Logo from './Logo';
+import RealtimeStatus from './RealtimeStatus';
+import NotificationSettings from './NotificationSettings';
 import {
   Breadcrumb,
   BreadcrumbList,
@@ -45,6 +49,14 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from './ui/popover';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from './ui/dialog';
 
 /**
  * Layout Component
@@ -55,11 +67,22 @@ const Layout = ({ children }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const { user } = useAuthStore();
+  const { initializeRealtime } = useOrderStore();
   const location = useLocation();
   const navigate = useNavigate();
   const { isInstallable, handleInstallClick } = usePWAInstall();
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+  const [notificationSettingsOpen, setNotificationSettingsOpen] = useState(false);
+
+  // Initialize real-time updates for all authenticated pages
+  useEffect(() => {
+    console.log('[Layout] Initializing real-time updates for authenticated user');
+    initializeRealtime();
+    
+    // Note: We don't disconnect on unmount because real-time
+    // should stay connected across all pages. It will disconnect on logout.
+  }, [initializeRealtime]);
 
   const handleLogout = async () => {
     try {
@@ -229,6 +252,11 @@ const Layout = ({ children }) => {
               </div>
             )}
           </nav>
+
+          {/* Realtime Connection Status */}
+          <div className={`p-4 border-t border-gray-200 ${sidebarCollapsed ? 'flex justify-center' : ''}`}>
+            <RealtimeStatus collapsed={sidebarCollapsed} />
+          </div>
         </div>
       </aside>
 
@@ -304,6 +332,13 @@ const Layout = ({ children }) => {
                       <KeyRound className="h-4 w-4" />
                       <span>Change Password</span>
                     </Link>
+                    <button
+                      onClick={() => setNotificationSettingsOpen(true)}
+                      className="w-full flex items-center gap-3 px-3 py-2 text-sm rounded-md hover:bg-gray-100 transition-colors"
+                    >
+                      <Bell className="h-4 w-4" />
+                      <span>Notifications</span>
+                    </button>
                     <div className="border-t my-1" />
                     <button
                       onClick={handleLogout}
@@ -429,6 +464,16 @@ const Layout = ({ children }) => {
                     <KeyRound className="h-4 w-4" />
                     <span>Change Password</span>
                   </Link>
+                  <button
+                    onClick={() => {
+                      setProfileMenuOpen(false);
+                      setNotificationSettingsOpen(true);
+                    }}
+                    className="w-full flex items-center gap-3 px-3 py-2 text-sm rounded-md hover:bg-gray-100 transition-colors"
+                  >
+                    <Bell className="h-4 w-4" />
+                    <span>Notifications</span>
+                  </button>
                   <div className="border-t my-1" />
                   <button
                     onClick={() => {
@@ -452,6 +497,19 @@ const Layout = ({ children }) => {
             {children}
           </div>
         </main>
+
+        {/* Notification Settings Dialog */}
+        <Dialog open={notificationSettingsOpen} onOpenChange={setNotificationSettingsOpen}>
+          <DialogContent className="sm:max-w-[500px]">
+            <DialogHeader>
+              <DialogTitle>Notification Settings</DialogTitle>
+              <DialogDescription>
+                Manage your push notification preferences
+              </DialogDescription>
+            </DialogHeader>
+            <NotificationSettings />
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );

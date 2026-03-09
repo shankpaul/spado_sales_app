@@ -50,10 +50,12 @@ import {
 import { Badge2 } from '@/components/ui/badge2';
 import { Skeleton } from '../components/ui/skeleton';
 import AssigneeResponseTick from '../components/AssigneeResponseTick';
+import { RealtimeStatus } from '@/components/RealtimeStatus';
 
 /**
  * Orders Page Component
  * Manages order list with search, filters, pagination
+ * Real-time updates via Ably WebSocket
  */
 const Orders = () => {
   const navigate = useNavigate();
@@ -371,15 +373,21 @@ const Orders = () => {
           <h1 className="text-2xl font-bold flex items-center gap-2 items-center"><Blocks className="h-8 w-8" strokeWidth={1.5} /> Orders</h1>
           <p className="text-muted-foreground">Manage customer orders and bookings</p>
         </div>
-        <Button onClick={() => setIsWizardOpen(true)} className="w-full sm:w-auto">
-          <Plus className="h-4 w-4 mr-2" />
-          Create Order
-        </Button>
+        <div className="flex items-center gap-3">
+          <RealtimeStatus />
+          <Button onClick={() => setIsWizardOpen(true)} className="w-full sm:w-auto">
+            <Plus className="h-4 w-4 mr-2" />
+            Create Order
+          </Button>
+        </div>
       </div>
 
       {/* Mobile Title - Visible only on mobile */}
       <div className="block md:hidden">
-        <h1 className="text-2xl font-bold flex items-center gap-2 items-center"><Blocks className="h-6 w-6" strokeWidth={1.5} /> Orders</h1>
+        <div className="flex items-center justify-between mb-2">
+          <h1 className="text-2xl font-bold flex items-center gap-2 items-center"><Blocks className="h-6 w-6" strokeWidth={1.5} /> Orders</h1>
+          <RealtimeStatus />
+        </div>
         <p className="text-muted-foreground text-sm">Manage customer orders and bookings</p>
       </div>
 

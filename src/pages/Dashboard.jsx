@@ -69,6 +69,7 @@ import { toast } from 'sonner';
 import { formatTime, checkServiceAvailability, getAgentsAvailableToday } from '@/lib/utilities';
 import { getBrands, getModelsByBrand, getVehicleType, getVehicleTypes } from '../lib/vehicleData';
 import VehicleIcon from '@/components/VehicleIcon';
+import { RealtimeStatus } from '@/components/RealtimeStatus';
 
 /**
  * Dashboard Page Component
@@ -76,6 +77,7 @@ import VehicleIcon from '@/components/VehicleIcon';
  * - Admin: Full system overview
  * - Sales Executive: Sales and customer metrics
  * - Accountant: Financial reports and transactions
+ * - Real-time updates via Ably WebSocket
  */
 const Dashboard = () => {
   const { user } = useAuthStore();
@@ -593,6 +595,7 @@ const Dashboard = () => {
             </div>
           </div>
           <div className="flex items-center gap-2">
+            <RealtimeStatus />
             <Button 
               variant="ghost" 
               size="icon" 
@@ -611,14 +614,19 @@ const Dashboard = () => {
       <div className="p-4 md:p-6 space-y-6">
         {/* Desktop Header - Hidden on Mobile */}
         <div className="hidden md:block">
-          <h1 className="text-3xl font-bold text-gray-900">
-            {user?.role === 'admin' && 'Admin Dashboard'}
-            {user?.role === 'sales_executive' && 'Sales Dashboard'}
-            {user?.role === 'accountant' && 'Financial Dashboard'}
-          </h1>
-          <p className="text-gray-600 mt-1">
-            Welcome back, {user?.name || user?.email}!
-          </p>
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900">
+                {user?.role === 'admin' && 'Admin Dashboard'}
+                {user?.role === 'sales_executive' && 'Sales Dashboard'}
+                {user?.role === 'accountant' && 'Financial Dashboard'}
+              </h1>
+              <p className="text-gray-600 mt-1">
+                Welcome back, {user?.name || user?.email}!
+              </p>
+            </div>
+            <RealtimeStatus />
+          </div>
         </div>
 
         {getRoleDashboard()}
