@@ -5,6 +5,7 @@ import path from 'path';
 
 // https://vite.dev/config/
 export default defineConfig({
+  base: '/',
   plugins: [
     react(),
     VitePWA({
@@ -12,10 +13,11 @@ export default defineConfig({
       strategies: 'injectManifest',
       srcDir: 'public',
       filename: 'sw.js',
-      includeAssets: ['spadologo.png', 'spadologo.svg'],
+      manifestFilename: 'manifest.webmanifest',
+      includeAssets: ['spadologo.png', 'spadologo.svg', 'icon-*.png', 'apple-touch-icon.png'],
       manifest: {
-        name: 'Spado Car Wash Management',
-        short_name: 'Spado',
+        name: 'SPADO Car Wash Management',
+        short_name: 'SPADO',
         description: 'Professional car wash business management system',
         theme_color: '#0846c1',
         background_color: '#ffffff',
@@ -23,21 +25,22 @@ export default defineConfig({
         orientation: 'portrait',
         scope: '/',
         start_url: '/',
+        categories: ['business', 'productivity'],
         icons: [
           {
-            src: 'pwa-192x192.png',
+            src: 'icon-192.png',
             sizes: '192x192',
             type: 'image/png',
             purpose: 'any'
           },
           {
-            src: 'pwa-512x512.png',
+            src: 'icon-512.png',
             sizes: '512x512',
             type: 'image/png',
             purpose: 'any'
           },
           {
-            src: 'maskable-icon.png',
+            src: 'icon-512-maskable.png',
             sizes: '512x512',
             type: 'image/png',
             purpose: 'maskable'
@@ -48,9 +51,10 @@ export default defineConfig({
         globPatterns: ['**/*.{js,css,html,ico,png,svg,webp}'],
         maximumFileSizeToCacheInBytes: 5000000
       },
-      devOptions: {
-        enabled: true,
-        type: 'module'
+      workbox: {
+        cleanupOutdatedCaches: true,
+        skipWaiting: true,
+        clientsClaim: true
       }
     })
   ],
@@ -60,6 +64,8 @@ export default defineConfig({
     },
   },
   build: {
+    outDir: 'dist',
+    sourcemap: false,
     // Optimize bundle size
     rollupOptions: {
       output: {
