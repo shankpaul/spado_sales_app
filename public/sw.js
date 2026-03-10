@@ -1,5 +1,72 @@
-// Service Worker for Push Notifications
+// Service Worker for Push Notifications and PWA
 /* eslint-disable no-restricted-globals */
+
+// Precache manifest - Workbox will inject files here during build
+const precacheManifest = self.__WB_MANIFEST || [];
+
+// Cache name
+const CACHE_NAME = 'spado-app-v1';
+
+// Install event - precache files
+self.addEventListener('install', function(event) {
+  console.log('[Service Worker] Installing...');
+  
+  event.waitUntil(
+    caches.open(CACHE_NAME).then(function(cache) {
+      // Cache the precache manifest files
+      const urlsToCache = precacheManifest.map(entry => {
+        return typeof entry === 'string' ? entry : entry.url;
+      });
+      console.log('[Service Worker] Caching app shell:', urlsToCache.length, 'files');
+      return cache.addAll(urlsToCache).catch(err => {
+        console.warn('[Service Worker] Failed to cache some resources:', err);
+      });
+    }).then(() => {
+      return self.skipWaiting();
+    })
+  );
+});
+
+// Activate event
+self.addEventListener('activate', function(event) {
+  console.log('[Service Worker] Activating...');
+  event.waitUntil(
+    caches.keys().then(function(cacheNames) {
+      return Promise.all(
+        cacheNames.map(function(cacheName) {
+          if (cacheName !== CACHE_NAME) {
+            console.log('[Service Worker] Deleting old cache:', cacheName);
+            return caches.delete(cacheName);
+          }
+        })
+      );
+    }).then(() => {
+      return self.clients.claim();
+    })
+  );
+});
+
+// Fetch event - serve from cache, fallback to network
+self.addEventListener('fetch', function(event) {
+  event.respondWith(
+    caches.match(event.request).then(function(response) {
+      // Return cached version or fetch from network
+      return response || fetch(event.request).then(function(fetchResponse) {
+        // Cache successful responses for future use
+        if (fetchResponse && fetchResponse.status === 200) {
+          const responseToCache = fetchResponse.clone();
+          caches.open(CACHE_NAME).then(function(cache) {
+            cache.put(event.request, responseToCache);
+          });
+        }
+        return fetchResponse;
+      }).catch(function() {
+        // If both cache and network fail, return offline page if available
+        return caches.match('/offline.html');
+      });
+    })
+  );
+});
 
 // Handle push notification events
 self.addEventListener('push', function(event) {
@@ -81,18 +148,6 @@ self.addEventListener('notificationclick', function(event) {
 // Handle notification close events
 self.addEventListener('notificationclose', function(event) {
   console.log('[Service Worker] Notification closed:', event.notification);
-});
-
-// Install event
-self.addEventListener('install', function(event) {
-  console.log('[Service Worker] Installing...');
-  self.skipWaiting();
-});
-
-// Activate event
-self.addEventListener('activate', function(event) {
-  console.log('[Service Worker] Activating...');
-  event.waitUntil(self.clients.claim());
 });
 
 // Handle messages from the main app
