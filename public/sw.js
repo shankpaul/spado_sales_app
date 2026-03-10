@@ -4,8 +4,8 @@
 // Precache manifest - Workbox will inject files here during build
 const precacheManifest = self.__WB_MANIFEST || [];
 
-// Cache name
-const CACHE_NAME = 'spado-app-v1';
+// Cache name - increment version to force cache refresh
+const CACHE_NAME = 'spado-app-v2';
 
 // Install event - precache files
 self.addEventListener('install', function(event) {
@@ -48,12 +48,23 @@ self.addEventListener('activate', function(event) {
 
 // Fetch event - serve from cache, fallback to network
 self.addEventListener('fetch', function(event) {
+  const url = new URL(event.request.url);
+  
+  // Skip caching for API requests - always fetch from network
+  if (url.pathname.startsWith('/api/') || 
+      url.hostname !== self.location.hostname ||
+      event.request.method !== 'GET') {
+    event.respondWith(fetch(event.request));
+    return;
+  }
+  
+  // Cache-first strategy for static assets
   event.respondWith(
     caches.match(event.request).then(function(response) {
       // Return cached version or fetch from network
       return response || fetch(event.request).then(function(fetchResponse) {
         // Cache successful responses for future use
-        if (fetchResponse && fetchResponse.status === 200) {
+        if (fetchResponse && fetchResponse.status === 200 && fetchResponse.type === 'basic') {
           const responseToCache = fetchResponse.clone();
           caches.open(CACHE_NAME).then(function(cache) {
             cache.put(event.request, responseToCache);
