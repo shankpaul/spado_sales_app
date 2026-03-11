@@ -125,7 +125,7 @@ export const getVehicleType = (brand, modelName) => {
  * @returns {Array<string>} Array of vehicle types
  */
 export const getVehicleTypes = () => {
-  return ['Hatchback', 'Sedan', 'SUV'];
+  return ['Hatchback', 'Sedan', 'SUV', 'Luxury'];
 };
 
 export default vehicleData;

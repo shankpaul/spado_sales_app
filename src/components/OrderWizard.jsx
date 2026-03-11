@@ -572,7 +572,6 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
       if (!bookingDate) stepErrors.bookingDate = 'Required';
       if (!bookingTimeFrom) stepErrors.bookingTimeFrom = 'Required';
       if (!bookingTimeTo) stepErrors.bookingTimeTo = 'Required';
-      if (!address.area) stepErrors.area = 'Area is required';
 
       // Validate time range
       if (bookingTimeFrom && bookingTimeTo && bookingTimeFrom >= bookingTimeTo) {
@@ -594,7 +593,7 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
       const errorCount = Object.keys(stepErrors).length;
       
       if (errorCount > 0) {
-        const stepName = ['Customer', 'Packages', 'Add-ons', 'Booking Details'][step - 1];
+        const stepName = ['Customer', 'Packages', 'Add-ons', 'Booking date'][step - 1];
         errorMessages.push({
           step,
           stepName,
@@ -630,6 +629,7 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
     // Check all steps
     for (let step = 1; step <= 4; step++) {
       const stepErrors = getStepErrors(step);
+      console.log(`Validation for step ${step}:`, stepErrors);
       if (Object.keys(stepErrors).length > 0) {
         allValid = false;
         if (firstInvalidStep === null) {
@@ -651,16 +651,21 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
 
   // Navigation handlers
   const handleNext = () => {
-    // Allow navigation without validation unless submit has been attempted
+    // Validate current step before proceeding
+    const isValid = validateStep(currentStep, true);
+    
+    if (!isValid) {
+      // Show validation errors and stay on current step
+      // toast.error('Please fix the errors before proceeding');
+      return;
+    }
+    
+    // Proceed to next step
     const nextStep = currentStep + 1;
     setCurrentStep(nextStep);
     
-    // If submit was attempted, re-validate to show/update errors
-    if (submitAttempted) {
-      const currentStepErrors = getStepErrors(currentStep);
-      setErrors(currentStepErrors);
-      checkOtherStepsErrors();
-    }
+    // Clear errors for the new step
+    setErrors({});
     
     saveDraft(nextStep);
   };
@@ -1621,7 +1626,7 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
                         const [hours, minutes] = value.split(':').map(Number);
                         const fromDate = new Date();
                         fromDate.setHours(hours, minutes);
-                        fromDate.setMinutes(fromDate.getMinutes() + 60);
+                        fromDate.setMinutes(fromDate.getMinutes() + 120);
                         const toHours = String(fromDate.getHours()).padStart(2, '0');
                         const toMinutes = String(fromDate.getMinutes()).padStart(2, '0');
                         setBookingTimeTo(`${toHours}:${toMinutes}`);
@@ -1824,11 +1829,24 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
 
   return (
     <>
-      <Dialog open={open} onOpenChange={handleClose}>
+      <Dialog open={open} onOpenChange={(isOpen) => {
+        // Only close if explicitly set to false, not on random state changes
+        if (!isOpen) {
+          handleClose();
+        }
+      }}>
         <DialogContent 
           className="max-w-4xl p-0 md:p-6 h-full md:h-auto md:max-h-[90vh] w-full rounded-none md:rounded-xl border-0 md:border overflow-hidden flex flex-col"
           onPointerDownOutside={(e) => {
             // Prevent dialog from closing on outside clicks
+            e.preventDefault();
+          }}
+          onEscapeKeyDown={(e) => {
+            // Prevent ESC key from closing dialog accidentally
+            e.preventDefault();
+          }}
+          onInteractOutside={(e) => {
+            // Prevent any outside interactions from closing dialog
             e.preventDefault();
           }}
         >

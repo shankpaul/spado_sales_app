@@ -69,7 +69,6 @@ import { toast } from 'sonner';
 import { formatTime, checkServiceAvailability, getAgentsAvailableToday } from '@/lib/utilities';
 import { getBrands, getModelsByBrand, getVehicleType, getVehicleTypes } from '../lib/vehicleData';
 import VehicleIcon from '@/components/VehicleIcon';
-import { RealtimeStatus } from '@/components/RealtimeStatus';
 
 /**
  * Dashboard Page Component
@@ -382,7 +381,7 @@ const Dashboard = () => {
         />
         <QuickLinkCard
           icon={<MapPin className="h-5 w-5" />}
-          label="Area Checker"
+          label="Service Availability"
           onClick={() => setServiceCheckerOpen(true)}
         />
         <QuickLinkCard
@@ -595,7 +594,6 @@ const Dashboard = () => {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <RealtimeStatus />
             <Button 
               variant="ghost" 
               size="icon" 
@@ -625,7 +623,6 @@ const Dashboard = () => {
                 Welcome back, {user?.name || user?.email}!
               </p>
             </div>
-            <RealtimeStatus />
           </div>
         </div>
 
@@ -649,9 +646,9 @@ const Dashboard = () => {
 
         {/* Vehicle Identifier Sheet */}
         <Sheet open={vehicleIdentifierOpen} onOpenChange={setVehicleIdentifierOpen}>
-          <SheetContent side="bottom" className="h-screen p-0 sm:h-auto sm:max-w-md sm:p-6 sm:top-1/2 sm:left-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 sm:right-auto sm:bottom-auto sm:rounded-lg">
+          <SheetContent side="bottom" className="h-screen p-0 flex flex-col sm:h-auto sm:max-w-md sm:p-6 sm:top-1/2 sm:left-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 sm:right-auto sm:bottom-auto sm:rounded-lg">
             {/* Mobile App Header */}
-            <div className="flex items-center justify-between p-4 border-b bg-white sticky top-0 z-10 sm:hidden">
+            <div className="flex items-center justify-between p-4 border-b bg-white sticky top-0 z-10 flex-shrink-0 sm:hidden">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-primary/10 rounded-full">
                   <Car className="h-5 w-5 text-primary" />
@@ -679,7 +676,7 @@ const Dashboard = () => {
               </DialogDescription>
             </DialogHeader>
             
-            <div className="space-y-4 p-4 flex-1 overflow-y-auto sm:py-4">
+            <div className="space-y-4 p-4 pt-12 flex-1 overflow-y-auto sm:py-4">
               <div className="space-y-2">
                 <Label htmlFor="brand">Brand</Label>
                 <Select value={selectedBrand} onValueChange={(value) => {
@@ -745,9 +742,9 @@ const Dashboard = () => {
           setServiceCheckerOpen(open);
           if (!open) resetServiceAvailability();
         }}>
-          <SheetContent side="bottom" className="h-screen p-0 sm:h-auto sm:max-w-md sm:p-6 sm:top-1/2 sm:left-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 sm:right-auto sm:bottom-auto sm:rounded-lg">
+          <SheetContent side="bottom" className="h-screen p-0 flex flex-col sm:h-auto sm:max-w-md sm:p-6 sm:top-1/2 sm:left-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 sm:right-auto sm:bottom-auto sm:rounded-lg">
             {/* Mobile App Header */}
-            <div className="flex items-center justify-between p-4 border-b bg-white sticky top-0 z-10 sm:hidden">
+            <div className="flex items-center justify-between p-4 border-b bg-white sticky top-0 z-10 flex-shrink-0 sm:hidden">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-primary/10 rounded-full">
                   <CheckCircle2 className="h-5 w-5 text-primary" />
@@ -775,10 +772,10 @@ const Dashboard = () => {
               </DialogDescription>
             </DialogHeader>
             
-            <div className="space-y-4 p-4 flex-1 overflow-y-auto sm:py-4">
+            <div className="space-y-4 p-4 pt-12 flex-1 overflow-y-auto sm:py-4">
               {/* Customer Phone */}
               <div className="space-y-2">
-                <Label htmlFor="service-phone">Customer Phone</Label>
+                <Label htmlFor="service-phone">Customer Phone <span className="text-muted-foreground">(optional)</span></Label>
                 <Input 
                   id="service-phone" 
                   type="tel"
@@ -790,7 +787,7 @@ const Dashboard = () => {
 
               {/* Vehicle Type */}
               <div className="space-y-2">
-                <Label htmlFor="service-vehicle-type">Vehicle Type</Label>
+                <Label htmlFor="service-vehicle-type">Vehicle Type <span className="text-muted-foreground">(optional)</span></Label>
                 <Select value={serviceVehicleType} onValueChange={setServiceVehicleType}>
                   <SelectTrigger id="service-vehicle-type">
                     <SelectValue placeholder="Select vehicle type" />
@@ -811,7 +808,7 @@ const Dashboard = () => {
                   <svg className="h-4 w-4 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
-                  <span>Customer phone and vehicle type are optional but provide more accurate results based on multiple criteria (customer eligibility, service history, vehicle-specific distance limits).</span>
+                  <span>Provide more accurate results based on multiple criteria (customer eligibility, service history, vehicle-specific distance limits).</span>
                 </p>
               </div>
 
@@ -952,9 +949,9 @@ const Dashboard = () => {
 
         {/* Agents Available Sheet */}
         <Sheet open={agentsAvailableOpen} onOpenChange={setAgentsAvailableOpen}>
-          <SheetContent side="bottom" className="h-screen p-0 sm:h-auto sm:max-w-md sm:p-6 sm:top-1/2 sm:left-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 sm:right-auto sm:bottom-auto sm:rounded-lg">
+          <SheetContent side="bottom" className="h-screen p-0 flex flex-col sm:h-auto sm:max-w-md sm:p-6 sm:top-1/2 sm:left-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 sm:right-auto sm:bottom-auto sm:rounded-lg">
             {/* Mobile App Header */}
-            <div className="flex items-center justify-between p-4 border-b bg-white sticky top-0 z-10 sm:hidden">
+            <div className="flex items-center justify-between p-4 border-b bg-white sticky top-0 z-10 flex-shrink-0 sm:hidden">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-primary/10 rounded-full">
                   <Users2 className="h-5 w-5 text-primary" />
@@ -982,7 +979,7 @@ const Dashboard = () => {
               </DialogDescription>
             </DialogHeader>
             
-            <div className="space-y-3 p-4 flex-1 overflow-y-auto sm:py-4">
+            <div className="space-y-4 p-4 pt-12 flex-1 overflow-y-auto sm:py-4">
               {loadingAgents ? (
                 <div className="space-y-3">
                   <Skeleton className="h-16 w-full rounded-lg" />

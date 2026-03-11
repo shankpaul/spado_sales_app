@@ -50,7 +50,6 @@ import {
 import { Badge2 } from '@/components/ui/badge2';
 import { Skeleton } from '../components/ui/skeleton';
 import AssigneeResponseTick from '../components/AssigneeResponseTick';
-import { RealtimeStatus } from '@/components/RealtimeStatus';
 
 /**
  * Orders Page Component
@@ -374,7 +373,6 @@ const Orders = () => {
           <p className="text-muted-foreground">Manage customer orders and bookings</p>
         </div>
         <div className="flex items-center gap-3">
-          <RealtimeStatus />
           <Button onClick={() => setIsWizardOpen(true)} className="w-full sm:w-auto">
             <Plus className="h-4 w-4 mr-2" />
             Create Order
@@ -386,8 +384,7 @@ const Orders = () => {
       <div className="block md:hidden">
         <div className="flex items-center justify-between mb-2">
           <h1 className="text-2xl font-bold flex items-center gap-2 items-center"><Blocks className="h-6 w-6" strokeWidth={1.5} /> Orders</h1>
-          <RealtimeStatus />
-        </div>
+         </div>
         <p className="text-muted-foreground text-sm">Manage customer orders and bookings</p>
       </div>
 
@@ -667,7 +664,7 @@ const Orders = () => {
                           variant={getBadgeVariant(order.payment_status, 'payment')}
                           className="h-5 text-[10px] px-1.5"
                         >
-                          {getStatusLabel(order.payment_status, PAYMENT_STATUSES)}
+                          Payment {getStatusLabel(order.payment_status, PAYMENT_STATUSES)}
                         </Badge2>
                       </div>
                     </div>

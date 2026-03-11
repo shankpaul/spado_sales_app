@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
+import { DatePicker } from './ui/date-picker';
 import { Card } from './ui/card';
 import { Checkbox } from './ui/checkbox';
 import { Badge2 } from './ui/badge2';
@@ -345,6 +346,18 @@ const EnquiryWizard = ({ open, onOpenChange, onSuccess }) => {
         <ContentComponent 
           side={isMobile ? "bottom" : undefined}
           className={isMobile ? "h-full p-0 flex flex-col" : "max-w-2xl max-h-[90vh] flex flex-col p-0"}
+          onPointerDownOutside={(e) => {
+            // Prevent dialog from closing on outside clicks
+            e.preventDefault();
+          }}
+          onEscapeKeyDown={(e) => {
+            // Prevent ESC key from closing dialog accidentally
+            e.preventDefault();
+          }}
+          onInteractOutside={(e) => {
+            // Prevent any outside interactions from closing dialog
+            e.preventDefault();
+          }}
         >
           {/* Header */}
           {isMobile ? (
@@ -383,7 +396,7 @@ const EnquiryWizard = ({ open, onOpenChange, onSuccess }) => {
           )}
 
           {/* Form Content */}
-          <div className={isMobile ? "flex-1 overflow-y-auto p-4 pb-24 bg-gray-50" : "flex-1 overflow-y-auto px-6 py-4 space-y-6"}>
+          <div className={isMobile ? "flex-1 space-y-4 overflow-y-auto p-4 pb-24 bg-gray-50" : "flex-1 overflow-y-auto px-6 py-4 space-y-6"}>
             {/* Mobile Number - Primary Field with Auto-focus */}
             <Card className={isMobile ? "p-4 bg-white" : "p-4"}>
               <div className="space-y-2" ref={customerSearchRef}>
@@ -395,7 +408,7 @@ const EnquiryWizard = ({ open, onOpenChange, onSuccess }) => {
                   <Input
                     ref={phoneInputRef}
                     type="tel"
-                    placeholder="+91 9876543210"
+                    placeholder="Mobile Number"
                     value={formData.contact_phone}
                     onChange={(e) => {
                       handleChange('contact_phone', e.target.value);
@@ -515,7 +528,7 @@ const EnquiryWizard = ({ open, onOpenChange, onSuccess }) => {
                       key={source.value}
                       type="button"
                       onClick={() => handleChange('source', source.value)}
-                      className={`flex items-center gap-2 px-4 py-2.5 rounded-full border-2 transition-all ${
+                      className={`flex items-center gap-2 px-2 py-1 rounded-full border-2 transition-all ${
                         formData.source === source.value
                           ? 'bg-primary text-primary-foreground border-primary shadow-sm'
                           : 'bg-white border-gray-200 hover:border-gray-300 text-gray-700'
@@ -531,7 +544,7 @@ const EnquiryWizard = ({ open, onOpenChange, onSuccess }) => {
             </Card>
 
             {/* Customer Sentiment - Badge Style */}
-            <Card className={isMobile ? "p-4 bg-white" : "p-4"}>
+            {/* <Card className={isMobile ? "p-4 bg-white" : "p-4"}>
               <label className="text-sm font-medium flex items-center gap-2 mb-3">
                 Customer Sentiment
               </label>
@@ -556,7 +569,7 @@ const EnquiryWizard = ({ open, onOpenChange, onSuccess }) => {
                   );
                 })}
               </div>
-            </Card>
+            </Card> */}
 
             {/* Vehicle Type and Service Selection */}
             <Card className={isMobile ? "p-4 bg-white" : "p-4"}>
@@ -582,8 +595,8 @@ const EnquiryWizard = ({ open, onOpenChange, onSuccess }) => {
                       }}
                       className={`px-3 py-1.5 rounded-md border text-sm font-medium transition-all ${
                         vehicleType === type
-                          ? 'bg-blue-500 text-white border-blue-500'
-                          : 'bg-white border-gray-300 hover:border-blue-400'
+                          ? 'bg-primary text-white border-primary'
+                          : 'bg-white border-gray-300 hover:border-primary'
                       }`}
                     >
                       {type}
@@ -709,7 +722,7 @@ const EnquiryWizard = ({ open, onOpenChange, onSuccess }) => {
                 Area <span className="text-muted-foreground">(Optional)</span>
               </label>
               <Input
-                placeholder="E.g., Koramangala, Whitefield"
+                placeholder="Location Name"
                 value={formData.area}
                 onChange={(e) => handleChange('area', e.target.value)}
                 className={isMobile ? "text-base h-11" : ""}
@@ -722,11 +735,9 @@ const EnquiryWizard = ({ open, onOpenChange, onSuccess }) => {
                 <Calendar className="h-4 w-4" />
                 Preferred Service Date <span className="text-muted-foreground">(Optional)</span>
               </label>
-              <Input
-                type="date"
+              <DatePicker
                 value={formData.preferred_date}
-                onChange={(e) => handleChange('preferred_date', e.target.value)}
-                min={new Date().toISOString().split('T')[0]}
+                onChange={(value) => handleChange('preferred_date', value)}
                 className={isMobile ? "text-base h-11" : ""}
               />
               <p className="text-xs text-muted-foreground mt-2">
@@ -752,7 +763,10 @@ const EnquiryWizard = ({ open, onOpenChange, onSuccess }) => {
 
       {/* Before Submit Dialog - Status & Follow-up */}
       <Dialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
-        <DialogContent className="max-w-md">
+        <DialogContent 
+          className="max-w-md"
+          onInteractOutside={(e) => e.preventDefault()}
+        >
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <CheckCircle className="h-5 w-5 text-primary" />
@@ -774,6 +788,10 @@ const EnquiryWizard = ({ open, onOpenChange, onSuccess }) => {
                 handleChange('status', value);
                 if (value !== 'lost') {
                   handleChange('lost_reason', '');
+                }
+                // Automatically check follow-up checkbox when status is "needs_followup"
+                if (value === 'needs_followup') {
+                  handleChange('needs_followup', true);
                 }
               }}>
                 <SelectTrigger>
@@ -845,12 +863,9 @@ const EnquiryWizard = ({ open, onOpenChange, onSuccess }) => {
                   <label className="text-xs font-medium text-amber-900">
                     Next Follow-up Date <span className="text-red-500">*</span>
                   </label>
-                  <Input
-                    type="date"
+                  <DatePicker
                     value={formData.followup_date}
-                    onChange={(e) => handleChange('followup_date', e.target.value)}
-                    min={new Date().toISOString().split('T')[0]}
-                    required
+                    onChange={(value) => handleChange('followup_date', value)}
                     className="border-amber-300"
                   />
                 </div>
@@ -880,6 +895,7 @@ const EnquiryWizard = ({ open, onOpenChange, onSuccess }) => {
         <SheetContent
           side={isMobile ? "bottom" : "right"}
           className={`w-full ${isMobile ? 'h-full' : 'sm:max-w-xl'} p-0 flex flex-col bg-gray-50 border-none z-50`}
+          onInteractOutside={(e) => e.preventDefault()}
         >
           <div className="flex items-center justify-between px-4 py-3 bg-white border-b sticky top-0 z-20 shadow-sm">
             <div className="flex items-center gap-3">

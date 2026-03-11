@@ -45,8 +45,13 @@ function App() {
         <Toaster 
           position="top-right"
           richColors
-          // closeButton
+          closeButton
           duration={4000}
+          toastOptions={{
+            style: { zIndex: 9999 },
+            className: 'pointer-events-auto',
+          }}
+          style={{ zIndex: 9999 }}
         />
 
         <Routes>

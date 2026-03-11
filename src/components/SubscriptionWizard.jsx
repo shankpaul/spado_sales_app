@@ -882,7 +882,7 @@ const SubscriptionWizard = ({ open, onOpenChange, onSuccess, customerId = null, 
             </Button>
             <div className="text-center">
               <h2 className="text-sm font-semibold">
-                {subscriptionId ? 'Edit Sub' : 'New Sub'}
+                {subscriptionId ? 'Edit Subscription' : 'New Subscription'}
               </h2>
               <p className="text-[10px] text-muted-foreground uppercase tracking-wider">
                 Step {currentStep} of 5
@@ -1485,7 +1485,7 @@ const SubscriptionWizard = ({ open, onOpenChange, onSuccess, customerId = null, 
                             </div>
                             <div className="grid grid-cols-2 gap-3">
                               <div>
-                                <Label className="text-xs">Default Start Time</Label>
+                                <Label className="text-xs">From</Label>
                                 <Select
                                   value={scheduleRule.defaultTimeFrom}
                                   onValueChange={(value) => setScheduleRule(prev => ({
@@ -1504,7 +1504,7 @@ const SubscriptionWizard = ({ open, onOpenChange, onSuccess, customerId = null, 
                                 </Select>
                               </div>
                               <div>
-                                <Label className="text-xs">Default End Time</Label>
+                                <Label className="text-xs">To</Label>
                                 <Select
                                   value={scheduleRule.defaultTimeTo}
                                   onValueChange={(value) => setScheduleRule(prev => ({
@@ -1630,8 +1630,8 @@ const SubscriptionWizard = ({ open, onOpenChange, onSuccess, customerId = null, 
                           )}
                         </div>
 
-                        <div className="grid grid-cols-3 gap-3 flex-1">
-                          <div>
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 flex-1">
+                          <div className="col-span-2 md:col-span-1">
                             <Label className="text-xs">Date *</Label>
                             <DatePicker
                               value={schedule.date}
