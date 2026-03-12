@@ -4,8 +4,9 @@
 // Precache manifest - Workbox will inject files here during build
 const precacheManifest = self.__WB_MANIFEST || [];
 
-// Cache name - increment version to force cache refresh
-const CACHE_NAME = 'spado-app-v2';
+// Cache name - use timestamp for unique versioning on each build
+const CACHE_VERSION = '1710234000000'; // Will be replaced during build
+const CACHE_NAME = `spado-app-v${CACHE_VERSION}`;
 
 // Install event - precache files
 self.addEventListener('install', function(event) {
@@ -46,7 +47,7 @@ self.addEventListener('activate', function(event) {
   );
 });
 
-// Fetch event - serve from cache, fallback to network
+// Fetch event - Network-first for HTML, cache-first for assets
 self.addEventListener('fetch', function(event) {
   const url = new URL(event.request.url);
   
@@ -58,7 +59,31 @@ self.addEventListener('fetch', function(event) {
     return;
   }
   
-  // Cache-first strategy for static assets
+  // Network-first strategy for HTML documents to get latest content
+  if (event.request.headers.get('accept').includes('text/html')) {
+    event.respondWith(
+      fetch(event.request)
+        .then(function(fetchResponse) {
+          // Cache the new HTML for offline use
+          if (fetchResponse && fetchResponse.status === 200) {
+            const responseToCache = fetchResponse.clone();
+            caches.open(CACHE_NAME).then(function(cache) {
+              cache.put(event.request, responseToCache);
+            });
+          }
+          return fetchResponse;
+        })
+        .catch(function() {
+          // If network fails, try cache
+          return caches.match(event.request).then(function(response) {
+            return response || caches.match('/offline.html');
+          });
+        })
+    );
+    return;
+  }
+  
+  // Cache-first strategy for static assets (JS, CSS, images)
   event.respondWith(
     caches.match(event.request).then(function(response) {
       // Return cached version or fetch from network
