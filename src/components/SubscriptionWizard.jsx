@@ -621,7 +621,6 @@ const SubscriptionWizard = ({ open, onOpenChange, onSuccess, customerId = null, 
     if (!vehicleType) newErrors.vehicleType = 'Please select vehicle type';
     if (!monthsDuration || monthsDuration < 1) newErrors.monthsDuration = 'Please enter valid duration';
     if (!startDate) newErrors.startDate = 'Please select start date';
-    if (!address.area) newErrors.area = 'Please enter service area';
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
