@@ -710,7 +710,7 @@ const Enquiries = () => {
                     <th className="px-4 py-3 font-semibold">Area</th>
                     <th className="px-4 py-3 font-semibold">Status</th>
                     <th className="px-4 py-3 font-semibold">Sentiment</th>
-                    <th className="px-4 py-3 font-semibold">Follow-up</th>
+                    <th className="px-4 py-3 font-semibold">Next Follow-up</th>
                     <th className="px-4 py-3 font-semibold">Created</th>
                   </tr>
                 </thead>

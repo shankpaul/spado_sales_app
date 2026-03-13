@@ -5,7 +5,9 @@
 const precacheManifest = self.__WB_MANIFEST || [];
 
 // Cache name - use timestamp for unique versioning on each build
-const CACHE_VERSION = '1773325196'; // Will be replaced during build
+// IMPORTANT: Update this timestamp on each deployment to force cache refresh
+// Generate: date +%s
+const CACHE_VERSION = '1773401303'; // Updated: 2026-03-13
 const CACHE_NAME = `spado-app-v${CACHE_VERSION}`;
 
 // Install event - precache files

@@ -9,11 +9,12 @@ echo ""
 
 # Get current timestamp for cache busting
 TIMESTAMP=$(date +%s)
-echo "📅 Build timestamp: $TIMESTAMP"
+CURRENT_DATE=$(date +%Y-%m-%d)
+echo "📅 Build timestamp: $TIMESTAMP ($CURRENT_DATE)"
 
 # Update the service worker cache version
 echo "🔧 Updating service worker cache version..."
-sed -i.bak "s/const CACHE_VERSION = '[0-9]*'/const CACHE_VERSION = '$TIMESTAMP'/" public/sw.js
+sed -i.bak "s/const CACHE_VERSION = '[0-9]*'; \/\/ Updated: [0-9-]*/const CACHE_VERSION = '$TIMESTAMP'; \/\/ Updated: $CURRENT_DATE/" public/sw.js
 
 # Clean old build
 echo "🧹 Cleaning old build..."

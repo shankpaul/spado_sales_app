@@ -28,6 +28,7 @@ import { toast } from 'sonner';
 import useEnquiryStore from '../store/enquiryStore';
 import customerService from '../services/customerService';
 import orderService from '../services/orderService';
+import enquiryService from '../services/enquiryService';
 import CustomerForm from './CustomerForm';
 import {
   SENTIMENT_OPTIONS,
@@ -40,6 +41,7 @@ import {
   LOST_REASON_LABELS,
 } from '../constants/enquiryConstants';
 import { getVehicleTypes } from '../lib/vehicleData';
+import VoiceNoteRecorder from './VoiceNoteRecorder';
 import { Loader2, User, Phone, MapPin, MessageSquare, Calendar, Bell, Plus, X, ArrowLeft, Check, Package, AlertCircle, CheckCircle } from 'lucide-react';
 
 /**
@@ -67,6 +69,12 @@ const EnquiryWizard = ({ open, onOpenChange, onSuccess }) => {
   
   // Confirmation dialog
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  
+  // Voice note state
+  const [voiceNoteBlob, setVoiceNoteBlob] = useState(null);
+  const [voiceNoteDuration, setVoiceNoteDuration] = useState(0);
+  const [voiceRecorderKey, setVoiceRecorderKey] = useState(0);
+  const [isRecordingInProgress, setIsRecordingInProgress] = useState(false);
   
   const customerSearchRef = useRef(null);
   const customerFormRef = useRef(null);
@@ -141,8 +149,35 @@ const EnquiryWizard = ({ open, onOpenChange, onSuccess }) => {
       setSelectedAddonIds([]);
       setVehicleType('');
       setShowConfirmDialog(false);
+      setVoiceNoteBlob(null);
+      setVoiceNoteDuration(0);
+      setVoiceRecorderKey(0);
+      setIsRecordingInProgress(false);
     }
   }, [open]);
+
+  // Voice note handlers
+  const handleVoiceNoteComplete = (audioBlob, duration) => {
+    console.log('Voice note complete:', {
+      audioBlob,
+      blobType: audioBlob?.type,
+      blobSize: audioBlob?.size,
+      duration
+    });
+    setVoiceNoteBlob(audioBlob);
+    setVoiceNoteDuration(duration);
+    setIsRecordingInProgress(false);
+  };
+  
+  const handleVoiceNoteDelete = () => {
+    setVoiceNoteBlob(null);
+    setVoiceNoteDuration(0);
+    setVoiceRecorderKey(prev => prev + 1);
+  };
+  
+  const handleRecordingStateChange = (isRecording) => {
+    setIsRecordingInProgress(isRecording);
+  };
 
   // Handle window resize for responsiveness
   useEffect(() => {
@@ -327,7 +362,29 @@ const EnquiryWizard = ({ open, onOpenChange, onSuccess }) => {
         followup_date: (formData.needs_followup && formData.followup_date) ? formData.followup_date : undefined,
       };
 
-      await createEnquiry(submitData);
+      const newEnquiry = await createEnquiry(submitData);
+      
+      // If there's a voice note, upload it as a comment
+      if (voiceNoteBlob && newEnquiry) {
+        try {
+          const voiceFormData = new FormData();
+          voiceFormData.append('audio', voiceNoteBlob, 'voice-note.webm');
+          voiceFormData.append('duration', voiceNoteDuration.toString());
+          voiceFormData.append('is_customer_response', 'false');
+          
+          // Add text if both text and voice note exist
+          if (formData.requirements.trim()) {
+            voiceFormData.append('text', 'Voice note attached with requirements');
+          }
+          
+          await enquiryService.addVoiceComment(newEnquiry.id, voiceFormData);
+        } catch (voiceError) {
+          console.error('Error uploading voice note:', voiceError);
+          // Don't fail the entire creation if voice note upload fails
+          toast.warning('Enquiry created but voice note upload failed');
+        }
+      }
+      
       toast.success('Enquiry created successfully');
       onOpenChange(false);
       if (onSuccess) onSuccess();
@@ -543,6 +600,7 @@ const EnquiryWizard = ({ open, onOpenChange, onSuccess }) => {
               </div>
             </Card>
 
+
             {/* Customer Sentiment - Badge Style */}
             {/* <Card className={isMobile ? "p-4 bg-white" : "p-4"}>
               <label className="text-sm font-medium flex items-center gap-2 mb-3">
@@ -705,13 +763,25 @@ const EnquiryWizard = ({ open, onOpenChange, onSuccess }) => {
               {/* Additional Requirements */}
               <div className="space-y-2">
                 <label className="text-xs text-muted-foreground">Additional Requirements</label>
-                <Textarea
-                  placeholder="Any specific requirements or notes..."
-                  value={formData.requirements}
-                  onChange={(e) => handleChange('requirements', e.target.value)}
-                  rows={2}
-                  className="resize-none text-sm"
-                />
+                <div className='border rounded-lg shadow-sm'>
+                  <Textarea
+                    placeholder="Any specific requirements or notes..."
+                    value={formData.requirements}
+                    onChange={(e) => handleChange('requirements', e.target.value)}
+                    rows={2}
+                    className="resize-none text-sm border-0 shadow-none focus:ring-0 focus-visible:ring-0"
+                  />
+                  
+                  {/* Voice Note Recorder */}
+                  <div className='border-t p-2'>
+                    <VoiceNoteRecorder
+                      key={voiceRecorderKey}
+                      onRecordingComplete={handleVoiceNoteComplete}
+                      onDelete={handleVoiceNoteDelete}
+                      onRecordingStateChange={handleRecordingStateChange}
+                    />
+                  </div>
+                </div>
               </div>
             </Card>
 
