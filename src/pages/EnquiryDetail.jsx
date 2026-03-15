@@ -38,6 +38,7 @@ import {
   AlertDialogTitle,
 } from '../components/ui/alert-dialog';
 import { toast } from 'sonner';
+import ablyClient from '../services/ablyClient';
 import useEnquiryStore from '../store/enquiryStore';
 import {
   ENQUIRY_SOURCE_LABELS,
@@ -149,6 +150,51 @@ const EnquiryDetail = ({ enquiryId, onClose, onUpdate }) => {
       fetchFollowUps();
     }
   }, [id, fetchEnquiryById]);
+
+  // Subscribe to real-time enquiry updates - only when viewing this specific enquiry
+  useEffect(() => {
+    if (!id) return;
+
+    console.log('[EnquiryDetail] Enquiry detail opened - subscribing to enquiry', id);
+    
+    let unsubscribe = null;
+
+    // Initialize Ably client and subscribe
+    const setupSubscription = async () => {
+      try {
+        await ablyClient.initialize();
+        
+        // Subscribe to specific enquiry channel
+        unsubscribe = ablyClient.subscribeToEnquiry(id, (eventName, eventData) => {
+          console.log('[EnquiryDetail] Received event:', eventName, eventData);
+
+          // Handle different event types
+          if (eventName === 'enquiry.updated' || eventName === 'enquiry.status_changed') {
+            console.log('[EnquiryDetail] Enquiry updated, refreshing details');
+            fetchEnquiryById(id);
+          } else if (eventName === 'enquiry.assigned') {
+            console.log('[EnquiryDetail] Enquiry assigned, refreshing details');
+            fetchEnquiryById(id);
+          } else if (eventName === 'enquiry.comment_added') {
+            console.log('[EnquiryDetail] Comment added, refreshing comments');
+            fetchComments();
+          }
+        });
+      } catch (err) {
+        console.error('[EnquiryDetail] Failed to setup Ably subscription:', err);
+      }
+    };
+
+    setupSubscription();
+
+    // Cleanup on unmount - unsubscribe when closing enquiry detail
+    return () => {
+      if (unsubscribe) {
+        console.log('[EnquiryDetail] Enquiry detail closed - cleaning up subscription');
+        unsubscribe();
+      }
+    };
+  }, [id]); // Only re-subscribe if enquiry ID changes
 
   // Fetch comments
   const fetchComments = async () => {

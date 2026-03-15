@@ -17,14 +17,22 @@ class AblyClientService {
   /**
    * Initialize Ably client with token auth
    */
-  async initialize() {
+  async initialize(forceReconnect = false) {
     console.log('='.repeat(80));
     console.log('[Ably] 🚀 INITIALIZE CALLED');
     console.log('='.repeat(80));
     
-    if (this.client) {
+    if (this.client && !forceReconnect) {
       console.log('[Ably] Client already initialized, skipping...');
       return;
+    }
+
+    // If forcing reconnect, close existing connection first
+    if (this.client && forceReconnect) {
+      console.log('[Ably] Force reconnect - closing existing connection...');
+      this.client.close();
+      this.client = null;
+      this.subscriptions.clear();
     }
 
     try {
@@ -199,6 +207,85 @@ class AblyClientService {
   }
 
   /**
+   * Subscribe to all enquiries channel
+   */
+  subscribeToEnquiries(callback) {
+    if (!this.client) {
+      console.error('[Ably] Client not initialized');
+      return null;
+    }
+
+    const channelName = 'enquiries';
+    
+    if (this.subscriptions.has(channelName)) {
+      console.log(`[Ably] Already subscribed to ${channelName}`);
+      return this.subscriptions.get(channelName);
+    }
+
+    const channel = this.client.channels.get(channelName);
+    
+    // Handle channel state changes (detect permission errors)
+    channel.on('failed', (stateChange) => {
+      if (stateChange.reason && stateChange.reason.code === 40160) {
+        console.error('[Ably] ⚠️ Channel permission denied - token needs refresh');
+        console.error('[Ably] Please log out and log back in to get updated permissions');
+      }
+    });
+    
+    // Subscribe to all enquiry events
+    const eventHandler = (message) => {
+      console.log(`[Ably] Event received on ${channelName}:`, message.name, message.data);
+      callback(message.name, message.data);
+    };
+
+    channel.subscribe(eventHandler);
+    
+    this.subscriptions.set(channelName, { channel, eventHandler });
+    console.log(`[Ably] Subscribed to ${channelName}`);
+
+    return () => this.unsubscribe(channelName);
+  }
+
+  /**
+   * Subscribe to a specific enquiry channel
+   */
+  subscribeToEnquiry(enquiryId, callback) {
+    if (!this.client) {
+      console.error('[Ably] Client not initialized');
+      return null;
+    }
+
+    const channelName = `enquiries:${enquiryId}`;
+    
+    if (this.subscriptions.has(channelName)) {
+      console.log(`[Ably] Already subscribed to ${channelName}`);
+      return this.subscriptions.get(channelName);
+    }
+
+    const channel = this.client.channels.get(channelName);
+    
+    // Handle channel state changes (detect permission errors)
+    channel.on('failed', (stateChange) => {
+      if (stateChange.reason && stateChange.reason.code === 40160) {
+        console.error('[Ably] ⚠️ Channel permission denied - token needs refresh');
+        console.error('[Ably] Please log out and log back in to get updated permissions');
+      }
+    });
+    
+    const eventHandler = (message) => {
+      console.log(`[Ably] Event received on ${channelName}:`, message.name, message.data);
+      callback(message.name, message.data);
+    };
+
+    channel.subscribe(eventHandler);
+    
+    this.subscriptions.set(channelName, { channel, eventHandler });
+    console.log(`[Ably] Subscribed to ${channelName}`);
+
+    return () => this.unsubscribe(channelName);
+  }
+
+  /**
    * Unsubscribe from a channel
    */
   unsubscribe(channelName) {
@@ -253,6 +340,14 @@ class AblyClientService {
    */
   getConnectionState() {
     return this.client?.connection.state || 'initialized';
+  }
+
+  /**
+   * Force reconnect with new token
+   */
+  async reconnect() {
+    console.log('[Ably] 🔄 Forcing reconnect to get new token...');
+    await this.initialize(true);
   }
 
   /**

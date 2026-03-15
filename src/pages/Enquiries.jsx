@@ -12,6 +12,7 @@ import {
   SelectValue,
 } from '../components/ui/select';
 import { toast } from 'sonner';
+import ablyClient from '../services/ablyClient';
 import useEnquiryStore from '../store/enquiryStore';
 import {
   ENQUIRY_SOURCE_OPTIONS,
@@ -225,6 +226,58 @@ const Enquiries = () => {
       if (element) observer.unobserve(element);
     };
   }, [handleObserver, isMobile]);
+
+  // Subscribe to real-time enquiry updates - only when this page is open
+  useEffect(() => {
+    console.log('[Enquiries] Page opened - setting up Ably subscription');
+    
+    let unsubscribe = null;
+
+    // Initialize Ably client and subscribe
+    const setupSubscription = async () => {
+      try {
+        await ablyClient.initialize();
+        
+        // Subscribe to enquiries channel
+        unsubscribe = ablyClient.subscribeToEnquiries((eventName, eventData) => {
+          console.log('[Enquiries] Received event:', eventName, eventData);
+
+          // Handle different event types
+          if (eventName === 'enquiry.created') {
+            toast.success('New Enquiry', {
+              description: `New enquiry from ${eventData.data.contact_name || 'Unknown'} via ${eventData.data.source || 'unknown'}`,
+            });
+            // Refresh the list to show new enquiry
+            fetchEnquiries(true);
+          } else if (eventName === 'enquiry.updated' || eventName === 'enquiry.status_changed') {
+            console.log('[Enquiries] Enquiry updated, refreshing list');
+            // Refresh the list to show updates
+            fetchEnquiries(true);
+          } else if (eventName === 'enquiry.assigned') {
+            toast.info('Enquiry Assigned', {
+              description: `Enquiry from ${eventData.data.contact_name || 'Unknown'} has been assigned`,
+            });
+            fetchEnquiries(true);
+          } else if (eventName === 'enquiry.comment_added') {
+            console.log('[Enquiries] Comment added to enquiry', eventData.enquiry_id);
+            // Optionally update comment count in the list
+          }
+        });
+      } catch (err) {
+        console.error('[Enquiries] Failed to setup Ably subscription:', err);
+      }
+    };
+
+    setupSubscription();
+
+    // Cleanup on unmount - unsubscribe when leaving the page
+    return () => {
+      if (unsubscribe) {
+        console.log('[Enquiries] Page closed - cleaning up Ably subscription');
+        unsubscribe();
+      }
+    };
+  }, []); // Run only once on mount, cleanup on unmount
 
   // Check if any filters are applied
   const hasActiveFilters = () => {
