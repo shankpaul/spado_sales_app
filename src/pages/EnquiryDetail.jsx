@@ -989,7 +989,7 @@ const EnquiryDetail = ({ enquiryId, onClose, onUpdate }) => {
                       }`}
                     >
                       <LetterAvatar 
-                        name={comment.created_by?.name || 'Unknown User'} 
+                        name={comment.comment_by_customer?.name || comment.comment_by_user?.name || comment.created_by?.name || 'Unknown User'} 
                         size="sm" 
                         className="md:w-10 md:h-10"
                       />
@@ -997,7 +997,7 @@ const EnquiryDetail = ({ enquiryId, onClose, onUpdate }) => {
                         <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-1 sm:gap-2 mb-2">
                           <div className="flex items-center gap-1.5 md:gap-2 flex-wrap">
                             <span className="font-semibold text-xs md:text-sm">
-                              {comment.created_by?.name || 'Unknown User'}
+                              {comment.comment_by_customer?.name || comment.comment_by_user?.name || comment.created_by?.name || 'Unknown User'}
                             </span>
                             {comment.is_customer_response && (
                               <Badge2 variant="default" className="text-[10px] md:text-xs h-4 md:h-5">
@@ -1013,11 +1013,37 @@ const EnquiryDetail = ({ enquiryId, onClose, onUpdate }) => {
                                 <span className="sm:hidden">Voice</span>
                               </Badge2>
                             )}
+                            {comment.image_url && (
+                              <Badge2 variant="outline" className="text-[10px] md:text-xs h-4 md:h-5">
+                                <span className="hidden sm:inline">📷 Image</span>
+                                <span className="sm:hidden">📷</span>
+                              </Badge2>
+                            )}
                           </div>
                           <span className="text-[10px] md:text-xs text-muted-foreground whitespace-nowrap">
                             {formatDateTime(comment.created_at)}
                           </span>
                         </div>
+                        {comment.image_url && (
+                          <div className="w-full mt-2 mb-2">
+                            <a 
+                              href={comment.image_url} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className="block"
+                            >
+                              <img 
+                                src={comment.image_url} 
+                                alt="WhatsApp image"
+                                className="max-w-full h-auto rounded-lg border border-gray-200 hover:opacity-90 transition-opacity cursor-pointer max-h-96 object-contain"
+                                onError={(e) => {
+                                  e.target.onerror = null;
+                                  e.target.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="200" height="200"%3E%3Crect fill="%23ddd" width="200" height="200"/%3E%3Ctext fill="%23999" x="50%25" y="50%25" dominant-baseline="middle" text-anchor="middle"%3EImage not available%3C/text%3E%3C/svg%3E';
+                                }}
+                              />
+                            </a>
+                          </div>
+                        )}
                         {comment.voice_note_url && (
                           <div className="w-full mt-1 mb-2">
                             <WaveformPlayer 
