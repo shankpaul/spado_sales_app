@@ -643,8 +643,11 @@ const EnquiryDetail = ({ enquiryId, onClose, onUpdate }) => {
             />
             <div className="flex-1 space-y-2 md:space-y-3 min-w-0">
               <div>
-                <h2 className="text-sm md:text-md font-semibold capitalize truncate">
-                  {enquiry.customer?.name || enquiry.contact_name || 'N/A'}
+                <h2 className="text-sm md:text-md font-semibold capitalize truncate flex  gap-2">
+                  <span>{enquiry.customer?.name || enquiry.contact_name || 'N/A'}  </span>
+                   <Badge2 variant={getSentimentBadgeVariant(enquiry.sentiment)}>
+                          {SENTIMENT_EMOJIS[enquiry.sentiment]} {SENTIMENT_LABELS[enquiry.sentiment]}
+                        </Badge2>
                 </h2>
                 <div className="flex flex-wrap gap-1.5 md:gap-2 mt-1.5 md:mt-2 text-xs md:text-sm">
                   <CustomerContact
@@ -663,7 +666,11 @@ const EnquiryDetail = ({ enquiryId, onClose, onUpdate }) => {
                       {formatDate(enquiry.preferred_date)}
                     </span>
                   )}
+
+
+
                 </div>
+                
               </div>
             </div>
           </div>
@@ -935,11 +942,10 @@ const EnquiryDetail = ({ enquiryId, onClose, onUpdate }) => {
                       />
                       <label
                         htmlFor="customer-response"
-                        className="text-xs sm:text-sm font-medium cursor-pointer flex items-center gap-1"
+                        className="text-sm sm:text-sm font-medium cursor-pointer flex items-center gap-1"
                       >
-                        <Phone className="h-3 w-3" />
-                        <span className="hidden sm:inline">Customer Response</span>
-                        <span className="sm:hidden">Customer</span>
+                        <span className="hidden sm:inline">Customer Comment</span>
+                        <span className="sm:hidden">Customer Comment</span>
                       </label>
                     </div>
                     
@@ -991,7 +997,6 @@ const EnquiryDetail = ({ enquiryId, onClose, onUpdate }) => {
                       <LetterAvatar 
                         name={comment.comment_by_customer?.name || comment.comment_by_user?.name || comment.created_by?.name || 'Unknown User'} 
                         size="sm" 
-                        className="md:w-10 md:h-10"
                       />
                       <div className="flex-1 min-w-0">
                         <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-1 sm:gap-2 mb-2">
@@ -1000,10 +1005,9 @@ const EnquiryDetail = ({ enquiryId, onClose, onUpdate }) => {
                               {comment.comment_by_customer?.name || comment.comment_by_user?.name || comment.created_by?.name || 'Unknown User'}
                             </span>
                             {comment.is_customer_response && (
-                              <Badge2 variant="default" className="text-[10px] md:text-xs h-4 md:h-5">
-                                <Phone className="h-2.5 w-2.5 md:h-3 md:w-3 mr-0.5 md:mr-1" />
-                                <span className="hidden sm:inline">Customer Response</span>
-                                <span className="sm:hidden">Customer</span>
+                              <Badge2 variant="info" className="text-xs md:text-xs h-4 md:h-5">
+                                <span className="hidden sm:inline">Customer Comment</span>
+                                <span className="sm:hidden">Customer Comment</span>
                               </Badge2>
                             )}
                             {comment.voice_note_url && (

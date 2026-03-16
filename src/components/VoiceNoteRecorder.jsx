@@ -564,10 +564,10 @@ const VoiceNoteRecorder = ({ onRecordingComplete, onDelete, onRecordingStateChan
   return (
     <Button
       type="button"
-      variant="ghost"
+      variant="outline"
       size="icon"
       onClick={handleStartClick}
-      className="h-9 w-9 rounded-full hover:bg-blue-50 hover:text-blue-600"
+      className="h-9 w-9 shadow-none rounded-full hover:bg-blue-50 hover:text-blue-600"
       title="Record voice note"
     >
       <Mic className="h-5 w-5" />

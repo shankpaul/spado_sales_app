@@ -170,7 +170,7 @@ const Layout = ({ children }) => {
       <Link
         to={item.href}
         onClick={() => mobile && setSidebarOpen(false)}
-        className={`flex items-center gap-3 rounded-lg transition-colors ${collapsed ? 'px-3 py-2 justify-center' : 'px-4 py-2'
+        className={`flex items-center text-sm gap-3 rounded-lg transition-colors ${collapsed ? 'px-3 py-2 justify-center' : 'px-4 py-2'
           } ${isActive
             ? 'bg-primary text-primary-foreground'
             : 'text-gray-700 hover:bg-gray-100'
@@ -196,7 +196,7 @@ const Layout = ({ children }) => {
 
       {/* Sidebar */}
       <aside
-        className={`fixed top-0 left-0 bottom-0 z-40 bg-gray-100 border-r border-gray-200 transform transition-all duration-300 ease-in-out ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'
+        className={`fixed top-0 left-0 bottom-0 z-40 bg-[#fbfbfb] border-r border-gray-200 transform transition-all duration-300 ease-in-out ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'
           } lg:translate-x-0 ${sidebarCollapsed ? 'w-20' : 'w-64'
           }`}
       >
@@ -243,7 +243,7 @@ const Layout = ({ children }) => {
               <div className="pt-4 mt-4 border-t border-gray-200">
                 <button
                   onClick={handleInstallClick}
-                  className={`flex items-center gap-3 w-full rounded-lg transition-colors px-4 py-2 text-primary bg-primary/5 hover:bg-primary/10 border border-primary/20 font-medium ${sidebarCollapsed ? 'justify-center px-0' : ''}`}
+                  className={`flex items-center cursor-pointer gap-3 w-full rounded-lg transition-colors px-4 py-2 text-sm  bg-primary/5 hover:bg-primary/10 border border-primary/20 font-medium ${sidebarCollapsed ? 'justify-center px-0' : ''}`}
                   title="Install App"
                 >
                   <Download className="h-5 w-5" />
@@ -492,7 +492,7 @@ const Layout = ({ children }) => {
         </nav>
 
         {/* Page Content */}
-        <main className="mb-16 lg:mb-0 lg:mt-0 bg-gray-50">
+        <main className="mb-16 lg:mb-0 lg:mt-0 bg-[#fbfbfb] min-h-[calc(100vh-4rem)]">
           <div className="mx-auto">
             {children}
           </div>

@@ -272,7 +272,7 @@ const Enquiries = () => {
 
     // Cleanup on unmount - unsubscribe when leaving the page
     return () => {
-      if (unsubscribe) {
+      if (unsubscribe && typeof unsubscribe === 'function') {
         console.log('[Enquiries] Page closed - cleaning up Ably subscription');
         unsubscribe();
       }
@@ -439,7 +439,7 @@ const Enquiries = () => {
       </div>
 
       {/* Search and Filters - Sticky on Mobile */}
-      <div className="sticky top-0 z-10 md:static bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 py-2 -mx-4 px-4 md:mx-0 md:px-0 flex flex-col sm:flex-row gap-4">
+      <div className="sticky top-0 z-10 ">
         <div className="flex flex-col sm:flex-row gap-4 w-full">
           {/* Single Search Field */}
           <div className="relative flex-1 flex gap-2">
@@ -450,7 +450,7 @@ const Enquiries = () => {
                 value={searchInput}
                 onChange={(e) => setSearchInput(e.target.value)}
                 onKeyPress={handleSearchKeyPress}
-                className="pl-10 pr-10"
+                className="pl-10 pr-10 bg-white border-gray-200 shadow-xs"
               />
               {searchInput && (
                 <button
@@ -606,7 +606,7 @@ const Enquiries = () => {
       )}
 
       {/* Enquiries List */}
-      <Card className="border-0 shadow-none md:border-1 md:shadow-sm">
+      <Card className="border-0 shadow-none md:border-1 rounded-lg md:shadow-xs bg-white">
         {loading ? (
           <div className="space-y-4">
             {/* Desktop Skeleton */}
@@ -762,9 +762,8 @@ const Enquiries = () => {
                     <th className="px-4 py-3 font-semibold">Source</th>
                     <th className="px-4 py-3 font-semibold">Area</th>
                     <th className="px-4 py-3 font-semibold">Status</th>
-                    <th className="px-4 py-3 font-semibold">Sentiment</th>
                     <th className="px-4 py-3 font-semibold">Next Follow-up</th>
-                    <th className="px-4 py-3 font-semibold">Created</th>
+                    <th className="px-4 py-3 font-semibold">Updated At</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -812,11 +811,6 @@ const Enquiries = () => {
                         </Badge2>
                       </td>
                       <td className="px-4 py-3">
-                        <Badge2 variant={getSentimentBadgeVariant(enquiry.sentiment)}>
-                          {SENTIMENT_EMOJIS[enquiry.sentiment]} {SENTIMENT_LABELS[enquiry.sentiment]}
-                        </Badge2>
-                      </td>
-                      <td className="px-4 py-3">
                         {enquiry.followup_date ? (
                           <div className={`flex items-center gap-1 ${isFollowUpNeeded(enquiry.followup_date) ? 'text-red-500 font-medium' : ''}`}>
                             <Bell className="h-3 w-3" />
@@ -826,7 +820,7 @@ const Enquiries = () => {
                           <span className="text-muted-foreground">N/A</span>
                         )}
                       </td>
-                      <td className="px-4 py-3">{formatDate(enquiry.created_at)}</td>
+                      <td className="px-4 py-3">{formatDate(enquiry.updated_at)}</td>
                     </tr>
                   ))}
                 </tbody>

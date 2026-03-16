@@ -40,6 +40,7 @@ export const ENQUIRY_STATUSES = {
 };
 
 export const ENQUIRY_STATUS_LABELS = {
+  [ENQUIRY_STATUSES.NEW]: 'New',
   [ENQUIRY_STATUSES.CONTACTED]: 'Contacted',
   [ENQUIRY_STATUSES.INTERESTED]: 'Interested',
   [ENQUIRY_STATUSES.NEEDS_FOLLOWUP]: 'Needs Follow-up',
@@ -54,7 +55,7 @@ export const ENQUIRY_STATUS_OPTIONS = Object.entries(ENQUIRY_STATUS_LABELS).map(
 
 // Status colors for badges
 export const ENQUIRY_STATUS_COLORS = {
-  [ENQUIRY_STATUSES.NEW]: 'secondary',
+  [ENQUIRY_STATUSES.NEW]: 'default',
   [ENQUIRY_STATUSES.CONTACTED]: 'info',
   [ENQUIRY_STATUSES.INTERESTED]: 'success',
   [ENQUIRY_STATUSES.NEEDS_FOLLOWUP]: 'warning',

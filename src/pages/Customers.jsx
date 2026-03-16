@@ -271,7 +271,7 @@ const Customers = () => {
       </div>
 
       {/* Search and Filters - Improved for Mobile App Feel */}
-      <div className="sticky top-0 z-10 bg-gray-50/80 backdrop-blur-md py-2 -mx-4 px-4 sm:mx-0 sm:px-0 space-y-3">
+      <div className="sticky top-0 z-10">
         <div className="flex gap-2">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -279,7 +279,7 @@ const Customers = () => {
               placeholder="Search by name or phone..."
               value={searchTerm}
               onChange={handleSearch}
-              className="pl-10 pr-10 bg-white border-gray-200 h-10 shadow-sm"
+              className="pl-10 pr-10 bg-white border-gray-200 shadow-xs"
             />
             {searchTerm && (
               <button
@@ -315,11 +315,11 @@ const Customers = () => {
             value={customDays}
             onChange={(e) => setCustomDays(e.target.value)}
             min="1"
-            className="h-9 bg-white shadow-sm"
+            className="h-9 bg-white"
           />
         )}
       </div>
-      <Card className="border-0 shadow-none md:border-1 md:shadow-sm">
+      <Card className="border-0 shadow-none rounded-lg md:border-1 md:shadow-xs bg-white">
         {loading ? (
           <div className="space-y-4">
             {/* Desktop Skeleton */}
@@ -422,7 +422,7 @@ const Customers = () => {
                 <tbody>
                   {customers.map((customer) => (
                     <tr key={customer.id} className="border-b last:border-0 hover:bg-muted/50 text-sm" >
-                      <td className="px-4 py-3">
+                      <td className="px-4 py-2">
                         <div className="flex items-center gap-2">
                           <LetterAvatar name={customer.name} size="xs" />
                           <button
@@ -433,7 +433,7 @@ const Customers = () => {
                           </button>
                         </div>
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="px-4 py-2">
                         <div className="flex items-center gap-2">
                           <MapPin className="h-4 w-4 text-muted-foreground" />
                           <span className="text-sm capitalize">
@@ -441,13 +441,13 @@ const Customers = () => {
                           </span>
                         </div>
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="px-4 py-2">
                         <div className="flex items-center gap-2">
                           <Calendar className="h-4 w-4 text-muted-foreground" />
                           {formatDate(customer.last_booked_at)}
                         </div>
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="px-4 py-2">
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <Button variant="ghost" size="icon" className="h-8 w-8">

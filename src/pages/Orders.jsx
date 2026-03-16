@@ -389,7 +389,7 @@ const Orders = () => {
       </div>
 
       {/* Search and Filters - Sticky on Mobile */}
-      <div className="sticky top-0 z-10 md:static bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 py-2 -mx-4 px-4 md:mx-0 md:px-0 flex flex-col sm:flex-row gap-4">
+      <div className="sticky top-0 z-10">
         <div className="flex flex-col sm:flex-row gap-4 w-full">
           {/* Single Search Field */}
           <div className="relative flex-1 flex gap-2">
@@ -400,7 +400,7 @@ const Orders = () => {
                 value={searchInput}
                 onChange={(e) => setSearchInput(e.target.value)}
                 onKeyPress={handleSearchKeyPress}
-                className="pl-10 pr-10"
+                className="pl-10 pr-10 bg-white border-gray-200 shadow-xs"
               />
               {searchInput && (
                 <button
@@ -554,7 +554,7 @@ const Orders = () => {
       )}
 
       {/* Orders List */}
-      <Card className="border-0 shadow-none md:border-1 md:shadow-sm">
+      <Card className="border-0 shadow-none rounded-lg md:border-1 md:shadow-xs bg-white">
         {loading ? (
           <div className="space-y-4">
             {/* Desktop Skeleton */}

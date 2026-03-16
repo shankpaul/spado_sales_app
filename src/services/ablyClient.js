@@ -125,7 +125,7 @@ class AblyClientService {
     
     if (this.subscriptions.has(channelName)) {
       console.log(`[Ably] Already subscribed to ${channelName}`);
-      return this.subscriptions.get(channelName);
+      return () => this.unsubscribe(channelName);
     }
 
     const channel = this.client.channels.get(channelName);
@@ -157,7 +157,7 @@ class AblyClientService {
     
     if (this.subscriptions.has(channelName)) {
       console.log(`[Ably] Already subscribed to ${channelName}`);
-      return this.subscriptions.get(channelName);
+      return () => this.unsubscribe(channelName);
     }
 
     const channel = this.client.channels.get(channelName);
@@ -188,7 +188,7 @@ class AblyClientService {
     
     if (this.subscriptions.has(channelName)) {
       console.log(`[Ably] Already subscribed to ${channelName}`);
-      return this.subscriptions.get(channelName);
+      return () => this.unsubscribe(channelName);
     }
 
     const channel = this.client.channels.get(channelName);
@@ -219,7 +219,7 @@ class AblyClientService {
     
     if (this.subscriptions.has(channelName)) {
       console.log(`[Ably] Already subscribed to ${channelName}`);
-      return this.subscriptions.get(channelName);
+      return () => this.unsubscribe(channelName);
     }
 
     const channel = this.client.channels.get(channelName);
@@ -259,7 +259,7 @@ class AblyClientService {
     
     if (this.subscriptions.has(channelName)) {
       console.log(`[Ably] Already subscribed to ${channelName}`);
-      return this.subscriptions.get(channelName);
+      return () => this.unsubscribe(channelName);
     }
 
     const channel = this.client.channels.get(channelName);
