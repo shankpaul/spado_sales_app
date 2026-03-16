@@ -698,12 +698,6 @@ const Enquiries = () => {
                         <div className="font-bold text-base truncate capitalize">
                           {enquiry.customer?.name || enquiry.contact_name || 'Unknown'}
                         </div>
-                        <Badge2 
-                          variant={getSentimentBadgeVariant(enquiry.sentiment)} 
-                          className="h-5 text-[10px] px-1.5"
-                        >
-                          {SENTIMENT_EMOJIS[enquiry.sentiment]} {SENTIMENT_LABELS[enquiry.sentiment]}
-                        </Badge2>
                       </div>
                       <div className="flex items-center justify-between mt-1">
                         <div className="text-xs text-muted-foreground flex items-center gap-2">

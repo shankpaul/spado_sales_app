@@ -645,9 +645,11 @@ const EnquiryDetail = ({ enquiryId, onClose, onUpdate }) => {
               <div>
                 <h2 className="text-sm md:text-md font-semibold capitalize truncate flex  gap-2">
                   <span>{enquiry.customer?.name || enquiry.contact_name || 'N/A'}  </span>
-                   <Badge2 variant={getSentimentBadgeVariant(enquiry.sentiment)}>
+                   {
+                   enquiry.sentiment && <Badge2 variant={getSentimentBadgeVariant(enquiry.sentiment)}>
                           {SENTIMENT_EMOJIS[enquiry.sentiment]} {SENTIMENT_LABELS[enquiry.sentiment]}
                         </Badge2>
+                   }
                 </h2>
                 <div className="flex flex-wrap gap-1.5 md:gap-2 mt-1.5 md:mt-2 text-xs md:text-sm">
                   <CustomerContact
