@@ -1041,7 +1041,7 @@ const EnquiryDetail = ({ enquiryId, onClose, onUpdate }) => {
                               <img 
                                 src={comment.image_url} 
                                 alt="WhatsApp image"
-                                className="max-w-full h-auto rounded-lg border border-gray-200 hover:opacity-90 transition-opacity cursor-pointer max-h-96 object-contain"
+                                className="max-w-full h-auto rounded-lg border border-gray-200 hover:opacity-90 transition-opacity cursor-pointer max-h-50 object-contain"
                                 onError={(e) => {
                                   e.target.onerror = null;
                                   e.target.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="200" height="200"%3E%3Crect fill="%23ddd" width="200" height="200"/%3E%3Ctext fill="%23999" x="50%25" y="50%25" dominant-baseline="middle" text-anchor="middle"%3EImage not available%3C/text%3E%3C/svg%3E';
