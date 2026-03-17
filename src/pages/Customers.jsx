@@ -11,6 +11,7 @@ import {
   SheetTitle,
   SheetDescription,
   SheetClose,
+  SheetTrigger,
 } from '../components/ui/sheet';
 import {
   AlertDialog,
@@ -54,6 +55,7 @@ import {
   DropdownMenuTrigger,
 } from '../components/ui/dropdown-menu';
 import { Skeleton } from '../components/ui/skeleton';
+import { Badge2 } from '../components/ui/badge2';
 import {
   Select,
   SelectContent,
@@ -70,8 +72,11 @@ const Customers = () => {
   const [customers, setCustomers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [searchInput, setSearchInput] = useState('');
   const [dateFilter, setDateFilter] = useState('all');
   const [customDays, setCustomDays] = useState('');
+  const [customMonths, setCustomMonths] = useState('');
+  const [customUnit, setCustomUnit] = useState('days'); // 'days' or 'months'
   const [page, setPage] = useState(1);
   const [perPage] = useState(20);
   const [totalPages, setTotalPages] = useState(1);
@@ -82,6 +87,13 @@ const Customers = () => {
   // Refs for infinite scroll
   const observerTarget = useRef(null);
   const isLoadingMore = useRef(false);
+
+  // Filter sheet states
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const [tempDateFilter, setTempDateFilter] = useState('all');
+  const [tempCustomDays, setTempCustomDays] = useState('');
+  const [tempCustomMonths, setTempCustomMonths] = useState('');
+  const [tempCustomUnit, setTempCustomUnit] = useState('days');
 
   // Dialog states
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -113,9 +125,13 @@ const Customers = () => {
 
       // Add date filter
       if (dateFilter !== 'all') {
-        if (dateFilter === 'custom' && customDays) {
-          params.last_booked_filter = `${customDays}d`;
-        } else if (dateFilter !== 'custom') {
+        if (dateFilter === 'custom') {
+          if (customUnit === 'days' && customDays) {
+            params.last_booked_filter = `${customDays}d`;
+          } else if (customUnit === 'months' && customMonths) {
+            params.last_booked_filter = `${customMonths}m`;
+          }
+        } else {
           params.last_booked_filter = dateFilter;
         }
       }
@@ -144,6 +160,67 @@ const Customers = () => {
     }
   };
 
+  // Check if any filters are applied
+  const hasActiveFilters = () => {
+    return dateFilter !== 'all';
+  };
+
+  // Get active filter count
+  const getActiveFilterCount = () => {
+    let count = 0;
+    if (dateFilter !== 'all') count++;
+    return count;
+  };
+
+  // Clear all filters
+  const clearFilters = () => {
+    setDateFilter('all');
+    setCustomDays('');
+    setCustomMonths('');
+    setCustomUnit('days');
+    setTempDateFilter('all');
+    setTempCustomDays('');
+    setTempCustomMonths('');
+    setTempCustomUnit('days');
+  };
+
+  // Apply filters from temporary states
+  const applyFilters = () => {
+    setDateFilter(tempDateFilter);
+    setCustomDays(tempCustomDays);
+    setCustomMonths(tempCustomMonths);
+    setCustomUnit(tempCustomUnit);
+    setIsFilterOpen(false);
+  };
+
+  // Sync temp filters with actual when opening sheet
+  const handleFilterOpen = (open) => {
+    if (open) {
+      setTempDateFilter(dateFilter);
+      setTempCustomDays(customDays);
+      setTempCustomMonths(customMonths);
+      setTempCustomUnit(customUnit);
+    }
+    setIsFilterOpen(open);
+  };
+
+  // Get filter summary for display
+  const getFilterSummary = () => {
+    const filters = [];
+    if (dateFilter === '7d') filters.push('Last 7 days');
+    else if (dateFilter === '14d') filters.push('Last 2 weeks');
+    else if (dateFilter === '1m') filters.push('Last month');
+    else if (dateFilter === '3m') filters.push('Last 3 months');
+    else if (dateFilter === 'custom') {
+      if (customUnit === 'days' && customDays) {
+        filters.push(`Last ${customDays} day${customDays > 1 ? 's' : ''}`);
+      } else if (customUnit === 'months' && customMonths) {
+        filters.push(`Last ${customMonths} month${customMonths > 1 ? 's' : ''}`);
+      }
+    }
+    return filters;
+  };
+
   // Handle window resize
   useEffect(() => {
     const handleResize = () => {
@@ -158,7 +235,7 @@ const Customers = () => {
     setPage(1);
     setCustomers([]);
     fetchCustomers(1, false);
-  }, [searchTerm, dateFilter, customDays]);
+  }, [searchTerm, dateFilter, customDays, customMonths, customUnit]);
 
   // Fetch customers on page change (desktop pagination)
   useEffect(() => {
@@ -224,8 +301,21 @@ const Customers = () => {
   };
 
   // Handle search
-  const handleSearch = (e) => {
-    setSearchTerm(e.target.value);
+  const handleSearch = () => {
+    setSearchTerm(searchInput);
+  };
+
+  // Clear search input and query
+  const clearSearch = () => {
+    setSearchInput('');
+    setSearchTerm('');
+  };
+
+  // Handle Enter key in search input
+  const handleSearchKeyPress = (e) => {
+    if (e.key === 'Enter') {
+      handleSearch();
+    }
   };
 
   // Open customer details dialog
@@ -270,55 +360,157 @@ const Customers = () => {
         <p className="text-muted-foreground text-sm">Manage your customer database ({totalCount})</p>
       </div>
 
-      {/* Search and Filters - Improved for Mobile App Feel */}
+      {/* Search and Filters - Sheet-based Implementation */}
       <div className="sticky top-0 z-10">
-        <div className="flex gap-2">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search by name or phone..."
-              value={searchTerm}
-              onChange={handleSearch}
-              className="pl-10 pr-10 bg-white border-gray-200 shadow-xs"
-            />
-            {searchTerm && (
-              <button
-                onClick={() => setSearchTerm('')}
-                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                type="button"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            )}
+        <div className="flex flex-col sm:flex-row gap-4 w-full">
+          {/* Search Field */}
+          <div className="relative flex-1 flex gap-2">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search by name or phone..."
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+                onKeyPress={handleSearchKeyPress}
+                className="pl-10 pr-10 bg-white border-gray-200 shadow-xs"
+              />
+              {searchInput && (
+                <button
+                  onClick={clearSearch}
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                  type="button"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              )}
+            </div>
+            <Button onClick={handleSearch} variant="default" className="shrink-0 hidden sm:flex">
+              <Search className="h-4 w-4 mr-2" />
+              Search
+            </Button>
           </div>
-          <div className="flex-shrink-0">
-            <Select value={dateFilter} onValueChange={setDateFilter}>
-              <SelectTrigger className="h-10 w-[130px] bg-white border-gray-200 shadow-sm focus:ring-1 focus:ring-primary">
-                <SelectValue placeholder="Filter" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Time</SelectItem>
-                <SelectItem value="7d">Last 7d</SelectItem>
-                <SelectItem value="1m">Last month</SelectItem>
-                <SelectItem value="3m">Last 3m</SelectItem>
-                <SelectItem value="custom">Custom</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
 
-        {/* Custom Days Input */}
-        {dateFilter === 'custom' && (
-          <Input
-            type="number"
-            placeholder="Enter range in days"
-            value={customDays}
-            onChange={(e) => setCustomDays(e.target.value)}
-            min="1"
-            className="h-9 bg-white"
-          />
-        )}
+          {/* Filter Button with Sheet */}
+          <Sheet open={isFilterOpen} onOpenChange={handleFilterOpen}>
+            <SheetTrigger asChild>
+              <Button
+                variant={hasActiveFilters() ? "default" : "outline"}
+                className="w-full sm:w-auto relative"
+              >
+                <Filter className="h-4 w-4 mr-2" />
+                Filters
+                {hasActiveFilters() && (
+                  <Badge2
+                    variant="secondary"
+                    className="ml-2 bg-white text-primary px-1.5 py-0 text-xs h-5 min-w-[20px]"
+                  >
+                    {getActiveFilterCount()}
+                  </Badge2>
+                )}
+              </Button>
+            </SheetTrigger>
+            <SheetContent side={isMobile ? "bottom" : "right"}>
+              <SheetHeader>
+                <SheetTitle>Filter Customers</SheetTitle>
+                <SheetDescription>
+                  Filter customers by their last booking date
+                </SheetDescription>
+              </SheetHeader>
+              <div className="grid gap-4 py-4">
+                {/* Booking Date Filter */}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Last Booked</label>
+                  <Select value={tempDateFilter} onValueChange={setTempDateFilter}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="All Time" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Time</SelectItem>
+                      <SelectItem value="7d">Last 7 days</SelectItem>
+                      <SelectItem value="14d">Last 2 weeks</SelectItem>
+                      <SelectItem value="1m">Last month</SelectItem>
+                      <SelectItem value="3m">Last 3 months</SelectItem>
+                      <SelectItem value="custom">Custom Range</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Custom Range Input */}
+                {tempDateFilter === 'custom' && (
+                  <div className="space-y-3 p-4 bg-muted/30 rounded-lg">
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Select Unit</label>
+                      <Select value={tempCustomUnit} onValueChange={setTempCustomUnit}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select unit" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="days">Days</SelectItem>
+                          <SelectItem value="months">Months</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    
+                    {tempCustomUnit === 'days' ? (
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">Number of Days</label>
+                        <Input
+                          type="number"
+                          placeholder="Enter number of days"
+                          value={tempCustomDays}
+                          onChange={(e) => setTempCustomDays(e.target.value)}
+                          min="1"
+                        />
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">Number of Months</label>
+                        <Input
+                          type="number"
+                          placeholder="Enter number of months"
+                          value={tempCustomMonths}
+                          onChange={(e) => setTempCustomMonths(e.target.value)}
+                          min="1"
+                        />
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+              <div className="flex flex-col gap-2 pt-4 border-t">
+                <Button onClick={applyFilters} className="w-full">
+                  Apply Filters
+                </Button>
+                <Button variant="outline" onClick={clearFilters} className="w-full">
+                  Clear All
+                </Button>
+              </div>
+            </SheetContent>
+          </Sheet>
+        </div>
       </div>
+
+      {/* Active Filters Summary */}
+      {hasActiveFilters() && (
+        <div className="mt-4 flex flex-wrap items-center gap-2">
+          <span className="text-sm text-muted-foreground">Active filters:</span>
+          {getFilterSummary().map((filter, index) => (
+            <Badge2 key={index} variant="secondary" className="gap-1">
+              {filter}
+            </Badge2>
+          ))}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={clearFilters}
+            className="h-6 px-2 text-xs"
+          >
+            <X className="h-3 w-3 mr-1" />
+            Clear all
+          </Button>
+        </div>
+      )}
+
       <Card className="border-0 shadow-none rounded-lg md:border-1 md:shadow-xs bg-white">
         {loading ? (
           <div className="space-y-4">

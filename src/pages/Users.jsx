@@ -48,6 +48,7 @@ import { Skeleton } from '../components/ui/skeleton';
 import { Badge } from '../components/ui/badge';
 import UserForm from '../components/UserForm';
 import ChangePasswordDialog from '../components/ChangePasswordDialog';
+import { Badge2 } from '@/components/ui/badge2';
 
 /**
  * Users Management Page (Admin Only)
@@ -197,12 +198,12 @@ const Users = () => {
   // Get role badge color
   const getRoleBadgeColor = (role) => {
     const colors = {
-      admin: 'bg-red-100 text-red-800',
-      agent: 'bg-blue-100 text-blue-800',
-      sales_executive: 'bg-green-100 text-green-800',
-      accountant: 'bg-purple-100 text-purple-800',
+      admin: 'destructive',
+      agent: 'info',
+      sales_executive: 'success',
+      accountant: 'purple',
     };
-    return colors[role] || 'bg-gray-100 text-gray-800';
+    return colors[role] || 'gray';
   };
 
   // Get role label
@@ -238,7 +239,7 @@ const Users = () => {
             placeholder="Search users by name, email, or role..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10"
+            className="pl-10 pr-10 bg-white border-gray-200 shadow-xs"
           />
         </div>
 
@@ -279,7 +280,7 @@ const Users = () => {
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {filteredUsers.map((user) => (
-            <Card key={user.id} className="p-6 hover:shadow-lg transition-shadow">
+            <Card key={user.id} className="p-6 shadow-xs hover:shadow-lg transition-shadow bg-white">
               <div className="flex items-start justify-between mb-4">
                 <div className="flex items-start gap-3">
                   {user.avatar_url ? (
@@ -292,7 +293,7 @@ const Users = () => {
                     <LetterAvatar name={user.name} size="md" />
                   )}
                   <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold text-gray-900 truncate">
+                    <h3 className="font-semibold text-gray-900 truncate capitalize">
                       {user.name}
                     </h3>
                     <p className="text-sm text-gray-600 truncate">{user.email}</p>
@@ -339,18 +340,18 @@ const Users = () => {
 
               <div className="space-y-2">
                 <div className="flex items-center gap-2">
-                  <Badge className={getRoleBadgeColor(user.role)}>
+                  <Badge2 variant={getRoleBadgeColor(user.role)}>
                     <Shield className="h-3 w-3 mr-1" />
                     {getRoleLabel(user.role)}
-                  </Badge>
+                  </Badge2>
                   {user.locked && (
-                    <Badge className="bg-red-100 text-red-800">
+                    <Badge2 className="bg-red-100 text-red-800">
                       <Lock className="h-3 w-3 mr-1" />
                       Locked
-                    </Badge>
+                    </Badge2>
                   )}
                   {user.expired && (
-                    <Badge className="bg-orange-100 text-orange-800">Expired</Badge>
+                    <Badge2 className="bg-orange-100 text-orange-800">Expired</Badge2>
                   )}
                 </div>
 

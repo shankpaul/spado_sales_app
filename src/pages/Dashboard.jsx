@@ -459,7 +459,7 @@ const Dashboard = () => {
 
         {/* Quick Links Column - Desktop Only */}
         <div className="hidden md:block">
-          <Card>
+          <Card className="bg-white">
             <CardHeader>
               <CardTitle className="text-lg flex items-center gap-2">
                 <Zap className="h-5 w-5 text-primary-600" />
@@ -468,6 +468,7 @@ const Dashboard = () => {
             </CardHeader>
             <CardContent className="space-y-2">
               <QuickLinkButton
+                className="bg-gray-50 hover:bg-gray-100"
                 icon={<Car className="h-5 w-5" />}
                 label="Identify Vehicle Type"
                 description="Check vehicle category"
@@ -476,12 +477,14 @@ const Dashboard = () => {
               <QuickLinkButton
                 icon={<CheckCircle2 className="h-5 w-5" />}
                 label="Service Area Checker"
+                className="bg-gray-50 hover:bg-gray-100"
                 description="Check area is serviceable"
                 onClick={() => setServiceCheckerOpen(true)}
               />
               <QuickLinkButton
                 icon={<Users2 className="h-5 w-5" />}
-                label="Agents Today"
+                label="Agents Available Today"
+                className="bg-gray-50 hover:bg-gray-100"
                 description="View available agents"
                 onClick={() => setAgentsAvailableOpen(true)}
               />
@@ -1202,10 +1205,10 @@ const QuickLinkCard = ({ icon, label, onClick }) => (
   </button>
 );
 
-const QuickLinkButton = ({ icon, label, description, onClick }) => (
+const QuickLinkButton = ({ icon, label, description, onClick, className }) => (
   <button
     onClick={onClick}
-    className="w-full flex items-start gap-3 p-3 rounded-lg border border-gray-200 hover:bg-primary-50 hover:border-primary-300 transition-all active:scale-[0.98]"
+    className={`w-full flex items-start gap-3 p-3 rounded-lg border border-gray-200 hover:bg-primary-50 hover:border-primary-300 transition-all active:scale-[0.98] ${className}`}
   >
     <div className="p-2 bg-primary/10 rounded-lg text-primary shrink-0">
       {icon}

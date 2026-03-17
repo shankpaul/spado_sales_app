@@ -54,6 +54,8 @@ import {
   Eye,
   Mail,
   User,
+  BoltIcon,
+  CogIcon,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -246,7 +248,7 @@ const Employees = () => {
       </div>
 
       {/* Filters and Search */}
-      <div className="flex flex-col sm:flex-row gap-4">
+      <div className="sticky top-0 flex flex-col sm:flex-row gap-4">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
           <Input
@@ -254,7 +256,7 @@ const Employees = () => {
             placeholder="Search by employee number, name, job title..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10"
+            className="pl-10 pr-10 bg-white border-gray-200 shadow-xs"
           />
         </div>
         <Select value={statusFilter} onValueChange={setStatusFilter}>
@@ -345,7 +347,7 @@ const Employees = () => {
         <>
           {/* Desktop Table View */}
           <div className="hidden md:block">
-            <Card>
+            <Card  className="border-0 shadow-none rounded-lg md:border-1 md:shadow-xs bg-white">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -368,8 +370,8 @@ const Employees = () => {
                             {employee.job_title && ` • ${employee.job_title}`}
                           </div>
                           {employee.user && (
-                            <div className="text-xs text-gray-400 mt-1">
-                              {employee.user.name} ({employee.user.role})
+                            <div className="text-xs text-gray-400 flex gap-1 items-center">
+                              <CogIcon strokeWidth={1.2} size={12} /> {employee.user.name} ({employee.user.role})
                             </div>
                           )}
                         </div>

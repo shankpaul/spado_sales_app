@@ -9,7 +9,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from './ui/select';
-import { Loader2 } from 'lucide-react';
+import { Loader2, UserCircle, Camera, X } from 'lucide-react';
 import { toast } from 'sonner';
 import officeService from '../services/officeService';
 import employeeService from '../services/employeeService';
@@ -31,7 +31,7 @@ const UserForm = ({ user, onSubmit, onCancel }) => {
     address: '',
     employee_number: '',
     employee_id: '',
-    role: 'agent',
+    role: '',
     office_id: '',
     home_latitude: '',
     home_longitude: '',
@@ -55,7 +55,7 @@ const UserForm = ({ user, onSubmit, onCancel }) => {
 
     const fetchEmployees = async () => {
       try {
-        const response = await employeeService.getAllEmployees({ status: 'active' });
+        const response = await employeeService.getAllEmployees({ status: 0 });
         setEmployees(response.employees || []);
       } catch (error) {
         console.error('Error fetching employees:', error);
@@ -77,10 +77,10 @@ const UserForm = ({ user, onSubmit, onCancel }) => {
         address: user.address || '',
         employee_number: user.employee_number || '',
         employee_id: user.employee_id ? user.employee_id.toString() : '',
-        role: user.role || 'agent',
+        role: user.role,
         office_id: user.office_id ? user.office_id.toString() : '',
-        home_latitude: user.home_latitude || '',
-        home_longitude: user.home_longitude || '',
+        home_latitude: user.home_latitude ? user.home_latitude.toString() : '',
+        home_longitude: user.home_longitude ? user.home_longitude.toString() : '',
         password: '',
         password_confirmation: '',
       });
@@ -109,10 +109,12 @@ const UserForm = ({ user, onSubmit, onCancel }) => {
 
   // Handle role change
   const handleRoleChange = (value) => {
-    setFormData((prev) => ({
-      ...prev,
-      role: value,
-    }));
+    if(value){
+      setFormData((prev) => ({
+        ...prev,
+        role: value,
+      }));
+    }
   };
 
   // Handle employee change
@@ -297,225 +299,249 @@ const UserForm = ({ user, onSubmit, onCancel }) => {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6 pt-6">
-      {/* Avatar */}
-      <div className="space-y-2">
-        <Label>Avatar (Optional)</Label>
-        <div className="flex items-center gap-4">
-          {avatarPreview && (
-            <div className="relative">
+      {/* Profile Image Upload */}
+      <div className="flex flex-col items-center space-y-4 pb-6 border-b">
+        <Label className="text-base font-medium">Profile Image (Optional)</Label>
+        
+        <div className="relative group">
+          {/* Avatar Preview Circle */}
+          <div className="relative w-24 h-24 rounded-full overflow-hidden bg-gradient-to-br from-gray-100 to-gray-200 border-3 border-white shadow-xs ring-2 ring-gray-200 group-hover:ring-gray-500 transition-all duration-200">
+            {avatarPreview ? (
               <img
                 src={avatarPreview}
-                alt="Avatar preview"
-                className="w-20 h-20 rounded-full object-cover border-2 border-gray-200"
+                alt="Profile preview"
+                className="w-full h-full object-cover"
               />
-              {avatarFile && (
-                <button
-                  type="button"
-                  onClick={handleRemoveAvatar}
-                  className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs hover:bg-red-600"
-                >
-                  ×
-                </button>
+            ) : (
+              <div className="w-full h-full flex items-center justify-center">
+                <UserCircle className="w-12 h-12 text-gray-400" />
+              </div>
+            )}
+            
+            {/* Hover Overlay */}
+            <div className=" inset-0 bg-gray-50 bg-opacity-0 group-hover:bg-opacity-50 transition-all duration-200 flex items-center justify-center">
+                <Camera className="w-6 h-6 text-white" />
+            </div>
+          </div>
+
+          {/* Remove Button */}
+          {avatarFile && (
+            <button
+              type="button"
+              onClick={handleRemoveAvatar}
+              className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center shadow-lg hover:bg-red-600 transition-colors duration-200 z-10"
+              title="Remove image"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
+
+          {/* Hidden File Input */}
+          <input
+            id="avatar"
+            type="file"
+            accept="image/*"
+            onChange={handleAvatarChange}
+            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-0"
+          />
+        </div>
+
+        {/* Upload Instructions */}
+        <div className="text-center space-y-1">
+          <p className="text-sm text-gray-600">
+            {avatarPreview ? 'Click to change image' : 'Click to upload image'}
+          </p>
+          <p className="text-xs text-gray-500">
+            JPEG, PNG, or GIF • Max 5MB
+          </p>
+        </div>
+      </div>
+
+      {/* Two Column Form Layout */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* Name */}
+        <div className="space-y-2">
+          <Label htmlFor="name">
+            Full Name <span className="text-red-500">*</span>
+          </Label>
+          <Input
+            id="name"
+            name="name"
+            type="text"
+            value={formData.name}
+            onChange={handleChange}
+            placeholder="John Doe"
+            className={errors.name ? 'border-red-500' : ''}
+          />
+          {errors.name && <p className="text-sm text-red-500">{errors.name}</p>}
+        </div>
+
+        {/* Email */}
+        <div className="space-y-2">
+          <Label htmlFor="email">
+            Email <span className="text-red-500">*</span>
+          </Label>
+          <Input
+            id="email"
+            name="email"
+            type="email"
+            value={formData.email}
+            onChange={handleChange}
+            placeholder="john@example.com"
+            className={errors.email ? 'border-red-500' : ''}
+          />
+          {errors.email && <p className="text-sm text-red-500">{errors.email}</p>}
+        </div>
+
+        {/* Phone */}
+        <div className="space-y-2">
+          <Label htmlFor="phone">Phone</Label>
+          <Input
+            id="phone"
+            name="phone"
+            type="tel"
+            value={formData.phone}
+            onChange={handleChange}
+            placeholder="+91 9876543210"
+          />
+        </div>
+
+        {/* Role */}
+        <div className="space-y-2">
+          <Label htmlFor="role">
+           Role <span className="text-red-500">*</span>
+          </Label>
+          <Select value={formData.role} onValueChange={handleRoleChange}>
+            <SelectTrigger className={errors.role ? 'border-red-500' : ''}>
+              <SelectValue placeholder="Select role" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="admin">Admin</SelectItem>
+              <SelectItem value="agent">Agent</SelectItem>
+              <SelectItem value="sales_executive">Sales Executive</SelectItem>
+              <SelectItem value="accountant">Accountant</SelectItem>
+            </SelectContent>
+          </Select>
+          {errors.role && <p className="text-sm text-red-500">{errors.role}</p>}
+        </div>
+
+        {/* Address */}
+        <div className="space-y-2 md:col-span-2">
+          <Label htmlFor="address">Address</Label>
+          <Input
+            id="address"
+            name="address"
+            type="text"
+            value={formData.address}
+            onChange={handleChange}
+            placeholder="Street address, City, State"
+          />
+        </div>
+
+        {/* Employee Number */}
+        <div className="space-y-2">
+          <Label htmlFor="employee_number">Employee Number</Label>
+          <Input
+            id="employee_number"
+            name="employee_number"
+            type="text"
+            value={formData.employee_number}
+            onChange={handleChange}
+            placeholder="EMP001"
+          />
+        </div>
+
+        {/* Office */}
+        <div className="space-y-2">
+          <Label htmlFor="office">Office Location (Optional)</Label>
+          <Select 
+            value={formData.office_id || undefined} 
+            onValueChange={handleOfficeChange}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Select office" />
+            </SelectTrigger>
+            <SelectContent>
+              {offices.map((office) => (
+                <SelectItem key={office.id} value={office.id.toString()}>
+                  {office.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-gray-500">
+            Auto-fills home location coordinates
+          </p>
+        </div>
+
+        {/* Employee Link */}
+        <div className="space-y-2 md:col-span-2">
+          <Label htmlFor="employee">Link to Employee Record (Optional)</Label>
+          <Select 
+            value={formData.employee_id || undefined} 
+            onValueChange={handleEmployeeChange}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Select employee (optional)" />
+            </SelectTrigger>
+            <SelectContent>
+              {employees.map((employee) => (
+                <SelectItem key={employee.id} value={employee.id.toString()}>
+                  {employee.name} ({employee.employee_number})
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-gray-500">
+            Link this user account to an employee record for compensation tracking
+          </p>
+        </div>
+
+        {/* Home Location Coordinates */}
+        <div className="space-y-4 md:col-span-2">
+          <Label>Home Location (Optional)</Label>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="home_latitude" className="text-sm text-gray-600">
+                Latitude
+              </Label>
+              <Input
+                id="home_latitude"
+                name="home_latitude"
+                type="number"
+                step="any"
+                value={formData.home_latitude}
+                onChange={handleChange}
+                placeholder="12.9716"
+                className={errors.home_latitude ? 'border-red-500' : ''}
+              />
+              {errors.home_latitude && (
+                <p className="text-sm text-red-500">{errors.home_latitude}</p>
               )}
             </div>
-          )}
-          <div className="flex-1">
-            <Input
-              id="avatar"
-              type="file"
-              accept="image/*"
-              onChange={handleAvatarChange}
-              className="cursor-pointer"
-            />
-            <p className="text-xs text-gray-500 mt-1">
-              {user ? 'Change avatar (JPEG, PNG, or GIF, max 5MB)' : 'Upload avatar (JPEG, PNG, or GIF, max 5MB)'}
-            </p>
+            <div className="space-y-2">
+              <Label htmlFor="home_longitude" className="text-sm text-gray-600">
+                Longitude
+              </Label>
+              <Input
+                id="home_longitude"
+                name="home_longitude"
+                type="number"
+                step="any"
+                value={formData.home_longitude}
+                onChange={handleChange}
+                placeholder="77.5946"
+                className={errors.home_longitude ? 'border-red-500' : ''}
+              />
+              {errors.home_longitude && (
+                <p className="text-sm text-red-500">{errors.home_longitude}</p>
+              )}
+            </div>
           </div>
+          <p className="text-xs text-gray-500">
+            Enter the home location coordinates for route calculation
+          </p>
         </div>
-      </div>
-
-      {/* Name */}
-      <div className="space-y-2">
-        <Label htmlFor="name">
-          Full Name <span className="text-red-500">*</span>
-        </Label>
-        <Input
-          id="name"
-          name="name"
-          type="text"
-          value={formData.name}
-          onChange={handleChange}
-          placeholder="John Doe"
-          className={errors.name ? 'border-red-500' : ''}
-        />
-        {errors.name && <p className="text-sm text-red-500">{errors.name}</p>}
-      </div>
-
-      {/* Email */}
-      <div className="space-y-2">
-        <Label htmlFor="email">
-          Email <span className="text-red-500">*</span>
-        </Label>
-        <Input
-          id="email"
-          name="email"
-          type="email"
-          value={formData.email}
-          onChange={handleChange}
-          placeholder="john@example.com"
-          className={errors.email ? 'border-red-500' : ''}
-        />
-        {errors.email && <p className="text-sm text-red-500">{errors.email}</p>}
-      </div>
-
-      {/* Phone */}
-      <div className="space-y-2">
-        <Label htmlFor="phone">Phone</Label>
-        <Input
-          id="phone"
-          name="phone"
-          type="tel"
-          value={formData.phone}
-          onChange={handleChange}
-          placeholder="+91 9876543210"
-        />
-      </div>
-
-      {/* Address */}
-      <div className="space-y-2">
-        <Label htmlFor="address">Address</Label>
-        <Input
-          id="address"
-          name="address"
-          type="text"
-          value={formData.address}
-          onChange={handleChange}
-          placeholder="Street address, City, State"
-        />
-      </div>
-
-      {/* Employee Number */}
-      <div className="space-y-2">
-        <Label htmlFor="employee_number">Employee Number</Label>
-        <Input
-          id="employee_number"
-          name="employee_number"
-          type="text"
-          value={formData.employee_number}
-          onChange={handleChange}
-          placeholder="EMP001"
-        />
-      </div>
-
-      {/* Employee Link */}
-      <div className="space-y-2">
-        <Label htmlFor="employee">Link to Employee Record (Optional)</Label>
-        <Select 
-          value={formData.employee_id || undefined} 
-          onValueChange={handleEmployeeChange}
-        >
-          <SelectTrigger>
-            <SelectValue placeholder="Select employee (optional)" />
-          </SelectTrigger>
-          <SelectContent>
-            {employees.map((employee) => (
-              <SelectItem key={employee.id} value={employee.id.toString()}>
-                {employee.name} ({employee.employee_number})
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <p className="text-xs text-gray-500">
-          Link this user account to an employee record for compensation tracking
-        </p>
-      </div>
-
-      {/* Role */}
-      <div className="space-y-2">
-        <Label htmlFor="role">
-          Role <span className="text-red-500">*</span>
-        </Label>
-        <Select value={formData.role} onValueChange={handleRoleChange}>
-          <SelectTrigger className={errors.role ? 'border-red-500' : ''}>
-            <SelectValue placeholder="Select role" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="admin">Admin</SelectItem>
-            <SelectItem value="agent">Agent</SelectItem>
-            <SelectItem value="sales_executive">Sales Executive</SelectItem>
-            <SelectItem value="accountant">Accountant</SelectItem>
-          </SelectContent>
-        </Select>
-        {errors.role && <p className="text-sm text-red-500">{errors.role}</p>}
-      </div>
-
-      {/* Office */}
-      <div className="space-y-2">
-        <Label htmlFor="office">Office Location (Optional)</Label>
-        <Select 
-          value={formData.office_id || undefined} 
-          onValueChange={handleOfficeChange}
-        >
-          <SelectTrigger>
-            <SelectValue placeholder="Select office" />
-          </SelectTrigger>
-          <SelectContent>
-            {offices.map((office) => (
-              <SelectItem key={office.id} value={office.id.toString()}>
-                {office.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <p className="text-xs text-gray-500">
-          Selecting an office will auto-fill home location coordinates
-        </p>
-      </div>
-
-      {/* Home Location Coordinates */}
-      <div className="space-y-4">
-        <Label>Home Location (Optional)</Label>
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label htmlFor="home_latitude" className="text-sm text-gray-600">
-              Latitude
-            </Label>
-            <Input
-              id="home_latitude"
-              name="home_latitude"
-              type="number"
-              step="any"
-              value={formData.home_latitude}
-              onChange={handleChange}
-              placeholder="12.9716"
-              className={errors.home_latitude ? 'border-red-500' : ''}
-            />
-            {errors.home_latitude && (
-              <p className="text-sm text-red-500">{errors.home_latitude}</p>
-            )}
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="home_longitude" className="text-sm text-gray-600">
-              Longitude
-            </Label>
-            <Input
-              id="home_longitude"
-              name="home_longitude"
-              type="number"
-              step="any"
-              value={formData.home_longitude}
-              onChange={handleChange}
-              placeholder="77.5946"
-              className={errors.home_longitude ? 'border-red-500' : ''}
-            />
-            {errors.home_longitude && (
-              <p className="text-sm text-red-500">{errors.home_longitude}</p>
-            )}
-          </div>
-        </div>
-        <p className="text-xs text-gray-500">
-          Enter the home location coordinates for route calculation
-        </p>
       </div>
 
       {/* Password Section */}
@@ -524,38 +550,40 @@ const UserForm = ({ user, onSubmit, onCancel }) => {
           {user ? 'Change Password (Optional)' : 'Set Password'}
         </Label>
         
-        <div className="space-y-2">
-          <Label htmlFor="password">
-            Password {!user && <span className="text-red-500">*</span>}
-          </Label>
-          <Input
-            id="password"
-            name="password"
-            type="password"
-            value={formData.password}
-            onChange={handleChange}
-            placeholder={user ? 'Leave blank to keep current password' : 'Enter password'}
-            className={errors.password ? 'border-red-500' : ''}
-          />
-          {errors.password && <p className="text-sm text-red-500">{errors.password}</p>}
-        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="space-y-2">
+            <Label htmlFor="password">
+              Password {!user && <span className="text-red-500">*</span>}
+            </Label>
+            <Input
+              id="password"
+              name="password"
+              type="password"
+              value={formData.password}
+              onChange={handleChange}
+              placeholder={user ? 'Leave blank to keep current password' : 'Enter password'}
+              className={errors.password ? 'border-red-500' : ''}
+            />
+            {errors.password && <p className="text-sm text-red-500">{errors.password}</p>}
+          </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="password_confirmation">
-            Confirm Password {!user && <span className="text-red-500">*</span>}
-          </Label>
-          <Input
-            id="password_confirmation"
-            name="password_confirmation"
-            type="password"
-            value={formData.password_confirmation}
-            onChange={handleChange}
-            placeholder="Confirm password"
-            className={errors.password_confirmation ? 'border-red-500' : ''}
-          />
-          {errors.password_confirmation && (
-            <p className="text-sm text-red-500">{errors.password_confirmation}</p>
-          )}
+          <div className="space-y-2">
+            <Label htmlFor="password_confirmation">
+              Confirm Password {!user && <span className="text-red-500">*</span>}
+            </Label>
+            <Input
+              id="password_confirmation"
+              name="password_confirmation"
+              type="password"
+              value={formData.password_confirmation}
+              onChange={handleChange}
+              placeholder="Confirm password"
+              className={errors.password_confirmation ? 'border-red-500' : ''}
+            />
+            {errors.password_confirmation && (
+              <p className="text-sm text-red-500">{errors.password_confirmation}</p>
+            )}
+          </div>
         </div>
       </div>
 

@@ -4,6 +4,8 @@
 
 > **Note**: This project is configured with Vercel auto-deployment. When you push to GitHub (main branch), Vercel automatically builds and deploys the application. No manual `vercel` commands needed!
 
+> **✨ New**: Cache versioning is now automatic! Every deployment automatically updates the service worker cache version via a prebuild script. No need to run `npm run force-update` manually unless troubleshooting.
+
 ### Understanding the Issue
 When you deploy new changes to Vercel, mobile users might not see updates immediately due to:
 1. **Service Worker Caching** - Old files cached by the service worker
@@ -17,10 +19,12 @@ When you deploy new changes to Vercel, mobile users might not see updates immedi
 - This ensures the app shell is always fresh
 - Falls back to cache only when offline
 
-#### 2. **Dynamic Cache Versioning**
+#### 2. **Dynamic Cache Versioning** (Automatic)
 - Service worker cache name includes timestamp
+- **Automatically updates on every build** via prebuild script
 - Each deployment gets a new cache version
 - Old caches are automatically cleaned up
+- No manual `npm run force-update` needed for normal deployments
 
 #### 3. **Proper Cache Headers** (vercel.json)
 ```json
@@ -57,6 +61,9 @@ git commit -m "Your feature/fix description"
 # 4. Push to GitHub - Vercel auto-deploys
 git push origin main
 
+# Cache version is automatically updated during Vercel build!
+# No manual force-update needed - it happens on every deployment
+
 # 5. Monitor at https://vercel.com/dashboard
 # Deployment typically takes 1-2 minutes
 ```
@@ -74,14 +81,15 @@ git push origin main
 # Check deployment status at vercel.com dashboard
 ```
 
-**Option 2: Force Update with Cache Clear**
+**Option 2: Manual Force Update (Rarely Needed)**
 ```bash
-# Updates cache version timestamp
+# Only needed if you want to manually update cache version locally
+# Normal deployments update automatically via prebuild script
 npm run force-update
 
 # Then commit and push
 git add public/sw.js
-git commit -m "Force cache clear - update service worker version"
+git commit -m "Manual cache clear - update service worker version"
 git push origin main
 ```
 
