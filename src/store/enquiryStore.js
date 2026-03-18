@@ -29,6 +29,7 @@ const useEnquiryStore = create((set, get) => ({
   hasMore: true,
   perPage: 20,
   totalCount: 0,
+  totalPages: 1,
 
   // Actions
   
@@ -93,10 +94,12 @@ const useEnquiryStore = create((set, get) => ({
       const response = await enquiryService.getAllEnquiries(params);
       const newEnquiries = response.enquiries || [];
       const total = response.total || 0;
+      const calculatedTotalPages = Math.ceil(total / state.perPage) || 1;
 
       set({
         enquiries: reset ? newEnquiries : [...state.enquiries, ...newEnquiries],
         totalCount: total,
+        totalPages: calculatedTotalPages,
         hasMore: newEnquiries.length === state.perPage,
         page: currentPage + 1,
         isLoading: false,
@@ -281,6 +284,54 @@ const useEnquiryStore = create((set, get) => ({
       throw error;
     }
   },
+
+  /**
+   * Fetch specific page (for desktop pagination)
+   */
+  fetchPage: async (pageNumber) => {
+    const state = get();
+    
+    set({ isLoading: true, error: null });
+    try {
+      const params = {
+        page: pageNumber,
+        per_page: state.perPage,
+        ...state.filters,
+      };
+
+      // Remove empty filters
+      Object.keys(params).forEach(key => {
+        if (params[key] === '' || params[key] === null || params[key] === undefined) {
+          delete params[key];
+        }
+      });
+
+      const response = await enquiryService.getAllEnquiries(params);
+      const newEnquiries = response.enquiries || [];
+      const total = response.total || 0;
+      const calculatedTotalPages = Math.ceil(total / state.perPage) || 1;
+
+      set({
+        enquiries: newEnquiries,
+        totalCount: total,
+        totalPages: calculatedTotalPages,
+        page: pageNumber,
+        hasMore: pageNumber < calculatedTotalPages,
+        isLoading: false,
+      });
+
+      return newEnquiries;
+    } catch (error) {
+      console.error('Error fetching page:', error);
+      set({ error: error.message, isLoading: false });
+      throw error;
+    }
+  },
+
+  /**
+   * Reset pagination to page 1
+   */
+  resetPagination: () => set({ page: 1, enquiries: [], hasMore: true }),
 
   /**
    * Clear selected enquiry

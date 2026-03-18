@@ -439,7 +439,7 @@ const Enquiries = () => {
       </div>
 
       {/* Search and Filters - Sticky on Mobile */}
-      <div className="sticky top-0 z-10 ">
+      <div className="sticky top-0 z-10 bg-gray-50 pb-4">
         <div className="flex flex-col sm:flex-row gap-4 w-full">
           {/* Single Search Field */}
           <div className="relative flex-1 flex gap-2">
@@ -606,7 +606,7 @@ const Enquiries = () => {
       )}
 
       {/* Enquiries List */}
-      <Card className="border-0 shadow-none md:border-1 rounded-lg md:shadow-xs bg-white">
+      <Card className="border-0 shadow-none md:border rounded-lg md:shadow-sm bg-white">
         {loading ? (
           <div className="space-y-4">
             {/* Desktop Skeleton */}

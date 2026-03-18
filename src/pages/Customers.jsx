@@ -145,9 +145,11 @@ const Customers = () => {
         setCustomers(newCustomers);
       }
 
-      setTotalPages(response.pagination?.total_pages || 1);
-      setTotalCount(response.pagination?.total_count || 0);
-      setHasMore(pageNum < (response.pagination?.total_pages || 1));
+      // Handle both flat and nested pagination structures
+      const paginationData = response.pagination || response;
+      setTotalPages(paginationData.total_pages || 1);
+      setTotalCount(paginationData.total_count || paginationData.total || 0);
+      setHasMore(pageNum < (paginationData.total_pages || 1));
     } catch (error) {
       console.error('Error fetching customers:', error);
       toast.error('Failed to load customers');
@@ -865,7 +867,11 @@ const Customers = () => {
       {/* Results Info */}
       {!loading && customers.length > 0 && (
         <div className="text-center text-sm text-muted-foreground">
-          Showing {customers.length} of {totalCount} customers
+          {isMobile ? (
+            `Showing ${customers.length} of ${totalCount} customers`
+          ) : (
+            `Showing ${(page - 1) * perPage + 1}-${Math.min(page * perPage, totalCount)} of ${totalCount} customers`
+          )}
         </div>
       )}
 
