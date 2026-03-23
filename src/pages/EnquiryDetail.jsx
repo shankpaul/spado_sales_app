@@ -72,6 +72,7 @@ import {
   AlertCircle,
   Volume2,
   Megaphone,
+  ShoppingCart,
 } from 'lucide-react';
 import { formatDate, formatDateTime } from '../lib/utilities';
 import { Badge2 } from '@/components/ui/badge2';
@@ -79,6 +80,7 @@ import LetterAvatar from '@/components/LetterAvatar';
 import CustomerContact from '@/components/CustomerContact';
 import VoiceNoteRecorder from '@/components/VoiceNoteRecorder';
 import WaveformPlayer from '@/components/WaveformPlayer';
+import OrderWizard from '../components/OrderWizard';
 import enquiryService from '../services/enquiryService';
 
 /**
@@ -125,6 +127,10 @@ const EnquiryDetail = ({ enquiryId, onClose, onUpdate }) => {
 
   // Convert status confirmation dialog
   const [isConvertStatusDialogOpen, setIsConvertStatusDialogOpen] = useState(false);
+
+  // Order Wizard state
+  const [isOrderWizardOpen, setIsOrderWizardOpen] = useState(false);
+  const [selectedCustomerForOrder, setSelectedCustomerForOrder] = useState(null);
 
   // Comments state
   const [comments, setComments] = useState([]);
@@ -849,36 +855,54 @@ const EnquiryDetail = ({ enquiryId, onClose, onUpdate }) => {
       {/* Quick Status Actions */}
       {enquiry.status !== 'converted' && (
         <Card className="p-4 md:p-6">
-          <h2 className="text-base md:text-lg font-semibold mb-3 md:mb-4">Quick Actions - Update Status</h2>
-          <div className="flex flex-wrap gap-1.5 md:gap-2">
-            {/* Need Follow Up Button */}
-            
-            {/* Status Change Buttons */}
-            {ENQUIRY_STATUS_OPTIONS.filter(s => s.value !== enquiry.status).map((status) => (
+          <h2 className="text-base md:text-lg font-semibold mb-3 md:mb-4">Quick Actions</h2>
+          
+          {/* Create Order Button */}
+          {enquiry.customer?.id && !enquiry.converted_to_order && (
+            <div className="mb-4">
               <Button
-                key={status.value}
-                variant='outline'
-                size="sm"
-                onClick={() => handleQuickStatusUpdate(status.value)}
-                disabled={updatingStatus}
-                className="gap-1 md:gap-2 text-xs md:text-sm"
+                onClick={() => {
+                  setSelectedCustomerForOrder(enquiry.customer.id);
+                  setIsOrderWizardOpen(true);
+                }}
+                className="w-full md:w-auto gap-2"
               >
-                {updatingStatus ? (
-                  <Loader2 className="h-3 w-3 animate-spin" />
-                ) : status.value === 'lost' ? (
-                  <XCircle className="h-3 w-3" />
-                ) : status.value === 'converted' ? (
-                  <TrendingUp className="h-3 w-3" />
-                ): status.value === 'interested' ? (
-                  <CheckCircle2 className="h-3 w-3" />
-                ) : status.value === 'needs_followup' ? (
-                  <Bell className="h-3 w-3" />
-                ) : (
-                  <AlertCircle className="h-3 w-3" />
-                )}
-                {status.label}
+                <ShoppingCart className="h-4 w-4" />
+                Create Order
               </Button>
-            ))}
+            </div>
+          )}
+          
+          {/* Status Change Buttons */}
+          <div className="space-y-2">
+            <h3 className="text-sm font-medium text-muted-foreground">Update Status</h3>
+            <div className="flex flex-wrap gap-1.5 md:gap-2">
+              {ENQUIRY_STATUS_OPTIONS.filter(s => s.value !== enquiry.status).map((status) => (
+                <Button
+                  key={status.value}
+                  variant='outline'
+                  size="sm"
+                  onClick={() => handleQuickStatusUpdate(status.value)}
+                  disabled={updatingStatus}
+                  className="gap-1 md:gap-2 text-xs md:text-sm"
+                >
+                  {updatingStatus ? (
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                  ) : status.value === 'lost' ? (
+                    <XCircle className="h-3 w-3" />
+                  ) : status.value === 'converted' ? (
+                    <TrendingUp className="h-3 w-3" />
+                  ): status.value === 'interested' ? (
+                    <CheckCircle2 className="h-3 w-3" />
+                  ) : status.value === 'needs_followup' ? (
+                    <Bell className="h-3 w-3" />
+                  ) : (
+                    <AlertCircle className="h-3 w-3" />
+                  )}
+                  {status.label}
+                </Button>
+              ))}
+            </div>
           </div>
         </Card>
       )}
@@ -1322,6 +1346,21 @@ const EnquiryDetail = ({ enquiryId, onClose, onUpdate }) => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Order Wizard */}
+      <OrderWizard
+        open={isOrderWizardOpen}
+        onOpenChange={setIsOrderWizardOpen}
+        customerId={selectedCustomerForOrder}
+        enquiryId={id}
+        onSuccess={() => {
+          setIsOrderWizardOpen(false);
+          setSelectedCustomerForOrder(null);
+          // Refresh enquiry data to show updated converted status
+          fetchEnquiryById(id);
+          toast.success('Order created successfully from enquiry');
+        }}
+      />
       </div>
     </div>
   );

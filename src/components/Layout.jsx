@@ -31,6 +31,7 @@ import {
   Briefcase,
   PackageOpen,
   Bell,
+  Tag,
 } from 'lucide-react';
 import usePWAInstall from '../hooks/usePWAInstall';
 import Logo from './Logo';
@@ -107,6 +108,7 @@ const Layout = ({ children }) => {
         { name: 'Enquiries', href: '/enquiries', icon: PackageOpen },
         { name: 'Orders', href: '/orders', icon: Calendar },
         { name: 'Subscriptions', href: '/subscriptions', icon: Calendar },
+        { name: 'Offers', href: '/offers', icon: Tag },
         { name: 'System Users', href: '/users', icon: UserCircle },
         { name: 'Employees', href: '/employees', icon: Briefcase },
         { name: 'Reports', href: '/reports', icon: BarChart3 },

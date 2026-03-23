@@ -35,6 +35,7 @@ import VehicleIcon from './VehicleIcon';
 import { toast } from 'sonner';
 import orderService from '../services/orderService';
 import customerService from '../services/customerService';
+import offerService from '../services/offerService';
 import useOrderStore from '../store/orderStore';
 import { getBrands, getModelsByBrand, getVehicleType, getVehicleTypes } from '../lib/vehicleData';
 import {
@@ -66,14 +67,17 @@ import {
   ArrowLeft,
   LoaderCircle,
   AlertCircle,
+  Tag,
+  Gift,
+  Percent,
 } from 'lucide-react';
 
 /**
  * Order Wizard Component
  * Multi-step wizard for creating/editing orders with localStorage persistence
- * Props: open, onOpenChange, onSuccess, customerId, orderId
+ * Props: open, onOpenChange, onSuccess, customerId, orderId, enquiryId
  */
-const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId = null }) => {
+const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId = null, enquiryId = null }) => {
   // Get agents from store
   const { agents, fetchAgents } = useOrderStore();
 
@@ -97,8 +101,14 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
   const [mapLinkLoading, setMapLinkLoading] = useState(false);
   const [mapLinkError, setMapLinkError] = useState(false);
 
+  // Offer states
+  const [availableOffers, setAvailableOffers] = useState([]);
+  const [selectedOffer, setSelectedOffer] = useState(null);
+  const [loadingOffers, setLoadingOffers] = useState(false);
+
   // Form refs
   const customerFormRef = useRef(null);
+  const appliedOfferRef = useRef(null); // Track which offer has been applied to prevent duplicates
 
   // Data states
   const [customers, setCustomers] = useState([]);
@@ -140,6 +150,7 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
       setSubmitAttempted(false);
       setErrors({});
       setOtherStepErrors([]);
+      appliedOfferRef.current = null;
     }
   }, [open, orderId]);
 
@@ -248,6 +259,83 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
     return () => clearTimeout(timeoutId);
   }, [address.map_link]);
 
+  // Fetch available offers when step 4 is reached
+  useEffect(() => {
+    const fetchOffers = async () => {
+      if (currentStep !== 4 || !selectedCustomer || packageItems.length === 0) {
+        setAvailableOffers([]);
+        return;
+      }
+
+      setLoadingOffers(true);
+      try {
+        const packageIds = packageItems.map(item => parseInt(item.package_id)).filter(id => !isNaN(id));
+        const addonIds = addonItems.map(item => parseInt(item.addon_id)).filter(id => !isNaN(id));
+        
+        if (packageIds.length === 0) {
+          setAvailableOffers([]);
+          return;
+        }
+
+        const response = await offerService.getAvailableOffers({
+          package_ids: packageIds,
+          addon_ids: addonIds,
+          customer_id: selectedCustomer.id,
+        });
+        
+        setAvailableOffers(response.data || []);
+      } catch (error) {
+        console.error('Error fetching offers:', error);
+        setAvailableOffers([]);
+      } finally {
+        setLoadingOffers(false);
+      }
+    };
+
+    fetchOffers();
+  }, [currentStep, selectedCustomer, packageItems, addonItems]);
+
+  // Check if selected offer is still valid when available offers change
+  useEffect(() => {
+    // Only proceed if we're on step 4 and have checked offers
+    if (currentStep !== 4) return;
+
+    // If no offers available and we have a selected offer, clear it
+    if (availableOffers.length === 0 && selectedOffer) {
+      removeOfferRewards(selectedOffer.id);
+      setSelectedOffer(null);
+      return;
+    }
+
+    // If an offer is selected, check if it's still in the available offers
+    if (selectedOffer && availableOffers.length > 0) {
+      const isStillAvailable = availableOffers.some(offer => offer.id === selectedOffer.id);
+      if (!isStillAvailable) {
+        removeOfferRewards(selectedOffer.id);
+        setSelectedOffer(null);
+      }
+    }
+  }, [availableOffers, selectedOffer, currentStep]);
+
+  // Auto-apply offer rewards when an offer is selected
+  useEffect(() => {
+    if (selectedOffer) {
+      // Only apply if this offer hasn't been applied yet
+      if (appliedOfferRef.current !== selectedOffer.id) {
+        // Check if offer has reward packages or addons
+        if ((selectedOffer.reward_packages && selectedOffer.reward_packages.length > 0) ||
+            (selectedOffer.reward_addons && selectedOffer.reward_addons.length > 0)) {
+          applyOfferRewards(selectedOffer);
+          appliedOfferRef.current = selectedOffer.id;
+          toast.success(`${selectedOffer.name} applied with rewards!`);
+        }
+      }
+    } else {
+      // Clear the ref when no offer is selected
+      appliedOfferRef.current = null;
+    }
+  }, [selectedOffer]);
+
   // Load draft with expiry check
   const loadDraft = () => {
     try {
@@ -290,6 +378,7 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
     setAddress(data.address || { area: '', city: '', district: '', state: '', map_link: '' });
     setCustomerPhone(data.customerPhone || '');
     setNotes(data.notes || '');
+    setSelectedOffer(data.selectedOffer || null);
   };
 
   // Save to localStorage (only for new orders, not edit mode)
@@ -309,6 +398,7 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
       customerPhone,
       address,
       notes,
+      selectedOffer,
     };
 
     localStorage.setItem(
@@ -528,6 +618,9 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
     setErrors({});
     setOtherStepErrors([]);
     setSubmitAttempted(false);
+    setSelectedOffer(null);
+    setAvailableOffers([]);
+    appliedOfferRef.current = null;
   };
 
   // Close handler
@@ -700,6 +793,18 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
   };
 
   const removePackageItem = (index) => {
+    const itemToRemove = packageItems[index];
+    
+    // If removing a reward item, clear the associated offer
+    if (itemToRemove?.is_reward && itemToRemove?.offer_id) {
+      if (selectedOffer && selectedOffer.id === itemToRemove.offer_id) {
+        removeOfferRewards(itemToRemove.offer_id);
+        setSelectedOffer(null);
+        toast.info('Offer removed as reward package was deleted');
+        return; // removeOfferRewards will handle the removal
+      }
+    }
+    
     setPackageItems(packageItems.filter((_, i) => i !== index));
   };
 
@@ -738,10 +843,6 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
       discount = item.discount_value;
     }
 
-    // Ensure discount doesn't exceed 50% of subtotal
-    const maxDiscount = subtotal * 0.5;
-    discount = Math.min(discount, maxDiscount);
-
     return subtotal - discount;
   };
 
@@ -765,8 +866,20 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
     const packageTotal = packageItems.reduce((sum, item) => sum + calculateLineTotal(item), 0);
     const addonTotal = addonItems.reduce((sum, item) => sum + calculateLineTotal(item), 0);
     const subtotal = packageTotal + addonTotal;
-    const gst = (subtotal * GST_PERCENTAGE) / 100;
-    const totalBeforeRounding = subtotal + gst;
+    
+    // Apply offer discount if selected
+    let offerDiscount = 0;
+    if (selectedOffer) {
+      if (selectedOffer.discount_type === 'fixed') {
+        offerDiscount = selectedOffer.discount_value;
+      } else if (selectedOffer.discount_type === 'percentage') {
+        offerDiscount = (subtotal * selectedOffer.discount_value) / 100;
+      }
+    }
+    
+    const subtotalAfterDiscount = Math.max(0, subtotal - offerDiscount);
+    const gst = (subtotalAfterDiscount * GST_PERCENTAGE) / 100;
+    const totalBeforeRounding = subtotalAfterDiscount + gst;
     const roundedTotal = Math.round(totalBeforeRounding);
     const roundOff = roundedTotal - totalBeforeRounding;
     
@@ -774,6 +887,8 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
       packages: packageTotal,
       addons: addonTotal,
       subtotal,
+      offerDiscount,
+      subtotalAfterDiscount,
       gst,
       gstPercentage: GST_PERCENTAGE,
       roundOff,
@@ -796,6 +911,18 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
   };
 
   const removeAddonItem = (index) => {
+    const itemToRemove = addonItems[index];
+    
+    // If removing a reward item, clear the associated offer
+    if (itemToRemove?.is_reward && itemToRemove?.offer_id) {
+      if (selectedOffer && selectedOffer.id === itemToRemove.offer_id) {
+        removeOfferRewards(itemToRemove.offer_id);
+        setSelectedOffer(null);
+        toast.info('Offer removed as reward addon was deleted');
+        return; // removeOfferRewards will handle the removal
+      }
+    }
+    
     setAddonItems(addonItems.filter((_, i) => i !== index));
   };
 
@@ -811,6 +938,98 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
     }
 
     setAddonItems(updated);
+    saveDraft();
+  };
+
+  // Apply offer rewards (add reward packages and addons)
+  const applyOfferRewards = (offer) => {
+    if (!offer) return;
+
+    // Track IDs of reward items being added
+    const rewardPackageIds = new Set();
+    const rewardAddonIds = new Set();
+
+    // Add reward packages to the order
+    if (offer.reward_packages && offer.reward_packages.length > 0) {
+      offer.reward_packages.forEach(pkg => {
+        rewardPackageIds.add(pkg.id);
+        
+        // Check if this reward package is already in the order
+        const existingIndex = packageItems.findIndex(item => 
+          String(item.package_id) === String(pkg.id) && item.is_reward === true
+        );
+
+        if (existingIndex === -1) {
+          // Find the package details from the packages list to get vehicle type
+          const packageDetails = packages.find(p => String(p.id) === String(pkg.id));
+          console.log('Applying reward package:', pkg, 'Details:', packageDetails);
+          // Add new reward package
+          setPackageItems(prev => [...prev, {
+            brand: '',
+            model: '',
+            vehicle_type: packageDetails?.vehicle_type || '',
+            package_id: String(pkg.id),
+            quantity: 1,
+            unit_price: packageDetails?.unit_price || packageDetails?.price || 0,
+            discount_type: DISCOUNT_TYPES.PERCENTAGE,
+            discount_value: 100,
+            is_reward: true, // Mark as reward item
+            offer_id: offer.id,
+          }]);
+        }
+      });
+    }
+
+    // Add reward addons to the order
+    if (offer.reward_addons && offer.reward_addons.length > 0) {
+      offer.reward_addons.forEach(addon => {
+        rewardAddonIds.add(addon.id);
+        
+        // Check if this reward addon is already in the order
+        const existingIndex = addonItems.findIndex(item => 
+          String(item.addon_id) === String(addon.id) && item.is_reward === true
+        );
+
+        if (existingIndex === -1) {
+          // Find the addon details from the addons list to get unit price
+          const addonDetails = addons.find(a => String(a.id) === String(addon.id));
+          
+          // Add new reward addon
+          setAddonItems(prev => [...prev, {
+            addon_id: String(addon.id),
+            quantity: 1,
+            unit_price: addonDetails?.unit_price || addonDetails?.price || 0,
+            discount_type: DISCOUNT_TYPES.PERCENTAGE,
+            discount_value: 100,
+            is_reward: true, // Mark as reward item
+            offer_id: offer.id,
+          }]);
+        }
+      });
+    }
+
+    saveDraft();
+  };
+
+  // Remove offer rewards from the order
+  const removeOfferRewards = (offerId) => {
+    if (!offerId) return;
+
+    // Remove reward packages added by this offer
+    setPackageItems(prev => prev.filter(item => 
+      !(item.is_reward === true && item.offer_id === offerId)
+    ));
+
+    // Remove reward addons added by this offer
+    setAddonItems(prev => prev.filter(item => 
+      !(item.is_reward === true && item.offer_id === offerId)
+    ));
+
+    // Clear the applied offer ref if it matches
+    if (appliedOfferRef.current === offerId) {
+      appliedOfferRef.current = null;
+    }
+
     saveDraft();
   };
 
@@ -836,12 +1055,14 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
 
       const orderData = {
         customer_id: parseInt(selectedCustomer.id, 10),
+        enquiry_id: enquiryId ? parseInt(enquiryId, 10) : undefined, // Link to enquiry if provided
         contact_phone: customerPhone || selectedCustomer.phone, // Order-specific phone
         status: finalStatus,
         booking_date: bookingDateISO,
         booking_time_from: bookingTimeFromISO,
         booking_time_to: bookingTimeToISO,
         assigned_to_id: selectedAgent && selectedAgent !== 'unassigned' ? parseInt(selectedAgent, 10) : null,
+        offer_id: selectedOffer ? parseInt(selectedOffer.id, 10) : null,
         notes,
         packages: packageItems.map((item) => ({
           package_id: parseInt(item.package_id, 10),
@@ -1753,6 +1974,89 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
               </Select>
             </div>
 
+            {/* Available Offers Section */}
+            <div>
+              <Label className="flex items-center gap-2">
+                <Gift className="h-4 w-4" />
+                Available Offers
+              </Label>
+              {loadingOffers ? (
+                <div className="text-sm text-muted-foreground py-2">Loading available offers...</div>
+              ) : availableOffers.length > 0 ? (
+                <div className="space-y-2 mt-2">
+                  {selectedOffer ? (
+                    <Card className="p-3 bg-green-50 border-green-200">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <Tag className="h-4 w-4 text-green-600" />
+                            <span className="font-medium text-green-700">{selectedOffer.name}</span>
+                          </div>
+                          <p className="text-sm text-muted-foreground mt-1">{selectedOffer.description}</p>
+                          <div className="flex items-center gap-1 mt-2 text-sm font-semibold text-green-600">
+                            <Percent className="h-3 w-3" />
+                            {selectedOffer.discount_type === 'percentage' ? (
+                              <span>{selectedOffer.discount_value}% Off</span>
+                            ) : (
+                              <span>₹{selectedOffer.discount_value} Off</span>
+                            )}
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            removeOfferRewards(selectedOffer.id);
+                            setSelectedOffer(null);
+                            saveDraft();
+                            toast.info('Offer removed');
+                          }}
+                          className="text-red-600 hover:text-red-700 text-sm font-medium px-2 py-1 rounded hover:bg-red-50 transition-colors"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    </Card>
+                  ) : (
+                    <div className="space-y-2">
+                      {availableOffers.map((offer) => (
+                        <Card key={offer.id} className="p-3 hover:bg-secondary/50 transition-colors">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2">
+                                <Tag className="h-4 w-4 text-primary" />
+                                <span className="font-medium">{offer.name}</span>
+                              </div>
+                              <p className="text-sm text-muted-foreground mt-1">{offer.description}</p>
+                              <div className="flex items-center gap-1 mt-2 text-sm font-semibold text-primary">
+                                <Percent className="h-3 w-3" />
+                                {offer.discount_type === 'percentage' ? (
+                                  <span>{offer.discount_value}% Off</span>
+                                ) : (
+                                  <span>₹{offer.discount_value} Off</span>
+                                )}
+                              </div>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSelectedOffer(offer);
+                                saveDraft();
+                              }}
+                              className="text-primary hover:text-primary/80 text-sm font-medium px-3 py-1 rounded border border-primary hover:bg-primary/10 transition-colors"
+                            >
+                              Apply
+                            </button>
+                          </div>
+                        </Card>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground py-2">No offers available for the selected items</p>
+              )}
+            </div>
+
             <div className='flex-grow flex flex-col'>
               <Label>Notes</Label>
               <Textarea
@@ -1781,6 +2085,21 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
                 <span>Subtotal:</span>
                 <span className="font-medium">₹{totals.subtotal.toFixed(2)}</span>
               </div>
+              {totals.offerDiscount > 0 && (
+                <>
+                  <div className="flex justify-between text-green-600">
+                    <span className="flex items-center gap-1">
+                      <Gift className="h-3 w-3" />
+                      Offer Discount:
+                    </span>
+                    <span className="font-medium">-₹{totals.offerDiscount.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between font-semibold">
+                    <span>After Discount:</span>
+                    <span>₹{totals.subtotalAfterDiscount.toFixed(2)}</span>
+                  </div>
+                </>
+              )}
               <div className="flex justify-between">
                 <span>GST ({totals.gstPercentage}%):</span>
                 <span className="font-medium">₹{totals.gst.toFixed(2)}</span>
