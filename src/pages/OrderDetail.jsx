@@ -488,7 +488,7 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
     try {
       const agentIdToSend = newAgentId === 'unassigned' ? null : parseInt(newAgentId, 10);
       await orderService.reassignOrder(id, agentIdToSend);
-      toast.success(newAgentId === 'unassigned' ? 'Agent unassigned successfully' : 'Agent reassigned successfully');
+      // toast.success(newAgentId === 'unassigned' ? 'Agent unassigned successfully' : 'Agent reassigned successfully');
       setIsReassignDialogOpen(false);
       await fetchOrderDetails(true); // Pass true to trigger onUpdate
       // Fetch timeline and reassignments in background without blocking
@@ -1082,7 +1082,7 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
                             <div className="flex-1 min-w-0">
                               <h4 className="font-medium mb-2">{item.addon_name}</h4>
                               <div className="text-sm ">
-                                {item.addon.name} • Quantity {item.quantity}
+                                Quantity {item.quantity}
                               </div>
                             </div>
                             <div className="text-right flex-shrink-0">
@@ -1290,13 +1290,46 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
                     <span className="text-muted-foreground">
                       Subtotal ({(order.packages?.length || 0) + (order.addons?.length || 0)} items)
                     </span>
-                    <span className="font-medium">{formatCurrency(calculateSubtotal())}</span>
+                    <span className="font-medium">
+                      {formatCurrency(order.subtotal_amount || calculateSubtotal())}
+                    </span>
                   </div>
 
-                  {order.discount > 0 && (
+                  {/* Legacy discount field (old orders) */}
+                  {order.discount > 0 && !order.offer_discount && !order.points_discount && (
                     <div className="flex justify-between text-sm text-destructive">
                       <span>Discount</span>
                       <span>-{formatCurrency(order.discount)}</span>
+                    </div>
+                  )}
+
+                  {/* Offer discount with offer details */}
+                  {order.offer_discount > 0 && (
+                    <div className="flex justify-between text-sm text-green-600">
+                      <div className="flex items-center gap-1">
+                        <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                        </svg>
+                        <span>
+                          {order.offer ? `${order.offer.name} Discount` : 'Offer Discount'}
+                        </span>
+                      </div>
+                      <span className="font-medium">-{formatCurrency(order.offer_discount)}</span>
+                    </div>
+                  )}
+
+                  {/* Points discount */}
+                  {(order.points_discount > 0 || order.points_redeemed > 0) && (
+                    <div className="flex justify-between text-sm text-blue-600">
+                      <div className="flex items-center gap-1">
+                        <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <span>
+                          Points Redeemed ({order.points_redeemed || 0} pts)
+                        </span>
+                      </div>
+                      <span className="font-medium">-{formatCurrency(order.points_discount || order.points_redeemed || 0)}</span>
                     </div>
                   )}
 
@@ -1322,6 +1355,41 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
                     <span className="font-semibold">Total</span>
                     <span className="text-2xl font-bold">{formatCurrency(order.total_amount)}</span>
                   </div>
+
+                  {/* Payment Breakdown */}
+                  {/* {(order.received_amount || order.points_redeemed > 0) && (
+                    <div className="border-t pt-3 mt-3 space-y-2">
+                      <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                        Payment Breakdown
+                      </div>
+                      
+                      {order.points_redeemed > 0 && (
+                        <div className="flex justify-between text-sm">
+                          <div className="flex items-center gap-1.5 text-blue-600">
+                            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            <span className="font-medium">Loyalty Points Used</span>
+                          </div>
+                          <span className="font-semibold text-blue-600">
+                            {order.points_redeemed} pts ({formatCurrency(order.points_discount || order.points_redeemed)})
+                          </span>
+                        </div>
+                      )}
+                      
+                      {order.received_amount && (
+                        <div className="flex justify-between text-sm">
+                          <div className="flex items-center gap-1.5">
+                            <svg className="h-4 w-4 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
+                            </svg>
+                            <span className="font-medium">Amount Paid</span>
+                          </div>
+                          <span className="font-semibold text-green-600">{formatCurrency(order.received_amount)}</span>
+                        </div>
+                      )}
+                    </div>
+                  )} */}
                 </div>
 
                 {/* Payment Proof */}

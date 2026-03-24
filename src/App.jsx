@@ -21,6 +21,7 @@ const Offers = lazy(() => import('./pages/Offers'));
 const OfferForm = lazy(() => import('./components/OfferForm'));
 const Users = lazy(() => import('./pages/Users'));
 const Employees = lazy(() => import('./pages/Employees'));
+const Profile = lazy(() => import('./pages/Profile'));
 
 // Loading fallback component
 const LoadingFallback = () => (
@@ -257,6 +258,17 @@ function App() {
                     <h2 className="text-2xl font-bold text-gray-900 mb-2">Settings</h2>
                     <p className="text-gray-600">Settings page coming soon...</p>
                   </div>
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/profile"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <Profile />
                 </Layout>
               </ProtectedRoute>
             }

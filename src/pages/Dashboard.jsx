@@ -27,6 +27,7 @@ import OrderDetail from './OrderDetail';
 import useAuthStore from '../store/authStore';
 import useOrderStore from '../store/orderStore';
 import orderService from '../services/orderService';
+import dashboardService from '../services/dashboardService';
 import { format, isToday, parseISO } from 'date-fns';
 import {
   Users,
@@ -82,6 +83,10 @@ const Dashboard = () => {
   const { user } = useAuthStore();
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(true);
+  
+  // Dashboard stats state
+  const [dashboardStats, setDashboardStats] = useState(null);
+  const [statsLoading, setStatsLoading] = useState(true);
   
   // Use order store instead of local state
   const {
@@ -144,6 +149,31 @@ const Dashboard = () => {
   useEffect(() => {
     fetchTodayOrders();
   }, [fetchTodayOrders]);
+
+  // Fetch dashboard stats
+  const fetchDashboardStats = async () => {
+    try {
+      const stats = await dashboardService.getStats();
+      setDashboardStats(stats);
+    } catch (error) {
+      console.error('Error fetching dashboard stats:', error);
+      // Don't show error to user, just use default values
+    } finally {
+      setStatsLoading(false);
+    }
+  };
+
+  // Fetch dashboard stats on mount and set up auto-refresh every 10 minutes
+  useEffect(() => {
+    fetchDashboardStats();
+    
+    // Refresh every 10 minutes (600000 ms)
+    const refreshInterval = setInterval(() => {
+      fetchDashboardStats();
+    }, 600000);
+
+    return () => clearInterval(refreshInterval);
+  }, []);
 
   // Handle vehicle identification
   const handleIdentifyVehicle = () => {
@@ -259,38 +289,54 @@ const Dashboard = () => {
 
 
   // Admin Dashboard
-  const AdminDashboard = () => (
-    <div className="space-y-6">
-      <div className="grid grid-cols-2 gap-3 md:gap-4 lg:grid-cols-4">
-        <StatCard
-          title="Total Revenue"
-          value="$12,458"
-          change="+12.5%"
-          icon={<DollarSign className="h-4 w-4 text-primary-600" />}
-          isLoading={isLoading}
-        />
-        <StatCard
-          title="Total Customers"
-          value="1,248"
-          change="+8.2%"
-          icon={<Users className="h-4 w-4 text-primary-600" />}
-          isLoading={isLoading}
-        />
-        <StatCard
-          title="Today's Bookings"
-          value="32"
-          change="+5.1%"
-          icon={<Calendar className="h-4 w-4 text-primary-600" />}
-          isLoading={isLoading}
-        />
-        <StatCard
-          title="Active Services"
-          value="12"
-          change="+2.3%"
-          icon={<Car className="h-4 w-4 text-primary-600" />}
-          isLoading={isLoading}
-        />
-      </div>
+  const AdminDashboard = () => {
+    // Format currency for display
+    const formatCurrency = (amount) => {
+      return new Intl.NumberFormat('en-IN', {
+        style: 'currency',
+        currency: 'INR',
+        minimumFractionDigits: 0,
+      }).format(amount || 0);
+    };
+
+    // Format percentage change
+    const formatPercentage = (percentage) => {
+      const sign = percentage > 0 ? '+' : '';
+      return `${sign}${percentage.toFixed(1)}%`;
+    };
+
+    return (
+      <div className="space-y-6">
+        <div className="grid grid-cols-2 gap-3 md:gap-4 lg:grid-cols-4">
+          <StatCard
+            title="This Month Revenue"
+            value={dashboardStats ? formatCurrency(dashboardStats.revenue.current) : '--'}
+            change={dashboardStats ? formatPercentage(dashboardStats.revenue.change_percentage) : '--'}
+            icon={<DollarSign className="h-4 w-4 text-primary-600" />}
+            isLoading={statsLoading}
+          />
+          <StatCard
+            title="Total Customers"
+            value={dashboardStats ? dashboardStats.total_customers.current.toString() : '--'}
+            change={dashboardStats ? formatPercentage(dashboardStats.total_customers.change_percentage) : '--'}
+            icon={<Users className="h-4 w-4 text-primary-600" />}
+            isLoading={statsLoading}
+          />
+          <StatCard
+            title="Today's Bookings"
+            value={dashboardStats ? dashboardStats.todays_bookings.current.toString() : '--'}
+            change={dashboardStats ? formatPercentage(dashboardStats.todays_bookings.change_percentage) : '--'}
+            icon={<Calendar className="h-4 w-4 text-primary-600" />}
+            isLoading={statsLoading}
+          />
+          <StatCard
+            title="Today's Enquiries"
+            value={dashboardStats ? dashboardStats.todays_enquiries.current.toString() : '--'}
+            change={dashboardStats ? formatPercentage(dashboardStats.todays_enquiries.change_percentage) : '--'}
+            icon={<Car className="h-4 w-4 text-primary-600" />}
+            isLoading={statsLoading}
+          />
+        </div>
 
       <div className="grid gap-4 md:grid-cols-2">
         <Card>
@@ -335,7 +381,8 @@ const Dashboard = () => {
         </Card>
       </div>
     </div>
-  );
+    );
+  };
 
   // Sales Executive Dashboard
   const SalesExecutiveDashboard = () => (
@@ -496,38 +543,54 @@ const Dashboard = () => {
   );
 
   // Accountant Dashboard
-  const AccountantDashboard = () => (
-    <div className="space-y-6">
-      <div className="grid grid-cols-2 gap-3 md:gap-4 lg:grid-cols-4">
-        <StatCard
-          title="Today's Revenue"
-          value="$3,842"
-          change="+18.2%"
-          icon={<DollarSign className="h-4 w-4 text-primary-600" />}
-          isLoading={isLoading}
-        />
-        <StatCard
-          title="Pending Payments"
-          value="$1,205"
-          change="-5.3%"
-          icon={<TrendingUp className="h-4 w-4 text-primary-600" />}
-          isLoading={isLoading}
-        />
-        <StatCard
-          title="Transactions Today"
-          value="48"
-          change="+9.7%"
-          icon={<BarChart3 className="h-4 w-4 text-primary-600" />}
-          isLoading={isLoading}
-        />
-        <StatCard
-          title="Monthly Revenue"
-          value="$45,230"
-          change="+22.1%"
-          icon={<DollarSign className="h-4 w-4 text-primary-600" />}
-          isLoading={isLoading}
-        />
-      </div>
+  const AccountantDashboard = () => {
+    // Format currency for display
+    const formatCurrency = (amount) => {
+      return new Intl.NumberFormat('en-IN', {
+        style: 'currency',
+        currency: 'INR',
+        minimumFractionDigits: 0,
+      }).format(amount || 0);
+    };
+
+    // Format percentage change
+    const formatPercentage = (percentage) => {
+      const sign = percentage > 0 ? '+' : '';
+      return `${sign}${percentage.toFixed(1)}%`;
+    };
+
+    return (
+      <div className="space-y-6">
+        <div className="grid grid-cols-2 gap-3 md:gap-4 lg:grid-cols-4">
+          <StatCard
+            title="Today's Revenue"
+            value="$3,842"
+            change="+18.2%"
+            icon={<DollarSign className="h-4 w-4 text-primary-600" />}
+            isLoading={isLoading}
+          />
+          <StatCard
+            title="Pending Payments"
+            value="$1,205"
+            change="-5.3%"
+            icon={<TrendingUp className="h-4 w-4 text-primary-600" />}
+            isLoading={isLoading}
+          />
+          <StatCard
+            title="Transactions Today"
+            value="48"
+            change="+9.7%"
+            icon={<BarChart3 className="h-4 w-4 text-primary-600" />}
+            isLoading={isLoading}
+          />
+          <StatCard
+            title="Monthly Revenue"
+            value={dashboardStats ? formatCurrency(dashboardStats.revenue.current) : '--'}
+            change={dashboardStats ? formatPercentage(dashboardStats.revenue.change_percentage) : '--'}
+            icon={<DollarSign className="h-4 w-4 text-primary-600" />}
+            isLoading={statsLoading}
+          />
+        </div>
 
       <div className="grid gap-4 md:grid-cols-2">
         <Card>
@@ -569,7 +632,8 @@ const Dashboard = () => {
         </Card>
       </div>
     </div>
-  );
+    );
+  };
 
   const getRoleDashboard = () => {
     switch (user?.role) {

@@ -610,6 +610,7 @@ const Customers = () => {
                     {/* <th className="px-4 py-3 font-medium">Phone</th> */}
                     <th className="px-4 py-3 font-semibold">Location</th>
                     <th className="px-4 py-3 font-semibold">Last Booked</th>
+                    <th className="px-4 py-3 font-semibold">Points</th>
                     <th className="px-4 py-3 font-semibold">Actions</th>
                   </tr>
                 </thead>
@@ -639,6 +640,12 @@ const Customers = () => {
                         <div className="flex items-center gap-2">
                           <Calendar className="h-4 w-4 text-muted-foreground" />
                           {formatDate(customer.last_booked_at)}
+                        </div>
+                      </td>
+                      <td className="px-4 py-2">
+                        <div className="flex items-center gap-1">
+                          <span className="font-semibold text-primary">{customer.loyalty_points || 0}</span>
+                          <span className="text-xs text-muted-foreground">pts</span>
                         </div>
                       </td>
                       <td className="px-4 py-2">
@@ -755,6 +762,10 @@ const Customers = () => {
                         <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
                           <Calendar className="h-3 w-3" />
                           <span>Last Booked: {formatDate(customer.last_booked_at)}</span>
+                        </div>
+                        <div className="flex items-center gap-1 text-[11px]">
+                          <span className="font-semibold text-primary">{customer.loyalty_points || 0}</span>
+                          <span className="text-muted-foreground">pts</span>
                         </div>
                         <div className="flex ml-auto items-center gap-1.5 ">
 

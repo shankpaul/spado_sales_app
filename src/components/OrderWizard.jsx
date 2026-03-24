@@ -36,6 +36,7 @@ import { toast } from 'sonner';
 import orderService from '../services/orderService';
 import customerService from '../services/customerService';
 import offerService from '../services/offerService';
+import loyaltyService from '../services/loyaltyService';
 import useOrderStore from '../store/orderStore';
 import { getBrands, getModelsByBrand, getVehicleType, getVehicleTypes } from '../lib/vehicleData';
 import {
@@ -70,6 +71,8 @@ import {
   Tag,
   Gift,
   Percent,
+  Coins,
+  Info,
 } from 'lucide-react';
 
 /**
@@ -105,6 +108,13 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
   const [availableOffers, setAvailableOffers] = useState([]);
   const [selectedOffer, setSelectedOffer] = useState(null);
   const [loadingOffers, setLoadingOffers] = useState(false);
+  const [offerDetailsDialog, setOfferDetailsDialog] = useState({ open: false, offer: null });
+
+  // Loyalty points states
+  const [loyaltySummary, setLoyaltySummary] = useState(null);
+  const [loadingLoyalty, setLoadingLoyalty] = useState(false);
+  const [pointsToRedeem, setPointsToRedeem] = useState('');
+  const [maxRedeemablePoints, setMaxRedeemablePoints] = useState(0);
 
   // Form refs
   const customerFormRef = useRef(null);
@@ -294,6 +304,42 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
 
     fetchOffers();
   }, [currentStep, selectedCustomer, packageItems, addonItems]);
+
+  // Fetch loyalty points when customer is selected or step 4 is reached
+  useEffect(() => {
+    const fetchLoyaltyData = async () => {
+      if (!selectedCustomer || currentStep !== 4) {
+        setLoyaltySummary(null);
+        setPointsToRedeem('');
+        setMaxRedeemablePoints(0);
+        return;
+      }
+
+      setLoadingLoyalty(true);
+      try {
+        const summary = await loyaltyService.getCustomerSummary(selectedCustomer.id);
+        setLoyaltySummary(summary.data);
+
+        // Calculate max redeemable based on current order total
+        const totals = calculateTotals();
+        if (totals.subtotalAfterDiscount > 0) {
+          const maxRedeemable = await loyaltyService.calculateMaxRedeemable(
+            selectedCustomer.id,
+            totals.subtotalAfterDiscount
+          );
+          setMaxRedeemablePoints(maxRedeemable.data.max_redeemable_points || 0);
+        }
+      } catch (error) {
+        console.error('Error fetching loyalty data:', error);
+        setLoyaltySummary(null);
+        setMaxRedeemablePoints(0);
+      } finally {
+        setLoadingLoyalty(false);
+      }
+    };
+
+    fetchLoyaltyData();
+  }, [currentStep, selectedCustomer, packageItems, addonItems, selectedOffer]);
 
   // Check if selected offer is still valid when available offers change
   useEffect(() => {
@@ -565,6 +611,11 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
 
         // Set notes
         setNotes(order.notes || '');
+
+        // Set redeemed points if any
+        if (order.points_redeemed) {
+          setPointsToRedeem(order.points_redeemed);
+        }
 
       }
     } catch (error) {
@@ -878,8 +929,13 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
     }
     
     const subtotalAfterDiscount = Math.max(0, subtotal - offerDiscount);
-    const gst = (subtotalAfterDiscount * GST_PERCENTAGE) / 100;
-    const totalBeforeRounding = subtotalAfterDiscount + gst;
+    
+    // Apply loyalty points discount (points_to_redeem is the discount value in rupees)
+    const pointsDiscount = pointsToRedeem || 0;
+    const subtotalAfterPointsDiscount = Math.max(0, subtotalAfterDiscount - pointsDiscount);
+    
+    const gst = (subtotalAfterPointsDiscount * GST_PERCENTAGE) / 100;
+    const totalBeforeRounding = subtotalAfterPointsDiscount + gst;
     const roundedTotal = Math.round(totalBeforeRounding);
     const roundOff = roundedTotal - totalBeforeRounding;
     
@@ -889,6 +945,8 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
       subtotal,
       offerDiscount,
       subtotalAfterDiscount,
+      pointsDiscount,
+      subtotalAfterPointsDiscount,
       gst,
       gstPercentage: GST_PERCENTAGE,
       roundOff,
@@ -1063,6 +1121,7 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
         booking_time_to: bookingTimeToISO,
         assigned_to_id: selectedAgent && selectedAgent !== 'unassigned' ? parseInt(selectedAgent, 10) : null,
         offer_id: selectedOffer ? parseInt(selectedOffer.id, 10) : null,
+        points_redeemed: pointsToRedeem || 0,
         notes,
         packages: packageItems.map((item) => ({
           package_id: parseInt(item.package_id, 10),
@@ -1856,7 +1915,7 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
                     }}
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder="Select time" />
+                      <SelectValue placeholder="Pick time" />
                     </SelectTrigger>
                     <SelectContent className="max-h-60 overflow-y-auto">
                       {(() => {
@@ -1906,7 +1965,7 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
                     }}
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder="Select time" />
+                      <SelectValue placeholder="Pick time" />
                     </SelectTrigger>
                     <SelectContent className="max-h-60 overflow-y-auto">
                       {(() => {
@@ -2025,9 +2084,17 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
                               <div className="flex items-center gap-2">
                                 <Tag className="h-4 w-4 text-primary" />
                                 <span className="font-medium">{offer.name}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => setOfferDetailsDialog({ open: true, offer })}
+                                  className="text-blue-600 hover:text-blue-700 p-1 rounded-full hover:bg-blue-50 transition-colors"
+                                  title="View offer details"
+                                >
+                                  <Info className="h-4 w-4" />
+                                </button>
                               </div>
                               <p className="text-sm text-muted-foreground mt-1">{offer.description}</p>
-                              <div className="flex items-center gap-1 mt-2 text-sm font-semibold text-primary">
+                              <div className="flex items-center gap-1 mt-2 text-xs  text-primary">
                                 <Percent className="h-3 w-3" />
                                 {offer.discount_type === 'percentage' ? (
                                   <span>{offer.discount_value}% Off</span>
@@ -2042,7 +2109,7 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
                                 setSelectedOffer(offer);
                                 saveDraft();
                               }}
-                              className="text-primary hover:text-primary/80 text-sm font-medium px-3 py-1 rounded border border-primary hover:bg-primary/10 transition-colors"
+                              className="bg-green-600 hover:bg-green-700 text-white text-sm font-medium px-3 py-1 rounded border border-green-700 transition-colors"
                             >
                               Apply
                             </button>
@@ -2067,11 +2134,139 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
                 }}
                 placeholder="Additional notes..."
                 className="flex-grow resize-none"
-                rows={isMobile ? 3 : 8}
+                rows={isMobile ? 3 : 5}
               />
             </div>
           </div>
-          <Card className="p-4 bg-secondary/50">
+          
+          <div className='space-y-4'>
+            {/* Loyalty Points Redemption Section */}
+            <div>
+              <Label className="flex items-center gap-2">
+                <Coins className="h-4 w-4" />
+                Loyalty Points
+              </Label>
+              {loadingLoyalty ? (
+                <div className="text-sm text-muted-foreground py-2">Loading points balance...</div>
+              ) : loyaltySummary ? (
+                <div className="space-y-3 mt-2">
+                  <Card className="p-3 bg-blue-50 border-blue-200">
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium text-blue-900">Available Points:</span>
+                        <span className="text-lg font-bold text-blue-600">{loyaltySummary.current_balance}</span>
+                      </div>
+                      <div className="flex items-center justify-between text-xs text-blue-700">
+                        <span>Points Value:</span>
+                        <span>₹{loyaltySummary.current_value_in_rupees?.toFixed(2)}</span>
+                      </div>
+                      {maxRedeemablePoints > 0 && (
+                        <div className="flex items-center justify-between text-xs text-blue-700">
+                          <span>Max Redeemable:</span>
+                          <span>{maxRedeemablePoints} points (₹{maxRedeemablePoints.toFixed(2)})</span>
+                        </div>
+                      )}
+                    </div>
+                  </Card>
+
+                  {maxRedeemablePoints > 0 && loyaltySummary.current_balance >= (loyaltySummary.min_redeem_points || 100) ? (
+                    <div className="space-y-2">
+                      <Label htmlFor="pointsToRedeem" className="text-sm">
+                        Redeem Points (Min: {loyaltySummary.min_redeem_points})
+                      </Label>
+                      <div className="flex gap-2">
+                        <Input
+                          id="pointsToRedeem"
+                          type="number"
+                          min="0"
+                          max={maxRedeemablePoints}
+                          step="1"
+                          value={pointsToRedeem || ''}
+                          disabled={loyaltySummary.current_balance < (loyaltySummary.min_redeem_points || 100)}
+                          onChange={(e) => {
+                            const inputValue = e.target.value;
+                            
+                            // If empty, keep it empty (don't force to 0)
+                            if (inputValue === '') {
+                              setPointsToRedeem('');
+                              return;
+                            }
+                            
+                            const value = parseInt(inputValue);
+                            if (isNaN(value)) {
+                              return;
+                            }
+                            
+                            const minPoints = loyaltySummary.min_redeem_points || 100;
+                            
+                            // Allow typing any value (including below minimum) for flexibility
+                            // Only show error when user tries to submit or moves away from input
+                            if (value > maxRedeemablePoints) {
+                              toast.error(`Maximum ${maxRedeemablePoints} points can be redeemed for this order`);
+                              setPointsToRedeem(maxRedeemablePoints);
+                              return;
+                            }
+                            
+                            setPointsToRedeem(value);
+                          }}
+                          onBlur={(e) => {
+                            // Validate on blur (when user leaves the input)
+                            const value = parseInt(e.target.value);
+                            const minPoints = loyaltySummary.min_redeem_points || 100;
+                            
+                            if (isNaN(value) || e.target.value === '') {
+                              setPointsToRedeem('');
+                              return;
+                            }
+                            
+                            if (value > 0 && value < minPoints) {
+                              toast.error(`Minimum ${minPoints} points required for redemption`);
+                              setPointsToRedeem('');
+                            }
+                          }}
+                          placeholder="Enter points to redeem"
+                          className="flex-1"
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setPointsToRedeem(maxRedeemablePoints)}
+                          disabled={maxRedeemablePoints === 0}
+                        >
+                          Max
+                        </Button>
+                        {pointsToRedeem > 0 && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setPointsToRedeem('')}
+                          >
+                            Clear
+                          </Button>
+                        )}
+                      </div>
+                      {pointsToRedeem > 0 && (
+                        <p className="text-sm text-green-600 font-medium">
+                          Discount: ₹{(pointsToRedeem || 0).toFixed(2)}
+                        </p>
+                      )}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">
+                      {loyaltySummary.current_balance < (loyaltySummary.min_redeem_points || 100)
+                        ? `Minimum ${loyaltySummary.min_redeem_points || 100} points required for redemption. Customer currently have ${loyaltySummary.current_balance} points.`
+                        : 'Maximum redeemable points (50% of order value) is 0 for this order amount'}
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground py-2">No loyalty points available</p>
+              )}
+            </div>
+
+            <Card className="p-4 bg-secondary/50">
             <div className="space-y-2 text-sm">
               <div className="flex justify-between">
                 <span>Packages Total:</span>
@@ -2100,6 +2295,21 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
                   </div>
                 </>
               )}
+              {totals.pointsDiscount > 0 && (
+                <>
+                  <div className="flex justify-between text-blue-600">
+                    <span className="flex items-center gap-1">
+                      <Coins className="h-3 w-3" />
+                      Points Redeemed ({pointsToRedeem} pts):
+                    </span>
+                    <span className="font-medium">-₹{totals.pointsDiscount.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between font-semibold">
+                    <span>After Points:</span>
+                    <span>₹{totals.subtotalAfterPointsDiscount.toFixed(2)}</span>
+                  </div>
+                </>
+              )}
               <div className="flex justify-between">
                 <span>GST ({totals.gstPercentage}%):</span>
                 <span className="font-medium">₹{totals.gst.toFixed(2)}</span>
@@ -2118,6 +2328,7 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
               </div>
             </div>
           </Card>
+          </div>
         </div>
 
       </div>
@@ -2468,6 +2679,131 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
                   </Button>
                 </div>
               </div>
+            </DialogContent>
+          </Dialog>
+
+          {/* Offer Details Dialog */}
+          <Dialog open={offerDetailsDialog.open} onOpenChange={(open) => setOfferDetailsDialog({ open, offer: null })}>
+            <DialogContent className="sm:max-w-lg">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <Tag className="h-5 w-5 text-primary" />
+                  Offer Details
+                </DialogTitle>
+              </DialogHeader>
+              {offerDetailsDialog.offer && (
+                <div className="space-y-4">
+                  <div>
+                    <Label className="text-sm font-semibold text-muted-foreground">Offer Name</Label>
+                    <p className="text-base font-medium mt-1">{offerDetailsDialog.offer.name}</p>
+                  </div>
+
+                  <div>
+                    <Label className="text-sm font-semibold text-muted-foreground">Description</Label>
+                    <p className="text-sm mt-1">{offerDetailsDialog.offer.description || 'No description available'}</p>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label className="text-sm font-semibold text-muted-foreground">Discount Type</Label>
+                      <p className="text-sm mt-1 capitalize">{offerDetailsDialog.offer.discount_type === 'percentage' ? 'Percentage' : 'Fixed Amount'}</p>
+                    </div>
+
+                    <div>
+                      <Label className="text-sm font-semibold text-muted-foreground">Discount Value</Label>
+                      <p className="text-lg font-bold text-primary mt-1">
+                        {offerDetailsDialog.offer.discount_type === 'percentage' 
+                          ? `${offerDetailsDialog.offer.discount_value}%` 
+                          : `₹${offerDetailsDialog.offer.discount_value}`}
+                      </p>
+                    </div>
+                  </div>
+
+                  {offerDetailsDialog.offer.min_order_value && (
+                    <div>
+                      <Label className="text-sm font-semibold text-muted-foreground">Minimum Order Value</Label>
+                      <p className="text-sm mt-1">₹{offerDetailsDialog.offer.min_order_value}</p>
+                    </div>
+                  )}
+
+                  {offerDetailsDialog.offer.max_discount_amount && (
+                    <div>
+                      <Label className="text-sm font-semibold text-muted-foreground">Maximum Discount Amount</Label>
+                      <p className="text-sm mt-1">₹{offerDetailsDialog.offer.max_discount_amount}</p>
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label className="text-sm font-semibold text-muted-foreground">Valid From</Label>
+                      <p className="text-sm mt-1">
+                        {offerDetailsDialog.offer.start_date 
+                          ? new Date(offerDetailsDialog.offer.start_date).toLocaleDateString('en-IN', { 
+                              day: 'numeric', 
+                              month: 'short', 
+                              year: 'numeric' 
+                            })
+                          : 'N/A'}
+                      </p>
+                    </div>
+
+                    <div>
+                      <Label className="text-sm font-semibold text-muted-foreground">Valid Until</Label>
+                      <p className="text-sm mt-1">
+                        {offerDetailsDialog.offer.end_date 
+                          ? new Date(offerDetailsDialog.offer.end_date).toLocaleDateString('en-IN', { 
+                              day: 'numeric', 
+                              month: 'short', 
+                              year: 'numeric' 
+                            })
+                          : 'N/A'}
+                      </p>
+                    </div>
+                  </div>
+
+                  {offerDetailsDialog.offer.applicable_vehicle_types && offerDetailsDialog.offer.applicable_vehicle_types.length > 0 && (
+                    <div>
+                      <Label className="text-sm font-semibold text-muted-foreground">Applicable Vehicle Types</Label>
+                      <div className="flex flex-wrap gap-2 mt-2">
+                        {offerDetailsDialog.offer.applicable_vehicle_types.map((type, index) => (
+                          <span key={index} className="px-2 py-1 bg-secondary text-xs rounded capitalize">
+                            {type}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {offerDetailsDialog.offer.applicable_packages && offerDetailsDialog.offer.applicable_packages.length > 0 && (
+                    <div>
+                      <Label className="text-sm font-semibold text-muted-foreground">Applicable Packages</Label>
+                      <div className="flex flex-wrap gap-2 mt-2">
+                        {offerDetailsDialog.offer.applicable_packages.map((pkg, index) => (
+                          <span key={index} className="px-2 py-1 bg-secondary text-xs rounded">
+                            {pkg.name || `Package #${pkg.id}`}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {offerDetailsDialog.offer.terms_and_conditions && (
+                    <div>
+                      <Label className="text-sm font-semibold text-muted-foreground">Terms & Conditions</Label>
+                      <p className="text-xs text-muted-foreground mt-1 whitespace-pre-line">{offerDetailsDialog.offer.terms_and_conditions}</p>
+                    </div>
+                  )}
+
+                  <div className="flex justify-end pt-4">
+                    <Button
+                      onClick={() => setOfferDetailsDialog({ open: false, offer: null })}
+                      variant="outline"
+                    >
+                      Close
+                    </Button>
+                  </div>
+                </div>
+              )}
             </DialogContent>
           </Dialog>
 

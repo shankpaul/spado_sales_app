@@ -24,6 +24,7 @@ import { Badge } from './ui/badge';
 import { Card } from './ui/card';
 import { toast } from 'sonner';
 import orderService from '../services/orderService';
+import loyaltyService from '../services/loyaltyService';
 import { ORDER_STATUSES, PAYMENT_STATUSES, getStatusColor, getStatusLabel } from '../lib/constants';
 import {
   Phone,
@@ -33,6 +34,10 @@ import {
   MessageCircle,
   ShoppingCart,
   Mail,
+  Award,
+  TrendingUp,
+  ArrowUpCircle,
+  ArrowDownCircle,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import CustomerContact from './CustomerContact';
@@ -47,6 +52,11 @@ import CustomerContact from './CustomerContact';
 const CustomerDetails = ({ customer, open, onOpenChange }) => {
   const [customerOrders, setCustomerOrders] = useState([]);
   const [loadingOrders, setLoadingOrders] = useState(false);
+  const [loyaltySummary, setLoyaltySummary] = useState(null);
+  const [loyaltyTransactions, setLoyaltyTransactions] = useState([]);
+  const [loadingLoyalty, setLoadingLoyalty] = useState(false);
+  const [loyaltyPage, setLoyaltyPage] = useState(1);
+  const [loyaltyTotal, setLoyaltyTotal] = useState(0);
 
   // Fetch customer orders when dialog opens
   useEffect(() => {
@@ -66,6 +76,31 @@ const CustomerDetails = ({ customer, open, onOpenChange }) => {
         })
         .finally(() => {
           setLoadingOrders(false);
+        });
+
+      // Fetch loyalty summary
+      setLoadingLoyalty(true);
+      loyaltyService.getCustomerSummary(customer.id)
+        .then((response) => {
+          setLoyaltySummary(response.data);
+        })
+        .catch((error) => {
+          console.error('Error fetching loyalty summary:', error);
+          setLoyaltySummary(null);
+        });
+
+      // Fetch loyalty transactions
+      loyaltyService.getCustomerTransactions(customer.id, 1, 20)
+        .then((response) => {
+          setLoyaltyTransactions(response.data || []);
+          setLoyaltyTotal(response.meta?.total || 0);
+        })
+        .catch((error) => {
+          console.error('Error fetching loyalty transactions:', error);
+          setLoyaltyTransactions([]);
+        })
+        .finally(() => {
+          setLoadingLoyalty(false);
         });
     }
   }, [open, customer]);
@@ -121,9 +156,10 @@ const CustomerDetails = ({ customer, open, onOpenChange }) => {
         </DialogHeader>
         
         <Tabs defaultValue="details" className="flex-1 overflow-hidden flex flex-col mt-4">
-          <TabsList className="grid w-full grid-cols-2">
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="details">Details</TabsTrigger>
             <TabsTrigger value="orders">Orders ({customerOrders.length})</TabsTrigger>
+            <TabsTrigger value="loyalty">Loyalty Points</TabsTrigger>
           </TabsList>
           
           <TabsContent value="details" className="flex-1 overflow-y-auto space-y-6 mt-4">
@@ -258,6 +294,125 @@ const CustomerDetails = ({ customer, open, onOpenChange }) => {
                   </TableBody>
                 </Table>
               </div>
+            )}
+          </TabsContent>
+
+          <TabsContent value="loyalty" className="flex-1 overflow-y-auto mt-4 space-y-6">
+            {loadingLoyalty ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              </div>
+            ) : (
+              <>
+                {/* Loyalty Summary Cards */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <Card className="p-4 bg-gradient-to-br from-primary/10 to-primary/5 border-primary/20">
+                    <div className="flex items-center gap-3 mb-2">
+                      <Award className="h-5 w-5 text-primary" />
+                      <div className="text-sm text-muted-foreground">Current Balance</div>
+                    </div>
+                    <div className="text-3xl font-bold text-primary">
+                      {loyaltySummary?.current_balance || 0}
+                      <span className="text-sm font-normal text-muted-foreground ml-2">points</span>
+                    </div>
+                    <div className="text-xs text-muted-foreground mt-1">
+                      Worth {formatCurrency(loyaltySummary?.current_value_in_rupees || 0)}
+                    </div>
+                  </Card>
+
+                  <Card className="p-4">
+                    <div className="flex items-center gap-3 mb-2">
+                      <TrendingUp className="h-5 w-5 text-green-600" />
+                      <div className="text-sm text-muted-foreground">Lifetime Earned</div>
+                    </div>
+                    <div className="text-2xl font-bold">
+                      {loyaltySummary?.lifetime_points_earned || 0}
+                      <span className="text-sm font-normal text-muted-foreground ml-2">points</span>
+                    </div>
+                  </Card>
+
+                  <Card className="p-4">
+                    <div className="flex items-center gap-3 mb-2">
+                      <Award className="h-5 w-5 text-amber-600" />
+                      <div className="text-sm text-muted-foreground">Point Value</div>
+                    </div>
+                    <div className="text-2xl font-bold">
+                      {formatCurrency(loyaltySummary?.point_value || 0)}
+                      <span className="text-sm font-normal text-muted-foreground ml-2">per point</span>
+                    </div>
+                    <div className="text-xs text-muted-foreground mt-1">
+                      Min. {loyaltySummary?.min_redeem_points || 0} points to redeem
+                    </div>
+                  </Card>
+                </div>
+
+                {/* Transaction History */}
+                <Card className="p-6">
+                  <h3 className="text-lg font-semibold mb-4">Transaction History</h3>
+                  {loyaltyTransactions.length === 0 ? (
+                    <div className="text-center py-12 text-muted-foreground">
+                      <Award className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                      <p className="text-lg font-medium mb-1">No transactions yet</p>
+                      <p className="text-sm">Points transactions will appear here</p>
+                    </div>
+                  ) : (
+                    <div className="border rounded-lg overflow-hidden">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Date</TableHead>
+                            <TableHead>Type</TableHead>
+                            <TableHead>Description</TableHead>
+                            <TableHead className="text-right">Points</TableHead>
+                            <TableHead className="text-right">Balance</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {loyaltyTransactions.map((transaction) => (
+                            <TableRow key={transaction.id} className="hover:bg-muted/50">
+                              <TableCell>
+                                <div className="flex items-center gap-1 text-sm">
+                                  <Calendar className="h-3 w-3 text-muted-foreground" />
+                                  {formatDate(transaction.created_at)}
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                <div className="flex items-center gap-2">
+                                  {transaction.transaction_type === 'credit' ? (
+                                    <ArrowUpCircle className="h-4 w-4 text-green-600" />
+                                  ) : (
+                                    <ArrowDownCircle className="h-4 w-4 text-red-600" />
+                                  )}
+                                  <Badge 
+                                    variant={transaction.transaction_type === 'credit' ? 'success' : 'secondary'}
+                                  >
+                                    {transaction.transaction_type === 'credit' ? 'Credit' : 'Debit'}
+                                  </Badge>
+                                </div>
+                              </TableCell>
+                              <TableCell className="text-sm">
+                                {transaction.description}
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <span className={
+                                  transaction.transaction_type === 'credit'
+                                    ? 'text-green-600 font-semibold'
+                                    : 'text-red-600 font-semibold'
+                                }>
+                                  {transaction.transaction_type === 'credit' ? '+' : '-'}{transaction.points}
+                                </span>
+                              </TableCell>
+                              <TableCell className="text-right font-medium">
+                                {transaction.balance_after}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  )}
+                </Card>
+              </>
             )}
           </TabsContent>
         </Tabs>

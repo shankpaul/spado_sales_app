@@ -55,9 +55,9 @@ export const ENQUIRY_STATUS_OPTIONS = Object.entries(ENQUIRY_STATUS_LABELS).map(
 
 // Status colors for badges
 export const ENQUIRY_STATUS_COLORS = {
-  [ENQUIRY_STATUSES.NEW]: 'default',
+  [ENQUIRY_STATUSES.NEW]: 'info',
   [ENQUIRY_STATUSES.CONTACTED]: 'info',
-  [ENQUIRY_STATUSES.INTERESTED]: 'success',
+  [ENQUIRY_STATUSES.INTERESTED]: 'info',
   [ENQUIRY_STATUSES.NEEDS_FOLLOWUP]: 'warning',
   [ENQUIRY_STATUSES.CONVERTED]: 'success',
   [ENQUIRY_STATUSES.LOST]: 'destructive',

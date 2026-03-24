@@ -149,6 +149,59 @@ const userService = {
       throw error;
     }
   },
+
+  /**
+   * Get current user's profile
+   * @returns {Promise} API response with user profile including employee and office data
+   */
+  async getProfile() {
+    try {
+      const response = await apiClient.get('/profile');
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  },
+
+  /**
+   * Update current user's profile
+   * @param {Object|FormData} profileData - Profile data to update
+   * @param {string} [profileData.name] - User name
+   * @param {string} [profileData.phone] - Phone number
+   * @param {string} [profileData.address] - Address
+   * @param {number} [profileData.home_latitude] - Home latitude
+   * @param {number} [profileData.home_longitude] - Home longitude
+   * @returns {Promise} API response with updated profile
+   */
+  async updateProfile(profileData) {
+    try {
+      const config = profileData instanceof FormData ? {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      } : {};
+      const response = await apiClient.put('/profile', profileData, config);
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  },
+
+  /**
+   * Change current user's password
+   * @param {string} currentPassword - Current password
+   * @param {string} newPassword - New password
+   * @returns {Promise} API response
+   */
+  async changeUserPassword(currentPassword, newPassword) {
+    try {
+      const response = await apiClient.post('/profile/change-password', {
+        current_password: currentPassword,
+        new_password: newPassword
+      });
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  },
 };
 
 export default userService;

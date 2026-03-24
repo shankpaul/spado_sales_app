@@ -328,7 +328,7 @@ const Layout = ({ children }) => {
                       <span>Profile</span>
                     </Link>
                     <Link
-                      to="/change-password"
+                      to="/profile"
                       className="flex items-center gap-3 px-3 py-2 text-sm rounded-md hover:bg-gray-100 transition-colors"
                     >
                       <KeyRound className="h-4 w-4" />
@@ -459,7 +459,7 @@ const Layout = ({ children }) => {
                     <span>Profile Info</span>
                   </Link>
                   <Link
-                    to="/change-password"
+                    to="/profile"
                     onClick={() => setProfileMenuOpen(false)}
                     className="flex items-center gap-3 px-3 py-2 text-sm rounded-md hover:bg-gray-100 transition-colors"
                   >

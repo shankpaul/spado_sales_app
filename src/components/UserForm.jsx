@@ -199,8 +199,8 @@ const UserForm = ({ user, onSubmit, onCancel }) => {
     if (!user || formData.password) {
       if (!formData.password && !user) {
         newErrors.password = 'Password is required for new users';
-      } else if (formData.password && formData.password.length < 6) {
-        newErrors.password = 'Password must be at least 6 characters';
+      } else if (formData.password && formData.password.length < 8) {
+        newErrors.password = 'Password must be at least 8 characters';
       }
 
       if (formData.password !== formData.password_confirmation) {
