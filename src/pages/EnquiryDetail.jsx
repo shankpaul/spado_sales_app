@@ -1083,7 +1083,7 @@ const EnquiryDetail = ({ enquiryId, onClose, onUpdate }) => {
                           </div>
                         )}
                         {comment.text && (
-                          <p className="text-xs md:text-sm whitespace-pre-wrap leading-relaxed">
+                          <p className="text-xs md:text-sm whitespace-pre-wrap leading-relaxed break-words">
                             {comment.text}
                           </p>
                         )}
