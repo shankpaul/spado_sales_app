@@ -80,7 +80,8 @@ const VoiceNoteRecorder = ({ onRecordingComplete, onDelete, onRecordingStateChan
     
     // Clear waveform container
     if (waveformRef.current) {
-      waveformRef.current.innerHTML = '';
+      // Use textContent instead of innerHTML for security
+      waveformRef.current.textContent = '';
     }
     
     // Clear media recorder reference

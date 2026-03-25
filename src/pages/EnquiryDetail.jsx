@@ -75,6 +75,7 @@ import {
   ShoppingCart,
 } from 'lucide-react';
 import { formatDate, formatDateTime } from '../lib/utilities';
+import { sanitizeImageUrl, isValidUrl } from '../lib/security';
 import { Badge2 } from '@/components/ui/badge2';
 import LetterAvatar from '@/components/LetterAvatar';
 import CustomerContact from '@/components/CustomerContact';
@@ -1017,16 +1018,21 @@ const EnquiryDetail = ({ enquiryId, onClose, onUpdate }) => {
                             {formatDateTime(comment.created_at)}
                           </span>
                         </div>
-                        {comment.image_url && (
+                        {comment.image_url && sanitizeImageUrl(comment.image_url) && (
                           <div className="w-full mt-2 mb-2">
                             <a 
-                              href={comment.image_url} 
+                              href={isValidUrl(comment.image_url) ? comment.image_url : '#'} 
                               target="_blank" 
                               rel="noopener noreferrer"
                               className="block"
+                              onClick={(e) => {
+                                if (!isValidUrl(comment.image_url)) {
+                                  e.preventDefault();
+                                }
+                              }}
                             >
                               <img 
-                                src={comment.image_url} 
+                                src={sanitizeImageUrl(comment.image_url)} 
                                 alt="WhatsApp image"
                                 className="max-w-full h-auto rounded-lg border border-gray-200 hover:opacity-90 transition-opacity cursor-pointer max-h-50 object-contain"
                                 onError={(e) => {

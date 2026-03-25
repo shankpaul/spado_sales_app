@@ -11,6 +11,7 @@ import {
 } from './ui/select';
 import { Loader2, UserCircle, Camera, X } from 'lucide-react';
 import { toast } from 'sonner';
+import { isValidFileType, isValidFileSize } from '../lib/security';
 import officeService from '../services/officeService';
 import employeeService from '../services/employeeService';
 
@@ -149,14 +150,16 @@ const UserForm = ({ user, onSubmit, onCancel }) => {
   const handleAvatarChange = (e) => {
     const file = e.target.files[0];
     if (file) {
-      // Validate file type
-      if (!file.type.startsWith('image/')) {
+      // Validate file type using security utility
+      if (!isValidFileType(file, ['image/*'])) {
         toast.error('Please select an image file');
+        e.target.value = '';
         return;
       }
-      // Validate file size (5MB)
-      if (file.size > 5 * 1024 * 1024) {
+      // Validate file size (5MB) using security utility
+      if (!isValidFileSize(file, 5 * 1024 * 1024)) {
         toast.error('Avatar must be less than 5MB');
+        e.target.value = '';
         return;
       }
       setAvatarFile(file);

@@ -98,6 +98,7 @@ import {
 import MapPreview from '@/components/MapPreview';
 import VehicleIcon from '../components/VehicleIcon';
 import { formatDate, formatDateTime, formatTime, formatCurrency } from '../lib/utilities';
+import { sanitizeImageUrl, isValidUrl } from '../lib/security';
 import { Badge2 } from '@/components/ui/badge2';
 import LetterAvatar from '@/components/LetterAvatar';
 import useOrderStore from '../store/orderStore';
