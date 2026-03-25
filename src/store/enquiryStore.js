@@ -107,7 +107,6 @@ const useEnquiryStore = create((set, get) => ({
 
       return newEnquiries;
     } catch (error) {
-      console.error('Error fetching enquiries:', error);
       set({ error: error.message, isLoading: false });
       throw error;
     }
@@ -135,7 +134,6 @@ const useEnquiryStore = create((set, get) => ({
       
       return enquiry;
     } catch (error) {
-      console.error('Error fetching enquiry:', error);
       set({ error: error.message, isLoading: false });
       throw error;
     }
@@ -159,7 +157,6 @@ const useEnquiryStore = create((set, get) => ({
       
       return newEnquiry;
     } catch (error) {
-      console.error('Error creating enquiry:', error);
       set({ error: error.message, isLoading: false });
       throw error;
     }
@@ -185,7 +182,6 @@ const useEnquiryStore = create((set, get) => ({
       
       return updatedEnquiry;
     } catch (error) {
-      console.error('Error updating enquiry:', error);
       set({ error: error.message, isLoading: false });
       throw error;
     }
@@ -211,7 +207,6 @@ const useEnquiryStore = create((set, get) => ({
       
       return updatedEnquiry;
     } catch (error) {
-      console.error('Error updating enquiry status:', error);
       set({ error: error.message, isLoading: false });
       throw error;
     }
@@ -237,7 +232,6 @@ const useEnquiryStore = create((set, get) => ({
       
       return updatedEnquiry;
     } catch (error) {
-      console.error('Error assigning enquiry:', error);
       set({ error: error.message, isLoading: false });
       throw error;
     }
@@ -257,7 +251,6 @@ const useEnquiryStore = create((set, get) => ({
       set({ isLoading: false });
       return response;
     } catch (error) {
-      console.error('Error converting enquiry:', error);
       set({ error: error.message, isLoading: false });
       throw error;
     }
@@ -279,7 +272,7 @@ const useEnquiryStore = create((set, get) => ({
         isLoading: false,
       }));
     } catch (error) {
-      console.error('Error deleting enquiry:', error);
+
       set({ error: error.message, isLoading: false });
       throw error;
     }
@@ -322,7 +315,6 @@ const useEnquiryStore = create((set, get) => ({
 
       return newEnquiries;
     } catch (error) {
-      console.error('Error fetching page:', error);
       set({ error: error.message, isLoading: false });
       throw error;
     }
@@ -348,7 +340,6 @@ const useEnquiryStore = create((set, get) => ({
       set({ isLoading: false });
       return response.report;
     } catch (error) {
-      console.error('Error fetching weekly report:', error);
       set({ error: error.message, isLoading: false });
       throw error;
     }

@@ -65,7 +65,6 @@ const VoiceNoteRecorder = ({ onRecordingComplete, onDelete, onRecordingStateChan
       try {
         recordPluginRef.current.destroy();
       } catch (error) {
-        console.error('Error destroying record plugin:', error);
       }
       recordPluginRef.current = null;
     }
@@ -75,7 +74,6 @@ const VoiceNoteRecorder = ({ onRecordingComplete, onDelete, onRecordingStateChan
       try {
         wavesurferRef.current.destroy();
       } catch (error) {
-        console.error('Error destroying wavesurfer:', error);
       }
       wavesurferRef.current = null;
     }
@@ -95,7 +93,6 @@ const VoiceNoteRecorder = ({ onRecordingComplete, onDelete, onRecordingStateChan
 
   const initializeRecording = async () => {
     if (!waveformRef.current) {
-      console.error('Waveform container still not ready');
       return;
     }
 
@@ -155,12 +152,6 @@ const VoiceNoteRecorder = ({ onRecordingComplete, onDelete, onRecordingStateChan
 
       // Handle recording end
       recordPluginRef.current.on('record-end', (blob) => {
-        console.log('Recording ended:', {
-          blob,
-          type: blob?.type,
-          size: blob?.size,
-          recordingTime
-        });
         
         // Skip if we're deleting
         if (isDeletingRef.current) {
@@ -188,7 +179,6 @@ const VoiceNoteRecorder = ({ onRecordingComplete, onDelete, onRecordingStateChan
         }
         
         // Automatically notify parent with the recording
-        console.log('Calling onRecordingComplete with:', { blob, recordingTime });
         if (onRecordingComplete) {
           onRecordingComplete(blob, recordingTime);
         }
@@ -210,7 +200,6 @@ const VoiceNoteRecorder = ({ onRecordingComplete, onDelete, onRecordingStateChan
         setRecordingTime(prev => prev + 1);
       }, 1000);
     } catch (error) {
-      console.error('Error starting recording:', error);
       toast.error('Could not access microphone');
       setIsInitializing(false);
     }
@@ -272,14 +261,11 @@ const VoiceNoteRecorder = ({ onRecordingComplete, onDelete, onRecordingStateChan
         // Determine mime type from first chunk or use default
         const mimeType = audioChunksRef.current[0].type || 'audio/webm';
         const blob = new Blob(audioChunksRef.current, { type: mimeType });
-        console.log('Paused blob created from chunks:', blob, 'Size:', blob.size);
         setPausedBlob(blob);
       } else {
-        console.warn('No audio chunks available yet');
         setPausedBlob(null);
       }
     } catch (error) {
-      console.error('Error pausing recording:', error);
     }
   };
 
@@ -309,7 +295,6 @@ const VoiceNoteRecorder = ({ onRecordingComplete, onDelete, onRecordingStateChan
 
   const togglePlayPausedRecording = async () => {
     if (!isPaused) {
-      console.log('Cannot play: not paused');
       return;
     }
 
@@ -325,11 +310,9 @@ const VoiceNoteRecorder = ({ onRecordingComplete, onDelete, onRecordingStateChan
       try {
         if (!pausedBlob) {
           toast.error('No recording available to play');
-          console.log('No paused blob available');
           return;
         }
         
-        console.log('Playing blob:', pausedBlob);
         const url = URL.createObjectURL(pausedBlob);
         const audio = new Audio(url);
         
@@ -339,7 +322,6 @@ const VoiceNoteRecorder = ({ onRecordingComplete, onDelete, onRecordingStateChan
         };
         
         audio.onerror = (e) => {
-          console.error('Audio playback error:', e);
           toast.error('Failed to play recording');
           setIsPlayingPausedRecording(false);
           URL.revokeObjectURL(url);
@@ -351,13 +333,11 @@ const VoiceNoteRecorder = ({ onRecordingComplete, onDelete, onRecordingStateChan
           await audio.play();
           setIsPlayingPausedRecording(true);
         } catch (playError) {
-          console.error('Play error:', playError);
           toast.error('Could not play audio');
           setIsPlayingPausedRecording(false);
           URL.revokeObjectURL(url);
         }
       } catch (error) {
-        console.error('Error playing paused recording:', error);
         toast.error('Failed to play recording');
       }
     }
@@ -389,7 +369,6 @@ const VoiceNoteRecorder = ({ onRecordingComplete, onDelete, onRecordingStateChan
       try {
         await recordPluginRef.current.stopRecording();
       } catch (error) {
-        console.error('Error stopping recording during delete:', error);
       }
     }
     

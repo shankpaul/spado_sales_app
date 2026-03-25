@@ -78,7 +78,6 @@ const Layout = ({ children }) => {
 
   // Initialize real-time updates for all authenticated pages
   useEffect(() => {
-    console.log('[Layout] Initializing real-time updates for authenticated user');
     initializeRealtime();
     
     // Note: We don't disconnect on unmount because real-time
@@ -91,7 +90,6 @@ const Layout = ({ children }) => {
       toast.success('Logged out successfully');
       navigate('/login');
     } catch (error) {
-      console.error('Logout error:', error);
       toast.error('Failed to logout');
     }
   };

@@ -203,7 +203,6 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
         });
         setCustomers(response.customers || []);
       } catch (error) {
-        console.error('Error searching customers:', error);
         toast.error('Failed to search customers');
       } finally {
         setCustomerSearchLoading(false);
@@ -258,7 +257,6 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
           saveDraft();
         }
       } catch (error) {
-        console.error('Error processing map link:', error);
         toast.error('Failed to process map link. Please enter area manually.');
         setMapLinkError(true);
       } finally {
@@ -295,7 +293,6 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
         
         setAvailableOffers(response.data || []);
       } catch (error) {
-        console.error('Error fetching offers:', error);
         setAvailableOffers([]);
       } finally {
         setLoadingOffers(false);
@@ -330,7 +327,6 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
           setMaxRedeemablePoints(maxRedeemable.data.max_redeemable_points || 0);
         }
       } catch (error) {
-        console.error('Error fetching loyalty data:', error);
         setLoyaltySummary(null);
         setMaxRedeemablePoints(0);
       } finally {
@@ -406,7 +402,6 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
         fetchCustomerById(customerId);
       }
     } catch (error) {
-      console.error('Error loading draft:', error);
       clearDraft();
     }
   };
@@ -475,7 +470,6 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
         fetchAgents();
       }
     } catch (error) {
-      console.error('Error fetching data:', error);
       toast.error('Failed to load data');
     }
   };
@@ -501,7 +495,6 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
         });
       }
     } catch (error) {
-      console.error('Error fetching customer:', error);
     }
   };
 
@@ -619,7 +612,6 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
 
       }
     } catch (error) {
-      console.error('Error fetching order:', error);
       toast.error('Failed to load order data');
     } finally {
       setLoading(false);
@@ -773,7 +765,6 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
     // Check all steps
     for (let step = 1; step <= 4; step++) {
       const stepErrors = getStepErrors(step);
-      console.log(`Validation for step ${step}:`, stepErrors);
       if (Object.keys(stepErrors).length > 0) {
         allValid = false;
         if (firstInvalidStep === null) {
@@ -1020,7 +1011,6 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
         if (existingIndex === -1) {
           // Find the package details from the packages list to get vehicle type
           const packageDetails = packages.find(p => String(p.id) === String(pkg.id));
-          console.log('Applying reward package:', pkg, 'Details:', packageDetails);
           // Add new reward package
           setPackageItems(prev => [...prev, {
             brand: '',
@@ -1155,7 +1145,6 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
       resetWizard();
       onSuccess();
     } catch (error) {
-      console.error('Error saving order:', error);
       const errorMessage = error.response?.data?.message || error.message || 'Failed to save order';
       setSubmitError(errorMessage);
       toast.error(errorMessage);

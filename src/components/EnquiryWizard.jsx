@@ -113,7 +113,6 @@ const EnquiryWizard = ({ open, onOpenChange, onSuccess }) => {
         setPackages(packagesRes.packages || packagesRes || []);
         setAddons(addonsRes.addons || addonsRes || []);
       } catch (error) {
-        console.error('Error fetching packages/addons:', error);
       }
     };
     
@@ -158,12 +157,6 @@ const EnquiryWizard = ({ open, onOpenChange, onSuccess }) => {
 
   // Voice note handlers
   const handleVoiceNoteComplete = (audioBlob, duration) => {
-    console.log('Voice note complete:', {
-      audioBlob,
-      blobType: audioBlob?.type,
-      blobSize: audioBlob?.size,
-      duration
-    });
     setVoiceNoteBlob(audioBlob);
     setVoiceNoteDuration(duration);
     setIsRecordingInProgress(false);
@@ -222,7 +215,6 @@ const EnquiryWizard = ({ open, onOpenChange, onSuccess }) => {
         
         setShowCustomerSuggestions(foundCustomers.length > 0);
       } catch (error) {
-        console.error('Error searching customers:', error);
       } finally {
         setCustomerSearchLoading(false);
       }
@@ -379,7 +371,6 @@ const EnquiryWizard = ({ open, onOpenChange, onSuccess }) => {
           
           await enquiryService.addVoiceComment(newEnquiry.id, voiceFormData);
         } catch (voiceError) {
-          console.error('Error uploading voice note:', voiceError);
           // Don't fail the entire creation if voice note upload fails
           toast.warning('Enquiry created but voice note upload failed');
         }
@@ -389,7 +380,6 @@ const EnquiryWizard = ({ open, onOpenChange, onSuccess }) => {
       onOpenChange(false);
       if (onSuccess) onSuccess();
     } catch (error) {
-      console.error('Error creating enquiry:', error);
       toast.error(error.response?.data?.error || 'Failed to create enquiry');
     }
   };

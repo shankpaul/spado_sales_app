@@ -135,7 +135,6 @@ const Subscriptions = () => {
           if (search) setSearchTerm(search);
         }
       } catch (error) {
-        console.error('Error loading filters:', error);
       }
     };
     loadPersistedState();
@@ -245,7 +244,6 @@ const Subscriptions = () => {
       setTotalCount(response.pagination?.total_count || 0);
       setHasMore(pageNum < (response.pagination?.total_pages || 1));
     } catch (error) {
-      console.error('Error fetching subscriptions:', error);
       toast.error('Failed to load subscriptions');
       if (!append) {
         setSubscriptions([]);
@@ -314,7 +312,6 @@ const Subscriptions = () => {
       }
       fetchSubscriptions(page, false);
     } catch (error) {
-      console.error('Error toggling subscription:', error);
       toast.error('Failed to update subscription');
     }
   };

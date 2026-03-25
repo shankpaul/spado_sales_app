@@ -74,7 +74,6 @@ const Users = () => {
       const response = await userService.getAllUsers();
       setUsers(response.users || response || []);
     } catch (error) {
-      console.error('Error fetching users:', error);
       toast.error('Failed to load users');
       setUsers([]);
     } finally {
@@ -129,7 +128,6 @@ const Users = () => {
       setIsDeleteOpen(false);
       setSelectedUser(null);
     } catch (error) {
-      console.error('Error deleting user:', error);
       toast.error(error.response?.data?.error || 'Failed to delete user');
     } finally {
       setActionLoading(false);
@@ -148,7 +146,6 @@ const Users = () => {
       }
       fetchUsers();
     } catch (error) {
-      console.error('Error toggling lock:', error);
       toast.error('Failed to update user lock status');
     }
   };
@@ -173,7 +170,6 @@ const Users = () => {
       setIsFormOpen(false);
       setSelectedUser(null);
     } catch (error) {
-      console.error('Error saving user:', error);
       throw error;
     }
   };
@@ -190,7 +186,6 @@ const Users = () => {
       setIsPasswordOpen(false);
       setSelectedUser(null);
     } catch (error) {
-      console.error('Error changing password:', error);
       throw error;
     }
   };

@@ -45,12 +45,10 @@ apiClient.interceptors.request.use(
     
     // Set appropriate headers based on request data type
     if (config.data instanceof FormData) {
-      console.log('🎯 FormData detected - letting Axios set multipart headers');
       // For FormData, Axios will automatically set Content-Type with boundary
       // Just ensure we accept JSON responses
       config.headers['Accept'] = 'application/json';
     } else {
-      console.log('📝 Regular request - setting JSON headers');
       // For regular requests, set JSON headers
       config.headers['Content-Type'] = 'application/json';
       config.headers['Accept'] = 'application/json';

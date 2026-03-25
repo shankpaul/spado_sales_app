@@ -104,7 +104,6 @@ const Employees = () => {
       const response = await employeeService.getAllEmployees(filters);
       setEmployees(response.employees || response || []);
     } catch (error) {
-      console.error('Error fetching employees:', error);
       toast.error('Failed to load employees');
       setEmployees([]);
     } finally {
@@ -168,7 +167,6 @@ const Employees = () => {
       setIsDeleteOpen(false);
       setSelectedEmployee(null);
     } catch (error) {
-      console.error('Error deleting employee:', error);
       toast.error(error.response?.data?.error || 'Failed to delete employee');
     } finally {
       setActionLoading(false);
@@ -187,7 +185,6 @@ const Employees = () => {
       }
       fetchEmployees();
     } catch (error) {
-      console.error('Error toggling status:', error);
       toast.error('Failed to update employee status');
     }
   };
@@ -206,7 +203,6 @@ const Employees = () => {
       setIsFormOpen(false);
       setSelectedEmployee(null);
     } catch (error) {
-      console.error('Error saving employee:', error);
       throw error;
     }
   };

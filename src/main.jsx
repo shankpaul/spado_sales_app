@@ -9,7 +9,6 @@ const updateSW = registerSW({
   immediate: true,
   onNeedRefresh() {
     // Show a subtle notification that an update is available
-    console.log('New version available! Reloading...');
     
     // Auto-reload after a short delay to apply updates
     setTimeout(() => {
@@ -18,7 +17,6 @@ const updateSW = registerSW({
     }, 1000);
   },
   onOfflineReady() {
-    console.log('App ready to work offline');
   },
   onRegistered(registration) {
     // Check for updates every 60 seconds
@@ -29,7 +27,6 @@ const updateSW = registerSW({
     }
   },
   onRegisterError(error) {
-    console.error('SW registration error:', error);
   },
 })
 

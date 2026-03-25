@@ -38,7 +38,6 @@ const Profile = () => {
       const response = await userService.getProfile();
       setProfile(response.data);
     } catch (error) {
-      console.error('Failed to load profile:', error);
       toast.error('Failed to load profile');
     } finally {
       setLoading(false);
@@ -80,7 +79,6 @@ const Profile = () => {
         confirmPassword: '',
       });
     } catch (error) {
-      console.error('Failed to change password:', error);
       toast.error(error.response?.data?.message || 'Failed to change password');
     } finally {
       setChangingPassword(false);

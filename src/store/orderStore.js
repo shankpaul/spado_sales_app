@@ -78,7 +78,7 @@ const useOrderStore = create((set, get) => ({
   fetchAgents: () => {
     orderService.getUsersByRole('agent')
       .then(response => set({ agents: response.users || [] }))
-      .catch(error => console.error('Error fetching agents:', error));
+      .catch(error => {});
   },
 
   /**
@@ -115,7 +115,6 @@ const useOrderStore = create((set, get) => ({
         isLoading: false,
       });
     } catch (error) {
-      console.error('Error fetching today orders:', error);
       set({ error: error.message, isLoading: false });
     }
   },
@@ -160,7 +159,6 @@ const useOrderStore = create((set, get) => ({
         totalCount: response.pagination?.total_count || 0,
       });
     } catch (error) {
-      console.error('Error fetching orders:', error);
       set({ error: error.message, isLoading: false });
     }
   },
@@ -198,7 +196,6 @@ const useOrderStore = create((set, get) => ({
         totalCount: response.pagination?.total_count || 0,
       });
     } catch (error) {
-      console.error('Error fetching orders:', error);
       set({ error: error.message, isLoading: false });
     }
   },
@@ -328,20 +325,14 @@ const useOrderStore = create((set, get) => ({
    * Initialize real-time updates via Ably
    */
   initializeRealtime: async () => {
-    console.log('='.repeat(80));
-    console.log('[OrderStore] ⚡ INITIALIZING REALTIME UPDATES - START');
-    console.log('='.repeat(80));
     
     try {
-      console.log('[OrderStore] Calling ablyClient.initialize()...');
       
       await ablyClient.initialize();
       
-      console.log('[OrderStore] ✓ ablyClient.initialize() completed');
       
       // Subscribe to connection state changes
       ablyClient.onConnectionStateChange((state) => {
-        console.log('[OrderStore] Ably connection state changed to:', state);
         
         const stateMap = {
           initialized: 'connecting',
@@ -355,7 +346,6 @@ const useOrderStore = create((set, get) => ({
         };
         
         const mappedStatus = stateMap[state] || 'disconnected';
-        console.log('[OrderStore] Mapped status:', mappedStatus);
         
         set({ 
           realtimeConnected: state === 'connected',
@@ -363,21 +353,13 @@ const useOrderStore = create((set, get) => ({
         });
       });
 
-      console.log('[OrderStore] Subscribing to orders channel...');
       
       // Subscribe to all orders channel
       ablyClient.subscribeToOrders((eventName, data) => {
         get().handleRealtimeEvent(eventName, data);
       });
 
-      console.log('[OrderStore] ✓ Ably subscriptions active');
-      console.log('='.repeat(80));
     } catch (error) {
-      console.error('='.repeat(80));
-      console.error('[OrderStore] ❌ FAILED TO INITIALIZE ABLY');
-      console.error('[OrderStore] Error:', error);
-      console.error('[OrderStore] Error stack:', error.stack);
-      console.error('='.repeat(80));
       set({ realtimeStatus: 'failed' });
     }
   },
@@ -386,7 +368,6 @@ const useOrderStore = create((set, get) => ({
    * Handle real-time events from Ably
    */
   handleRealtimeEvent: async (eventName, eventData) => {
-    console.log('[OrderStore] Received event:', eventName, eventData);
     
     const { order_id, data } = eventData;
     
@@ -396,7 +377,6 @@ const useOrderStore = create((set, get) => ({
     
     // Skip if this event was triggered by the current user
     if (data?.changed_by_id && currentUserId && data.changed_by_id === currentUserId) {
-      console.log('[OrderStore] Skipping self-triggered event:', eventName, 'by user', currentUserId);
       return;
     }
 
@@ -408,7 +388,6 @@ const useOrderStore = create((set, get) => ({
           get().addOrder(order);
           toast.success(`New order created: ${data.order_number || order_id}`);
         } catch (error) {
-          console.error('[OrderStore] Error fetching new order:', error);
         }
         break;
 
@@ -432,7 +411,6 @@ const useOrderStore = create((set, get) => ({
             toast.info(`Order ${order.order_number} response: ${data.assignee_response}`);
           }
         } catch (error) {
-          console.error('[OrderStore] Error fetching updated order:', error);
         }
         break;
 
@@ -443,7 +421,6 @@ const useOrderStore = create((set, get) => ({
           get().updateOrder(order);
           toast.warning(`Order ${order.order_number} cancelled: ${data.cancel_reason || ''}`);
         } catch (error) {
-          console.error('[OrderStore] Error fetching cancelled order:', error);
         }
         break;
 
@@ -453,12 +430,10 @@ const useOrderStore = create((set, get) => ({
           const order = await orderService.getOrder(order_id);
           get().updateOrder(order);
         } catch (error) {
-          console.error('[OrderStore] Error fetching order with journey:', error);
         }
         break;
 
       default:
-        console.log('[OrderStore] Unhandled event:', eventName);
     }
   },
 

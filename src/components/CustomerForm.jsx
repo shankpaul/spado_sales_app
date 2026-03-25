@@ -165,14 +165,12 @@ const CustomerForm = forwardRef(({ customer = null, onSuccess, onCancel, showAct
           limit: 8,
         });
         
-        console.log('Area suggestions fetched:', suggestions); // Debug log
         setAreaSuggestions(suggestions);
         // Show dropdown if we have suggestions and field is focused
         if (suggestions.length > 0 && isAreaFocused) {
           setShowAreaSuggestions(true);
         }
       } catch (error) {
-        console.error('Error fetching area suggestions:', error);
         setAreaSuggestions([]);
         setShowAreaSuggestions(false);
       } finally {
@@ -221,7 +219,6 @@ const CustomerForm = forwardRef(({ customer = null, onSuccess, onCancel, showAct
           toast.warning('Could not extract location details from the link');
         }
       } catch (error) {
-        console.error('Error processing map link:', error);
         toast.error('Failed to process map link');
       } finally {
         setMapLinkLoading(false);
@@ -277,7 +274,6 @@ const CustomerForm = forwardRef(({ customer = null, onSuccess, onCancel, showAct
         onSuccess(result);
       }
     } catch (error) {
-      console.error('Error saving customer:', error);
       toast.error(error.response?.data?.errors.join('\n') || 'Failed to save customer');
     } finally {
       setFormLoading(false);

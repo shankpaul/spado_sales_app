@@ -156,7 +156,6 @@ const Dashboard = () => {
       const stats = await dashboardService.getStats();
       setDashboardStats(stats);
     } catch (error) {
-      console.error('Error fetching dashboard stats:', error);
       // Don't show error to user, just use default values
     } finally {
       setStatsLoading(false);
@@ -205,7 +204,6 @@ const Dashboard = () => {
           const response = await orderService.getPackages(serviceVehicleType, false);
           setAvailablePackages(response.packages || []);
         } catch (error) {
-          console.error('Error fetching packages:', error);
           toast.error('Failed to load packages');
           setAvailablePackages([]);
         } finally {
@@ -248,7 +246,6 @@ const Dashboard = () => {
       setAvailabilityResult(result);
 
     } catch (error) {
-      console.error('Error checking availability:', error);
       toast.error(error.response?.data?.error || 'Failed to check availability');
     } finally {
       setCheckingAvailability(false);
@@ -275,7 +272,6 @@ const Dashboard = () => {
           const result = await getAgentsAvailableToday();
           setAvailableAgents(result.agents || []);
         } catch (error) {
-          console.error('Error fetching agents:', error);
           toast.error('Failed to load available agents');
           setAvailableAgents([]);
         } finally {

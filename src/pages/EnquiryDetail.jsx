@@ -161,7 +161,6 @@ const EnquiryDetail = ({ enquiryId, onClose, onUpdate }) => {
   useEffect(() => {
     if (!id) return;
 
-    console.log('[EnquiryDetail] Enquiry detail opened - subscribing to enquiry', id);
     
     let unsubscribe = null;
 
@@ -172,22 +171,17 @@ const EnquiryDetail = ({ enquiryId, onClose, onUpdate }) => {
         
         // Subscribe to specific enquiry channel
         unsubscribe = ablyClient.subscribeToEnquiry(id, (eventName, eventData) => {
-          console.log('[EnquiryDetail] Received event:', eventName, eventData);
 
           // Handle different event types
           if (eventName === 'enquiry.updated' || eventName === 'enquiry.status_changed') {
-            console.log('[EnquiryDetail] Enquiry updated, refreshing details');
             fetchEnquiryById(id);
           } else if (eventName === 'enquiry.assigned') {
-            console.log('[EnquiryDetail] Enquiry assigned, refreshing details');
             fetchEnquiryById(id);
           } else if (eventName === 'enquiry.comment_added') {
-            console.log('[EnquiryDetail] Comment added, refreshing comments');
             fetchComments();
           }
         });
       } catch (err) {
-        console.error('[EnquiryDetail] Failed to setup Ably subscription:', err);
       }
     };
 
@@ -196,7 +190,6 @@ const EnquiryDetail = ({ enquiryId, onClose, onUpdate }) => {
     // Cleanup on unmount - unsubscribe when closing enquiry detail
     return () => {
       if (unsubscribe) {
-        console.log('[EnquiryDetail] Enquiry detail closed - cleaning up subscription');
         unsubscribe();
       }
     };
@@ -208,7 +201,6 @@ const EnquiryDetail = ({ enquiryId, onClose, onUpdate }) => {
       const data = await enquiryService.getComments(id);
       setComments(data.comments || []);
     } catch (error) {
-      console.error('Error fetching comments:', error);
       // Gracefully fail - start with empty comments
       setComments([]);
     }
@@ -220,7 +212,6 @@ const EnquiryDetail = ({ enquiryId, onClose, onUpdate }) => {
       const data = await enquiryService.getFollowUps(id);
       setFollowUps(data.follow_ups || []);
     } catch (error) {
-      console.error('Error fetching follow-ups:', error);
       setFollowUps([]);
     }
   };
@@ -276,7 +267,6 @@ const EnquiryDetail = ({ enquiryId, onClose, onUpdate }) => {
         onUpdate({ ...enquiry, status: newStatus });
       }
     } catch (error) {
-      console.error('Error updating status:', error);
       toast.error(error.response?.data?.error || 'Failed to update status');
     } finally {
       setUpdatingStatus(false);
@@ -308,7 +298,6 @@ const EnquiryDetail = ({ enquiryId, onClose, onUpdate }) => {
         onUpdate({ ...enquiry, status: 'lost' });
       }
     } catch (error) {
-      console.error('Error updating status:', error);
       toast.error(error.response?.data?.error || 'Failed to update status');
     } finally {
       setUpdatingLostStatus(false);
@@ -328,28 +317,12 @@ const EnquiryDetail = ({ enquiryId, onClose, onUpdate }) => {
       
       // If there's a voice note, add it as a voice comment
       if (voiceNoteBlob) {
-        console.log('Sending voice note:', {
-          voiceNoteBlob,
-          type: voiceNoteBlob?.type,
-          size: voiceNoteBlob?.size,
-          duration: voiceNoteDuration,
-          isFormData: voiceNoteBlob instanceof FormData,
-          constructor: voiceNoteBlob.constructor.name
-        });
         
         // Create FormData to upload audio file
         const formData = new FormData();
         formData.append('audio', voiceNoteBlob, 'voice-note.webm');
         formData.append('duration', voiceNoteDuration.toString());
         formData.append('is_customer_response', isCustomerResponse.toString());
-        
-        // Debug: Log FormData entries
-        console.log('FormData entries:');
-        for (let pair of formData.entries()) {
-          console.log(pair[0], pair[1]);
-        }
-        console.log('FormData instance check:', formData instanceof FormData);
-        console.log('FormData constructor:', formData.constructor.name);
         
         // If there's also text, include it
         if (newComment.trim()) {
@@ -378,7 +351,6 @@ const EnquiryDetail = ({ enquiryId, onClose, onUpdate }) => {
       setIsCustomerResponse(false);
       toast.success('Comment added successfully');
     } catch (error) {
-      console.error('Error adding comment:', error);
       toast.error(error.response?.data?.error || 'Failed to add comment');
     } finally {
       setAddingComment(false);
@@ -387,12 +359,6 @@ const EnquiryDetail = ({ enquiryId, onClose, onUpdate }) => {
 
   // Handle voice note upload
   const handleVoiceNoteComplete = (audioBlob, duration) => {
-    console.log('Voice note complete:', {
-      audioBlob,
-      blobType: audioBlob?.type,
-      blobSize: audioBlob?.size,
-      duration
-    });
     // Store the voice note blob instead of immediately adding it as a comment
     setVoiceNoteBlob(audioBlob);
     setVoiceNoteDuration(duration);
@@ -432,7 +398,6 @@ const EnquiryDetail = ({ enquiryId, onClose, onUpdate }) => {
       // Navigate to the new order
       navigate(`/orders?orderId=${result.order.id}`);
     } catch (error) {
-      console.error('Error converting to order:', error);
       toast.error(error.response?.data?.error || 'Failed to convert to order');
     } finally {
       setConverting(false);
@@ -461,7 +426,6 @@ const EnquiryDetail = ({ enquiryId, onClose, onUpdate }) => {
         onUpdate({ ...enquiry, assigned_to_id: assignToId });
       }
     } catch (error) {
-      console.error('Error assigning enquiry:', error);
       toast.error(error.response?.data?.error || 'Failed to assign enquiry');
     } finally {
       setAssigning(false);
@@ -497,7 +461,6 @@ const EnquiryDetail = ({ enquiryId, onClose, onUpdate }) => {
         onUpdate({ ...enquiry, followup_date: followUpDate, status: 'needs_followup' });
       }
     } catch (error) {
-      console.error('Error adding follow-up:', error);
       toast.error(error.response?.data?.error || 'Failed to schedule follow-up');
     } finally {
       setAddingFollowUp(false);
@@ -1332,7 +1295,6 @@ const EnquiryDetail = ({ enquiryId, onClose, onUpdate }) => {
                     onUpdate({ ...enquiry, status: 'converted' });
                   }
                 } catch (error) {
-                  console.error('Error updating status:', error);
                   toast.error(error.response?.data?.error || 'Failed to update status');
                 } finally {
                   setUpdatingStatus(false);

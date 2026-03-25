@@ -70,7 +70,6 @@ const CustomerDetails = ({ customer, open, onOpenChange }) => {
           setCustomerOrders(response.orders || []);
         })
         .catch((error) => {
-          console.error('Error fetching customer orders:', error);
           toast.error('Failed to load customer orders');
           setCustomerOrders([]);
         })
@@ -85,7 +84,6 @@ const CustomerDetails = ({ customer, open, onOpenChange }) => {
           setLoyaltySummary(response.data);
         })
         .catch((error) => {
-          console.error('Error fetching loyalty summary:', error);
           setLoyaltySummary(null);
         });
 
@@ -96,7 +94,6 @@ const CustomerDetails = ({ customer, open, onOpenChange }) => {
           setLoyaltyTotal(response.meta?.total || 0);
         })
         .catch((error) => {
-          console.error('Error fetching loyalty transactions:', error);
           setLoyaltyTransactions([]);
         })
         .finally(() => {

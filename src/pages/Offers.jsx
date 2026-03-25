@@ -74,7 +74,6 @@ const Offers = () => {
       setTotalCount(response.meta?.total || 0);
       setTotalPages(Math.ceil((response.meta?.total || 0) / perPage));
     } catch (error) {
-      console.error('Error fetching offers:', error);
       toast.error('Failed to fetch offers');
     } finally {
       setLoading(false);
@@ -121,7 +120,6 @@ const Offers = () => {
       }
       fetchOffers();
     } catch (error) {
-      console.error('Error archiving offer:', error);
       toast.error('Failed to archive offer');
     }
   };
@@ -137,7 +135,6 @@ const Offers = () => {
       toast.success('Offer deleted successfully');
       fetchOffers();
     } catch (error) {
-      console.error('Error deleting offer:', error);
       toast.error('Failed to delete offer');
     }
   };

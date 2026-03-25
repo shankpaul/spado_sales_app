@@ -51,7 +51,6 @@ const ForgotPassword = () => {
         description: 'Please check your email for instructions to reset your password.',
       });
     } catch (error) {
-      console.error('Forgot password error:', error);
       
       // API endpoint not yet implemented
       if (error.response?.status === 404) {

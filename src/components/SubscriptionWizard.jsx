@@ -183,7 +183,6 @@ const SubscriptionWizard = ({ open, onOpenChange, onSuccess, customerId = null, 
         setCustomers(response.customers || []);
         setHasSearched(true);
       } catch (error) {
-        console.error('Error searching customers:', error);
         toast.error('Failed to search customers');
         setHasSearched(true);
       } finally {
@@ -235,7 +234,6 @@ const SubscriptionWizard = ({ open, onOpenChange, onSuccess, customerId = null, 
       if (draft.paymentMethod) setPaymentMethod(draft.paymentMethod);
       if (draft.notes) setNotes(draft.notes);
     } catch (error) {
-      console.error('Error loading draft:', error);
       localStorage.removeItem(STORAGE_KEYS.SUBSCRIPTION_WIZARD_DRAFT);
     }
   };
@@ -263,7 +261,6 @@ const SubscriptionWizard = ({ open, onOpenChange, onSuccess, customerId = null, 
 
       localStorage.setItem(STORAGE_KEYS.SUBSCRIPTION_WIZARD_DRAFT, JSON.stringify(draft));
     } catch (error) {
-      console.error('Error saving draft:', error);
     }
   };
 
@@ -299,7 +296,6 @@ const SubscriptionWizard = ({ open, onOpenChange, onSuccess, customerId = null, 
         }
       }
     } catch (error) {
-      console.error('Error fetching initial data:', error);
       toast.error('Failed to load data');
     }
   };
@@ -326,7 +322,6 @@ const SubscriptionWizard = ({ open, onOpenChange, onSuccess, customerId = null, 
       setPaymentStatus(subscription.payment_status || 'pending');
       setNotes(subscription.notes || '');
     } catch (error) {
-      console.error('Error fetching subscription:', error);
       toast.error('Failed to load subscription');
     } finally {
       setLoading(false);
@@ -814,7 +809,6 @@ const SubscriptionWizard = ({ open, onOpenChange, onSuccess, customerId = null, 
       onOpenChange(false);
       if (onSuccess) onSuccess();
     } catch (error) {
-      console.error('Error creating subscription:', error);
       toast.error(error.response?.data?.message || 'Failed to create subscription');
     } finally {
       setLoading(false);

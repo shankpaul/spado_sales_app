@@ -263,11 +263,8 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
   useEffect(() => {
     if (!id) return;
 
-    console.log(`[OrderDetail] Subscribing to order:${id} real-time updates`);
-    
     // Subscribe to this specific order's channel
     ablyClient.subscribeToOrder(id, (eventName, eventData) => {
-      console.log(`[OrderDetail] Received event for order ${id}:`, eventName);
       
       // Reload order data when updates come in
       fetchOrderDetails(true); // true = should call onUpdate callback
@@ -275,7 +272,6 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
 
     // Cleanup subscription when component unmounts or orderId changes
     return () => {
-      console.log(`[OrderDetail] Unsubscribing from order:${id}`);
       ablyClient.unsubscribe(`orders:${id}`);
     };
   }, [id]); // Re-subscribe if orderId changes
@@ -300,7 +296,6 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
       }
       
     } catch (error) {
-      console.error('Error fetching order:', error);
       toast.error('Failed to load order details');
       navigate('/orders');
     } finally {
@@ -313,7 +308,6 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
       const data = await orderService.getOrderTimeline(id);
       setTimeline(data.timeline || []);
     } catch (error) {
-      console.error('Error fetching timeline:', error);
       // Silently fail - this is background data
     }
   };
@@ -323,7 +317,6 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
       const data = await orderService.getOrderReassignments(id);
       setReassignments(data.reassignments || []);
     } catch (error) {
-      console.error('Error fetching reassignments:', error);
       // Silently fail - this is background data
     }
   };
@@ -360,7 +353,6 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
       setIsStatusConfirmOpen(false);
       setPaymentReceived(false); // Reset checkbox
     } catch (error) {
-      console.error('Error updating status:', error);
       toast.error('Failed to update status');
     } finally {
       setChangingStatus(false);
@@ -409,7 +401,6 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
       await fetchOrderDetails(true);
       setTimeout(() => fetchTimeline(), 0);
     } catch (error) {
-      console.error('Error updating booking:', error);
       toast.error('Failed to update booking time');
     } finally {
       setUpdatingBooking(false);
@@ -434,7 +425,6 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
       // Fetch timeline in background without blocking
       setTimeout(() => fetchTimeline(), 0);
     } catch (error) {
-      console.error('Error cancelling order:', error);
       toast.error('Failed to cancel order');
     } finally {
       setCancelling(false);
@@ -512,7 +502,6 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
       setEditingNote(false);
       await fetchOrderDetails(true); // Pass true to trigger onUpdate
     } catch (error) {
-      console.error('Error updating note:', error);
       toast.error('Failed to update note');
     }
   };
@@ -536,7 +525,6 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
       setFeedbackComment('');
       await fetchOrderDetails(true); // Pass true to trigger onUpdate
     } catch (error) {
-      console.error('Error submitting feedback:', error);
       toast.error('Failed to submit feedback');
     } finally {
       setSubmittingFeedback(false);

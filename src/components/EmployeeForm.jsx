@@ -197,7 +197,6 @@ const EmployeeForm = ({ employee, onSubmit, onCancel }) => {
 
       await onSubmit(submitData);
     } catch (error) {
-      console.error('Form submission error:', error);
       
       // Handle validation errors from server
       if (error.response?.data?.errors) {

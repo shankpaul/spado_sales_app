@@ -134,7 +134,6 @@ const expandUrlWithApi = async (shortUrl) => {
     }
     return null;
   } catch (error) {
-    console.warn('API URL expansion failed:', error);
     return null;
   }
 };
@@ -167,7 +166,6 @@ export const parseMapLink = async (mapLink) => {
           needsExpansion = false;
         }
       } catch (fetchError) {
-        console.warn('Fetch expansion failed, trying API:', fetchError);
       }
       
       // Method 2: Try backend API expansion if fetch failed
@@ -177,7 +175,6 @@ export const parseMapLink = async (mapLink) => {
           mapLink = apiExpanded;
           needsExpansion = false;
         } else {
-          console.warn('Could not expand shortened URL with any method');
           // Return early with a flag indicating manual expansion needed
           return { 
             latitude: null, 
@@ -237,7 +234,6 @@ export const parseMapLink = async (mapLink) => {
 
     return { latitude, longitude, needsExpansion: false };
   } catch (error) {
-    console.error('Error parsing map link:', error);
     return { latitude: null, longitude: null, needsExpansion: false };
   }
 };
@@ -270,7 +266,6 @@ export const reverseGeocode = async (latitudeOrMapLink, longitude) => {
     
     throw new Error('Reverse geocoding failed');
   } catch (error) {
-    console.error('Error reverse geocoding:', error);
     throw error;
   }
 };
@@ -299,7 +294,6 @@ export const checkServiceAvailability = async (params) => {
     
     throw new Error(response.data.error || 'Service availability check failed');
   } catch (error) {
-    console.error('Error checking service availability:', error);
     throw error;
   }
 };
@@ -320,7 +314,6 @@ export const getAgentsAvailableToday = async () => {
     
     throw new Error(response.data.error || 'Failed to fetch available agents');
   } catch (error) {
-    console.error('Error fetching available agents:', error);
     throw error;
   }
 };
@@ -410,7 +403,7 @@ export const searchAreas = async (query, options = {}) => {
       .filter(area => area.toLowerCase().startsWith(lowerQuery))
       .slice(0, limit);
   } catch (error) {
-    console.error('Error searching areas:', error);
+
     
     // Fallback to local areas starting with query
     return localAreas

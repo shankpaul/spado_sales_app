@@ -86,7 +86,6 @@ const Orders = () => {
         return JSON.parse(savedFilters);
       }
     } catch (error) {
-      console.error('Error loading persisted filters:', error);
     }
     return null;
   };

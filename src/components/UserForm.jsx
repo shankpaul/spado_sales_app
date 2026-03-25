@@ -48,7 +48,6 @@ const UserForm = ({ user, onSubmit, onCancel }) => {
         const response = await officeService.getAllOffices(true); // active only
         setOffices(response.offices || []);
       } catch (error) {
-        console.error('Error fetching offices:', error);
         // Don't show error toast, just log it
       }
     };
@@ -58,7 +57,6 @@ const UserForm = ({ user, onSubmit, onCancel }) => {
         const response = await employeeService.getAllEmployees({ status: 0 });
         setEmployees(response.employees || []);
       } catch (error) {
-        console.error('Error fetching employees:', error);
         // Don't show error toast, just log it
       }
     };
@@ -267,7 +265,6 @@ const UserForm = ({ user, onSubmit, onCancel }) => {
 
       await onSubmit(submitData);
     } catch (error) {
-      console.error('Form submission error:', error);
       
       // Handle validation errors from server
       if (error.response?.data?.errors) {

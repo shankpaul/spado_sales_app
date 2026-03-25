@@ -151,7 +151,6 @@ const Customers = () => {
       setTotalCount(paginationData.total_count || paginationData.total || 0);
       setHasMore(pageNum < (paginationData.total_pages || 1));
     } catch (error) {
-      console.error('Error fetching customers:', error);
       toast.error('Failed to load customers');
       if (!append) {
         setCustomers([]);
@@ -297,7 +296,6 @@ const Customers = () => {
       setIsDeleteOpen(false);
       fetchCustomers();
     } catch (error) {
-      console.error('Error deleting customer:', error);
       toast.error('Failed to delete customer');
     }
   };

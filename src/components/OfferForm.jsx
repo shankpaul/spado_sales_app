@@ -85,7 +85,6 @@ const OfferForm = () => {
         setPackages(packagesResp.packages || packagesResp || []);
         setAddons(addonsResp.addons || addonsResp || []);
       } catch (error) {
-        console.error('Error loading packages/addons:', error);
         toast.error('Failed to load packages and addons');
       }
     };
@@ -146,7 +145,6 @@ const OfferForm = () => {
         reward_addon_ids,
       });
     } catch (error) {
-      console.error('Error loading offer:', error);
       toast.error('Failed to load offer');
       navigate('/offers');
     } finally {
@@ -207,7 +205,6 @@ const OfferForm = () => {
       }
       navigate('/offers');
     } catch (error) {
-      console.error('Error saving offer:', error);
       toast.error(error.response?.data?.errors?.[0] || 'Failed to save offer');
     } finally {
       setSaving(false);

@@ -157,7 +157,6 @@ const VoiceRecorder = ({ onRecordingComplete, onCancel, autoStart = false, press
       drawWaveform();
 
     } catch (error) {
-      console.error('Error accessing microphone:', error);
       toast.error('Could not access microphone. Please check permissions.');
     }
   };

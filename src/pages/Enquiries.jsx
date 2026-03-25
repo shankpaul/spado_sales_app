@@ -87,7 +87,6 @@ const Enquiries = () => {
         return JSON.parse(savedFilters);
       }
     } catch (error) {
-      console.error('Error loading persisted filters:', error);
     }
     return null;
   };
@@ -229,8 +228,6 @@ const Enquiries = () => {
 
   // Subscribe to real-time enquiry updates - only when this page is open
   useEffect(() => {
-    console.log('[Enquiries] Page opened - setting up Ably subscription');
-    
     let unsubscribe = null;
 
     // Initialize Ably client and subscribe
@@ -240,8 +237,6 @@ const Enquiries = () => {
         
         // Subscribe to enquiries channel
         unsubscribe = ablyClient.subscribeToEnquiries((eventName, eventData) => {
-          console.log('[Enquiries] Received event:', eventName, eventData);
-
           // Handle different event types
           if (eventName === 'enquiry.created') {
             toast.success('New Enquiry', {
@@ -250,7 +245,6 @@ const Enquiries = () => {
             // Refresh the list to show new enquiry
             fetchEnquiries(true);
           } else if (eventName === 'enquiry.updated' || eventName === 'enquiry.status_changed') {
-            console.log('[Enquiries] Enquiry updated, refreshing list');
             // Refresh the list to show updates
             fetchEnquiries(true);
           } else if (eventName === 'enquiry.assigned') {
@@ -259,12 +253,10 @@ const Enquiries = () => {
             });
             fetchEnquiries(true);
           } else if (eventName === 'enquiry.comment_added') {
-            console.log('[Enquiries] Comment added to enquiry', eventData.enquiry_id);
             // Optionally update comment count in the list
           }
         });
       } catch (err) {
-        console.error('[Enquiries] Failed to setup Ably subscription:', err);
       }
     };
 
@@ -273,7 +265,6 @@ const Enquiries = () => {
     // Cleanup on unmount - unsubscribe when leaving the page
     return () => {
       if (unsubscribe && typeof unsubscribe === 'function') {
-        console.log('[Enquiries] Page closed - cleaning up Ably subscription');
         unsubscribe();
       }
     };

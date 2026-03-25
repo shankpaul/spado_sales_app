@@ -91,7 +91,6 @@ const ChangePasswordDialog = ({ open, onOpenChange, user, onSubmit }) => {
       });
       setErrors({});
     } catch (error) {
-      console.error('Password change error:', error);
       
       // Handle validation errors from server
       if (error.response?.data?.errors) {

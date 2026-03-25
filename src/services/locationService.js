@@ -209,7 +209,6 @@ const locationService = {
       }
       return [];
     } catch (error) {
-      console.error('Error fetching pincode data:', error);
       return [];
     }
   },
@@ -234,7 +233,6 @@ const locationService = {
       }
       return [];
     } catch (error) {
-      console.error('Error fetching areas:', error);
       return [];
     }
   },

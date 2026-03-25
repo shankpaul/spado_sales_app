@@ -38,7 +38,6 @@ export default function NotificationSettings() {
         toast.error('Failed to enable push notifications');
       }
     } catch (error) {
-      console.error('Error enabling notifications:', error);
       toast.error('Error enabling push notifications');
     } finally {
       setIsLoading(false);
@@ -52,7 +51,6 @@ export default function NotificationSettings() {
       toast.info('To fully disable, revoke permission in browser settings');
       updateStatus();
     } catch (error) {
-      console.error('Error disabling notifications:', error);
       toast.error('Error disabling push notifications');
     } finally {
       setIsLoading(false);
@@ -68,7 +66,6 @@ export default function NotificationSettings() {
         toast.error('Failed to send test notification');
       }
     } catch (error) {
-      console.error('Error sending test notification:', error);
       toast.error('Error sending test notification');
     }
   };

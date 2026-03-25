@@ -82,13 +82,11 @@ const Login = () => {
 
       // Initialize push notifications after successful login
       pushNotificationService.initialize().catch(error => {
-        console.error('Error initializing push notifications:', error);
       });
 
       // Navigate to dashboard
       navigate('/dashboard');
     } catch (error) {
-      console.error('Login error:', error);
       
       const errorMessage = 
         error.response?.data?.error || 

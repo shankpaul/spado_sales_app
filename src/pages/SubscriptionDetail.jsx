@@ -113,7 +113,6 @@ const SubscriptionDetail = () => {
       const data = await subscriptionService.getSubscriptionById(id);
       setSubscription(data.subscription);
     } catch (error) {
-      console.error('Error fetching subscription:', error);
       toast.error('Failed to load subscription details');
     } finally {
       setLoading(false);
@@ -125,7 +124,6 @@ const SubscriptionDetail = () => {
       const data = await subscriptionService.getSubscriptionOrders(id);
       setOrders(data.orders || []);
     } catch (error) {
-      console.error('Error fetching orders:', error);
     }
   };
 
@@ -140,7 +138,6 @@ const SubscriptionDetail = () => {
       }
       fetchSubscriptionDetails();
     } catch (error) {
-      console.error('Error toggling subscription:', error);
       toast.error('Failed to update subscription');
     }
   };
@@ -152,7 +149,6 @@ const SubscriptionDetail = () => {
       setIsCancelDialogOpen(false);
       fetchSubscriptionDetails();
     } catch (error) {
-      console.error('Error cancelling subscription:', error);
       toast.error('Failed to cancel subscription');
     }
   };
@@ -177,7 +173,6 @@ const SubscriptionDetail = () => {
       setPaymentMethod('');
       fetchSubscriptionDetails();
     } catch (error) {
-      console.error('Error updating payment:', error);
       toast.error('Failed to update payment');
     } finally {
       setPaymentLoading(false);
