@@ -101,26 +101,6 @@ export const HTTP_STATUS = {
   INTERNAL_SERVER_ERROR: 500,
 };
 
-// Test Credentials (from API docs - for development only)
-export const TEST_CREDENTIALS = {
-  ADMIN: {
-    email: 'admin@spado.com',
-    password: 'password123',
-  },
-  AGENT: {
-    email: 'agent1@spado.com',
-    password: 'password123',
-  },
-  SALES_EXECUTIVE: {
-    email: 'sales1@spado.com',
-    password: 'password123',
-  },
-  ACCOUNTANT: {
-    email: 'accountant1@spado.com',
-    password: 'password123',
-  },
-};
-
 // ============================================
 // ORDER MANAGEMENT CONSTANTS
 // ============================================
@@ -181,10 +161,10 @@ export const DISCOUNT_TYPES = {
 };
 
 // Maximum Discount Percentage
-export const MAX_DISCOUNT_PERCENTAGE = 50;
+export const MAX_DISCOUNT_PERCENTAGE = 100;
 
 // GST Percentage (18% for car wash services)
-export const GST_PERCENTAGE = 18;
+export const GST_PERCENTAGE = 0;
 
 /**
  * Get status color class

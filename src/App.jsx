@@ -22,6 +22,7 @@ const OfferForm = lazy(() => import('./components/OfferForm'));
 const Users = lazy(() => import('./pages/Users'));
 const Employees = lazy(() => import('./pages/Employees'));
 const Profile = lazy(() => import('./pages/Profile'));
+const Reports = lazy(() => import('./pages/Reports'));
 
 // Loading fallback component
 const LoadingFallback = () => (
@@ -240,10 +241,7 @@ function App() {
             element={
               <ProtectedRoute allowedRoles={['admin', 'accountant']}>
                 <Layout>
-                  <div className="text-center py-12">
-                    <h2 className="text-2xl font-bold text-gray-900 mb-2">Reports</h2>
-                    <p className="text-gray-600">Reports page coming soon...</p>
-                  </div>
+                  <Reports />
                 </Layout>
               </ProtectedRoute>
             }

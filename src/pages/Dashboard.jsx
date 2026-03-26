@@ -55,7 +55,8 @@ import {
   Sparkles,
   MapPinCheck,
   MapPinX,
-  UserSearch
+  UserSearch,
+  IndianRupee
 } from 'lucide-react';
 import {
   ORDER_STATUSES,
@@ -308,7 +309,7 @@ const Dashboard = () => {
             title="This Month Revenue"
             value={dashboardStats ? formatCurrency(dashboardStats.revenue.current) : '--'}
             change={dashboardStats ? formatPercentage(dashboardStats.revenue.change_percentage) : '--'}
-            icon={<DollarSign className="h-4 w-4 text-primary-600" />}
+            icon={<IndianRupee className="h-4 w-4 text-primary-600" />}
             isLoading={statsLoading}
           />
           <StatCard
@@ -335,7 +336,7 @@ const Dashboard = () => {
         </div>
 
       <div className="grid gap-4 md:grid-cols-2">
-        <Card>
+        {/* <Card>
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
               <BarChart3 className="h-5 w-5 text-primary-600" />
@@ -357,9 +358,9 @@ const Dashboard = () => {
               </div>
             )}
           </CardContent>
-        </Card>
+        </Card> */}
 
-        <Card>
+        {/* <Card>
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
               <ClipboardList className="h-5 w-5 text-primary-600" />
@@ -374,7 +375,7 @@ const Dashboard = () => {
               <QuickActionButton>Manage Staff</QuickActionButton>
             </div>
           </CardContent>
-        </Card>
+        </Card> */}
       </div>
     </div>
     );
@@ -562,7 +563,7 @@ const Dashboard = () => {
             title="Today's Revenue"
             value="$3,842"
             change="+18.2%"
-            icon={<DollarSign className="h-4 w-4 text-primary-600" />}
+            icon={<IndianRupee className="h-4 w-4 text-primary-600" />}
             isLoading={isLoading}
           />
           <StatCard

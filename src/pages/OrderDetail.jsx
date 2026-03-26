@@ -94,11 +94,12 @@ import {
   Paperclip,
   AlertTriangle,
   CalendarClock,
+  BadgePlus,
+  BadgePercent,
 } from 'lucide-react';
 import MapPreview from '@/components/MapPreview';
 import VehicleIcon from '../components/VehicleIcon';
 import { formatDate, formatDateTime, formatTime, formatCurrency } from '../lib/utilities';
-import { sanitizeImageUrl, isValidUrl } from '../lib/security';
 import { Badge2 } from '@/components/ui/badge2';
 import LetterAvatar from '@/components/LetterAvatar';
 import useOrderStore from '../store/orderStore';
@@ -976,7 +977,7 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
               <Tabs
                 value={activeTab}
                 onValueChange={setActiveTab}
-                className="space-y-6"
+                className="space-y-6 border rounded-lg"
               >
                 <TabsList className="grid w-full grid-cols-4 bg-transparent border-b rounded-none h-auto p-0">
                   <TabsTrigger
@@ -1006,7 +1007,7 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
                 </TabsList>
 
                 {/* Packages Tab */}
-                <TabsContent value="packages" className="space-y-6 mt-6">
+                <TabsContent value="packages" className="space-y-6 mt-6 px-4">
                   {/* Packages */}
                   <div>
                     <div className="flex items-center justify-between mb-4">
@@ -1017,12 +1018,12 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
                       {order.packages && order.packages.length > 0 ? (
                         order.packages.map((item, index) => (
                           <div key={index} className="flex gap-4  border-b last:border-0">
-                            <div className="w-20 h-20 bg-gray-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                            <div className="w-20 h-20 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
                               <VehicleIcon vehicleType={item.vehicle_type} size={40} className="text-gray-600" />
                             </div>
                             <div className="flex-1 min-w-0">
                               <h4 className="font-semibold text-sm mb-2">{item.package_name}</h4>
-                              <div className="text-sm  space-y-1">
+                              <div className="text-sm space-y-1">
                                 <div>{item.description}</div>
                                 <div className="flex items-center gap-2 flex-wrap">
                                   <span className="capitalize">{item.vehicle_type}</span>
@@ -1042,7 +1043,7 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
                               <div className="font-semibold text-lg">{formatCurrency(item.total_price)}</div>
                               {item.discount > 0 && (
                                 <div className="text-sm text-destructive mt-1">
-                                  Discount -{formatCurrency(item.discount)}
+                                  Discount -{formatCurrency(item.price - item.total_price)}
                                 </div>
                               )}
                             </div>
@@ -1065,11 +1066,15 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
                         <Badge2 variant="outline" className="text-xs">{order.addons.length} items</Badge2>
                       </div>
                       <div className="space-y-4">
+                       
                         {order.addons.map((item, index) => (
                           <div key={index} className="flex gap-4 border-b last:border-0">
-
+                            <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                              <BadgePlus size={20} className="text-gray-600" />
+                            </div>
+                            
                             <div className="flex-1 min-w-0">
-                              <h4 className="font-medium mb-2">{item.addon_name}</h4>
+                              <h4 className="font-semibold text-sm mb-2 capitalize">{item.addon_name}</h4>
                               <div className="text-sm ">
                                 Quantity {item.quantity}
                               </div>
@@ -1078,7 +1083,7 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
                               <div className="font-semibold text-lg">{formatCurrency(item.total_price)}</div>
                               {item.discount > 0 && (
                                 <div className="text-sm text-destructive mt-1">
-                                  Discount -{formatCurrency(item.discount)}
+                                  Discount -{formatCurrency(item.price - item.total_price)}
                                 </div>
                               )}
                             </div>
@@ -1092,7 +1097,7 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
                 </TabsContent>
 
                 {/* Images Tab */}
-                <TabsContent value="images" className="space-y-6 mt-6">
+                <TabsContent value="images" className="space-y-6 mt-6 px-2">
                   {/* Before Images */}
                   <div>
                     <div className="flex items-center justify-between mb-4">
@@ -1177,7 +1182,7 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
                 </TabsContent>
 
                 {/* Timeline Tab */}
-                <TabsContent value="timeline" className="mt-6">
+                <TabsContent value="timeline" className="mt-6 px-2">
                   <div className="space-y-2">
                     {timeline.length > 0 ? (
                       timeline.map((event, index) => (
@@ -1215,7 +1220,7 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
                 </TabsContent>
 
                 {/* Reassignments Tab */}
-                <TabsContent value="reassignments" className="mt-6">
+                <TabsContent value="reassignments" className="mt-6 px-2">
                   <div className="space-y-2">
                     {reassignments.length > 0 ? (
                       reassignments.map((item, index) => (
@@ -1255,6 +1260,13 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
 
               </Tabs>
             </div>
+
+             {order.offer && <div className="p-4 border flex  items-center gap-2 rounded-lg bg-green-50">
+              <BadgePercent className='text-green-600' />
+              <span className="text-sm text-green-700">{order.offer.name} applied
+               </span>
+             </div>
+        }
 
             <div className="p-4 border rounded-lg bg-slate-50">
               {/* Payment Details */}

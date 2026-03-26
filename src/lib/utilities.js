@@ -87,10 +87,10 @@ export const calculateBookingDuration = (fromTime, toTime) => {
 /**
  * Calculate GST amount and total with GST
  * @param {number} amount - Base amount to calculate GST on
- * @param {number} gstPercentage - GST percentage (default: 18)
+ * @param {number} gstPercentage - GST percentage (default:0)
  * @returns {Object} Object containing gst, total, and gstPercentage
  */
-export const calculateGST = (amount, gstPercentage = 18) => {
+export const calculateGST = (amount, gstPercentage = 0) => {
   const gst = (amount * gstPercentage) / 100;
   const total = amount + gst;
   

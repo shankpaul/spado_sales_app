@@ -31,6 +31,7 @@ import {
 } from './ui/alert-dialog';
 import { ConfirmDialog } from './ui/confirm-dialog';
 import { Card } from './ui/card';
+import { Skeleton } from './ui/skeleton';
 import VehicleIcon from './VehicleIcon';
 import { toast } from 'sonner';
 import orderService from '../services/orderService';
@@ -270,8 +271,15 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
   // Fetch available offers when step 4 is reached
   useEffect(() => {
     const fetchOffers = async () => {
-      if (currentStep !== 4 || !selectedCustomer || packageItems.length === 0) {
+      // Only fetch when on step 4
+      if (currentStep !== 4) {
+        return;
+      }
+
+      // Clear offers if no customer or packages
+      if (!selectedCustomer || packageItems.length === 0) {
         setAvailableOffers([]);
+        setSelectedOffer(null);
         return;
       }
 
@@ -282,6 +290,7 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
         
         if (packageIds.length === 0) {
           setAvailableOffers([]);
+          setSelectedOffer(null);
           return;
         }
 
@@ -291,9 +300,24 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
           customer_id: selectedCustomer.id,
         });
         
-        setAvailableOffers(response.data || []);
+        const offers = response.data || [];
+        setAvailableOffers(offers);
+
+        // Check if previously selected offer is still valid
+        if (selectedOffer) {
+          const isStillValid = offers.some(offer => offer.id === selectedOffer.id);
+          if (!isStillValid) {
+            // Remove offer if no longer valid
+            removeOfferRewards(selectedOffer.id);
+            setSelectedOffer(null);
+          }
+        }
       } catch (error) {
         setAvailableOffers([]);
+        if (selectedOffer) {
+          removeOfferRewards(selectedOffer.id);
+          setSelectedOffer(null);
+        }
       } finally {
         setLoadingOffers(false);
       }
@@ -305,7 +329,13 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
   // Fetch loyalty points when customer is selected or step 4 is reached
   useEffect(() => {
     const fetchLoyaltyData = async () => {
-      if (!selectedCustomer || currentStep !== 4) {
+      // Only fetch when on step 4
+      if (currentStep !== 4) {
+        return;
+      }
+
+      // Clear loyalty data if no customer
+      if (!selectedCustomer) {
         setLoyaltySummary(null);
         setPointsToRedeem('');
         setMaxRedeemablePoints(0);
@@ -324,7 +354,13 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
             selectedCustomer.id,
             totals.subtotalAfterDiscount
           );
-          setMaxRedeemablePoints(maxRedeemable.data.max_redeemable_points || 0);
+          const newMaxRedeemable = maxRedeemable.data.max_redeemable_points || 0;
+          setMaxRedeemablePoints(newMaxRedeemable);
+
+          // If user has already entered points, validate they're still within the new max
+          if (pointsToRedeem && parseInt(pointsToRedeem) > newMaxRedeemable) {
+            setPointsToRedeem(newMaxRedeemable);
+          }
         }
       } catch (error) {
         setLoyaltySummary(null);
@@ -340,16 +376,10 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
   // Check if selected offer is still valid when available offers change
   useEffect(() => {
     // Only proceed if we're on step 4 and have checked offers
-    if (currentStep !== 4) return;
+    if (currentStep !== 4 || loadingOffers) return;
 
-    // If no offers available and we have a selected offer, clear it
-    if (availableOffers.length === 0 && selectedOffer) {
-      removeOfferRewards(selectedOffer.id);
-      setSelectedOffer(null);
-      return;
-    }
-
-    // If an offer is selected, check if it's still in the available offers
+    // If an offer is selected but not in available offers, it was already removed in fetchOffers
+    // This useEffect is now mainly for edge cases
     if (selectedOffer && availableOffers.length > 0) {
       const isStillAvailable = availableOffers.some(offer => offer.id === selectedOffer.id);
       if (!isStillAvailable) {
@@ -357,7 +387,7 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
         setSelectedOffer(null);
       }
     }
-  }, [availableOffers, selectedOffer, currentStep]);
+  }, [availableOffers, selectedOffer, currentStep, loadingOffers]);
 
   // Auto-apply offer rewards when an offer is selected
   useEffect(() => {
@@ -1497,7 +1527,10 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
   );
 
   // Step 2: Package Selection (simplified for now)
-  const renderStep2 = () => (
+  const renderStep2 = () => {
+    const hasRewardPackages = packageItems.some(item => item.is_reward);
+    
+    return (
     <div className="space-y-4">
       {renderOtherStepErrors()}
       <div className="flex justify-between items-center">
@@ -1509,6 +1542,15 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
       </div>
 
       {errors.packages && <p className="text-sm text-destructive">{errors.packages}</p>}
+
+      {hasRewardPackages && (
+        <div className="flex items-start gap-2 p-3 bg-green-50 border border-green-200 rounded-lg text-sm">
+          <Info className="h-4 w-4 text-green-600 mt-0.5 shrink-0" />
+          <div className="text-green-800">
+            <span className="font-medium">Offer rewards included:</span> Items marked with the "Offer Reward" badge are complimentary and cannot be modified or removed.
+          </div>
+        </div>
+      )}
 
       {packageItems.length === 0 ? (
         <Card className="p-8 text-center">
@@ -1525,33 +1567,45 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
           {packageItems.map((item, index) => {
             const hasError = errors[`package_${index}_vehicle_type`] || errors[`package_${index}_package`];
             return (
-              <Card key={index} className={`p-4 `}>
+              <Card key={index} className={`p-4 ${item.is_reward ? 'bg-green-50 border-green-200' : ''}`}>
                 <div className="space-y-4">
                   <div className="flex justify-between items-center">
-                    <span className="font-medium">Service {index + 1}</span>
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium">Service {index + 1}</span>
+                      {item.is_reward && (
+                        <div className="flex items-center gap-1 px-2 py-0.5 bg-green-600 text-white text-xs rounded-full">
+                          <Gift className="h-3 w-3" />
+                          <span>Offer Reward</span>
+                        </div>
+                      )}
+                    </div>
                     <div className='flex gap-2 items-center'>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="h-6 text-xs cursor-pointer"
-                        onClick={() => {
-                          setIdentifyDialog({ open: true, index });
-                          setIdentifyBrand('');
-                          setIdentifyModel('');
-                        }}
-                      >
-                        <Search className="h-3 w-3 mr-1" />
-                        Identify Vehicle Type
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setDeletePackageDialog({ open: true, index })}
-                      >
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
+                      {!item.is_reward && (
+                        <>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="h-6 text-xs cursor-pointer"
+                            onClick={() => {
+                              setIdentifyDialog({ open: true, index });
+                              setIdentifyBrand('');
+                              setIdentifyModel('');
+                            }}
+                          >
+                            <Search className="h-3 w-3 mr-1" />
+                            Identify Vehicle Type
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setDeletePackageDialog({ open: true, index })}
+                          >
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </>
+                      )}
                     </div>
                   </div>
 
@@ -1576,6 +1630,7 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
                             size="sm"
                             className="flex-1 h-12 flex flex-col md:flex-row items-center justify-center gap-0  md:gap-2 rounded-lg cursor-pointer active:scale-[0.95] transition-all"
                             onClick={() => updatePackageItem(index, 'vehicle_type', type)}
+                            disabled={item.is_reward}
                           >
                             <VehicleIcon vehicleType={type} size={32} className={item.vehicle_type === type ? 'text-white' : 'text-black'} />
                             <span className="text-xs capitalize font-semibold -mt-2 md:mt-0">{type}</span>
@@ -1590,7 +1645,7 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
                         <Select
                           value={item.package_id}
                           onValueChange={(value) => updatePackageItem(index, 'package_id', value)}
-                          disabled={!item.vehicle_type}
+                          disabled={!item.vehicle_type || item.is_reward}
                         >
                           <SelectTrigger className="h-8 text-sm">
                             <SelectValue placeholder="Select package" />
@@ -1619,7 +1674,7 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
                             const newQty = Math.max(1, item.quantity - 1);
                             updatePackageItem(index, 'quantity', newQty);
                           }}
-                          disabled={item.quantity <= 1}
+                          disabled={item.quantity <= 1 || item.is_reward}
                         >
                           <Minus className="h-3 w-3" />
                         </Button>
@@ -1637,6 +1692,7 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
                           onClick={() => {
                             updatePackageItem(index, 'quantity', item.quantity + 1);
                           }}
+                          disabled={item.is_reward}
                         >
                           <Plus className="h-3 w-3" />
                         </Button>
@@ -1657,10 +1713,12 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
                             updatePackageItem(index, 'discount_value', isNaN(numValue) ? 0 : numValue);
                           }}
                           className="h-8 text-sm"
+                          disabled={item.is_reward}
                         />
                         <Select
                           value={item.discount_type}
                           onValueChange={(value) => updatePackageItem(index, 'discount_type', value)}
+                          disabled={item.is_reward}
                         >
                           <SelectTrigger className="h-8 w-16 text-xs">
                             <SelectValue />
@@ -1687,22 +1745,36 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
         </div>
       )}
     </div>
-  );
+    );
+  };
 
   // Step 3: Add-ons (similar to packages but simpler)
-  const renderStep3 = () => (
-    <div className="space-y-4">
-      {renderOtherStepErrors()}
-      <div className="flex justify-between items-center">
-        <div>
-          <Label>Add-on Services (Optional)</Label>
-          <p className="text-xs text-muted-foreground">Additional services for the order</p>
+  const renderStep3 = () => {
+    const hasRewardAddons = addonItems.some(item => item.is_reward);
+
+    return (
+      <div className="space-y-4">
+        {renderOtherStepErrors()}
+        
+        {hasRewardAddons && (
+          <div className="flex items-start gap-2 p-3 bg-green-50 border border-green-200 rounded-lg text-sm">
+            <Info className="h-4 w-4 text-green-600 mt-0.5 shrink-0" />
+            <div className="text-green-800">
+              <span className="font-medium">Offer rewards included:</span> Items marked with the "Offer Reward" badge are complimentary and cannot be modified or removed.
+            </div>
+          </div>
+        )}
+
+        <div className="flex justify-between items-center">
+          <div>
+            <Label>Add-on Services (Optional)</Label>
+            <p className="text-xs text-muted-foreground">Additional services for the order</p>
+          </div>
+          <Button type="button" size="sm" onClick={addAddonItem}>
+            <Plus className="h-4 w-4 mr-1" />
+            Add Add-on
+          </Button>
         </div>
-        <Button type="button" size="sm" onClick={addAddonItem}>
-          <Plus className="h-4 w-4 mr-1" />
-          Add Add-on
-        </Button>
-      </div>
 
       {addonItems.length === 0 ? (
         <Card className="p-8 text-center">
@@ -1718,18 +1790,28 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
           {addonItems.map((item, index) => {
             const hasError = errors[`addon_${index}_addon`];
             return (
-              <Card key={index} className={`p-4`}>
+              <Card key={index} className={`p-4 ${item.is_reward ? 'bg-green-50 border-green-200' : ''}`}>
                 <div className="space-y-3">
                   <div className="flex justify-between items-start">
-                    <span className="font-medium">Add-on {index + 1}</span>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => removeAddonItem(index)}
-                    >
-                      <Trash2 className="h-4 w-4 text-destructive" />
-                    </Button>
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium">Add-on {index + 1}</span>
+                      {item.is_reward && (
+                        <div className="flex items-center gap-1 px-2 py-0.5 bg-green-600 text-white text-xs rounded-full">
+                          <Gift className="h-3 w-3" />
+                          <span>Offer Reward</span>
+                        </div>
+                      )}
+                    </div>
+                    {!item.is_reward && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => removeAddonItem(index)}
+                      >
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    )}
                   </div>
 
                   {hasError && (
@@ -1746,6 +1828,7 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
                         <Select
                           value={item.addon_id}
                           onValueChange={(value) => updateAddonItem(index, 'addon_id', value)}
+                          disabled={item.is_reward}
                         >
                           <SelectTrigger className="h-8 text-sm">
                             <SelectValue placeholder="Select add-on" />
@@ -1772,7 +1855,7 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
                             const newQty = Math.max(1, item.quantity - 1);
                             updateAddonItem(index, 'quantity', newQty);
                           }}
-                          disabled={item.quantity <= 1}
+                          disabled={item.quantity <= 1 || item.is_reward}
                         >
                           <Minus className="h-3 w-3" />
                         </Button>
@@ -1790,6 +1873,7 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
                           onClick={() => {
                             updateAddonItem(index, 'quantity', item.quantity + 1);
                           }}
+                          disabled={item.is_reward}
                         >
                           <Plus className="h-3 w-3" />
                         </Button>
@@ -1811,10 +1895,12 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
                             updateAddonItem(index, 'discount_value', isNaN(numValue) ? 0 : numValue);
                           }}
                           className="h-8 text-sm"
+                          disabled={item.is_reward}
                         />
                         <Select
                           value={item.discount_type}
                           onValueChange={(value) => updateAddonItem(index, 'discount_type', value)}
+                          disabled={item.is_reward}
                         >
                           <SelectTrigger className="h-8 w-16 text-xs">
                             <SelectValue />
@@ -1841,7 +1927,8 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
         </div>
       )}
     </div>
-  );
+    );
+  };
 
   // Step 4: Booking Details
   const renderStep4 = () => {
@@ -2029,7 +2116,42 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
                 Available Offers
               </Label>
               {loadingOffers ? (
-                <div className="text-sm text-muted-foreground py-2">Loading available offers...</div>
+                <div className="space-y-2 mt-2">
+                  <Card className="p-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1 space-y-2">
+                        <div className="flex items-center gap-2">
+                          <Skeleton className="h-4 w-4" />
+                          <Skeleton className="h-4 w-32" />
+                        </div>
+                        <Skeleton className="h-3 w-full" />
+                        <Skeleton className="h-3 w-2/3" />
+                        <div className="flex items-center gap-1 mt-2">
+                          <Skeleton className="h-3 w-3" />
+                          <Skeleton className="h-3 w-16" />
+                        </div>
+                      </div>
+                      <Skeleton className="h-8 w-16" />
+                    </div>
+                  </Card>
+                  <Card className="p-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1 space-y-2">
+                        <div className="flex items-center gap-2">
+                          <Skeleton className="h-4 w-4" />
+                          <Skeleton className="h-4 w-40" />
+                        </div>
+                        <Skeleton className="h-3 w-full" />
+                        <Skeleton className="h-3 w-3/4" />
+                        <div className="flex items-center gap-1 mt-2">
+                          <Skeleton className="h-3 w-3" />
+                          <Skeleton className="h-3 w-20" />
+                        </div>
+                      </div>
+                      <Skeleton className="h-8 w-16" />
+                    </div>
+                  </Card>
+                </div>
               ) : availableOffers.length > 0 ? (
                 <div className="space-y-2 mt-2">
                   {selectedOffer ? (
@@ -2136,7 +2258,31 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
                 Loyalty Points
               </Label>
               {loadingLoyalty ? (
-                <div className="text-sm text-muted-foreground py-2">Loading points balance...</div>
+                <div className="space-y-3 mt-2">
+                  <Card className="p-3">
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <Skeleton className="h-4 w-32" />
+                        <Skeleton className="h-6 w-16" />
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <Skeleton className="h-3 w-24" />
+                        <Skeleton className="h-3 w-12" />
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <Skeleton className="h-3 w-28" />
+                        <Skeleton className="h-3 w-20" />
+                      </div>
+                    </div>
+                  </Card>
+                  <div className="space-y-2">
+                    <Skeleton className="h-4 w-48" />
+                    <div className="flex gap-2">
+                      <Skeleton className="h-10 flex-1" />
+                      <Skeleton className="h-10 w-24" />
+                    </div>
+                  </div>
+                </div>
               ) : loyaltySummary ? (
                 <div className="space-y-3 mt-2">
                   <Card className="p-3 bg-blue-50 border-blue-200">
@@ -2484,7 +2630,7 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
                         type="button"
                         variant="outline"
                         onClick={() => handleSubmit()}
-                        disabled={loading}
+                        disabled={loading || loadingOffers || loadingLoyalty}
                         size="sm"
                         className="h-10 hidden md:flex"
                       >
@@ -2494,7 +2640,7 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
                       <Button
                         type="button"
                         onClick={() => handleSubmit('confirmed')}
-                        disabled={loading}
+                        disabled={loading || loadingOffers || loadingLoyalty}
                         size="sm"
                         className="h-10 px-4"
                       >
@@ -2509,7 +2655,7 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
                         type="button"
                         variant="outline"
                         onClick={() => handleSubmit('draft')}
-                        disabled={loading}
+                        disabled={loading || loadingOffers || loadingLoyalty}
                         size="sm"
                         className="h-10 hidden md:flex"
                       >
@@ -2519,7 +2665,7 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
                       <Button
                         type="button"
                         onClick={() => handleSubmit('confirmed')}
-                        disabled={loading}
+                        disabled={loading || loadingOffers || loadingLoyalty}
                         size="sm"
                         className="h-10 px-4"
                       >
