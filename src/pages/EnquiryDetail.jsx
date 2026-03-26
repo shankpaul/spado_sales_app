@@ -249,6 +249,12 @@ const EnquiryDetail = ({ enquiryId, onClose, onUpdate }) => {
       return;
     }
 
+    // If status is "needs_followup", show follow-up scheduling dialog
+    if (newStatus === 'needs_followup') {
+      setIsFollowUpDialogOpen(true);
+      return;
+    }
+
     // If status is "converted", show confirmation dialog
     if (newStatus === 'converted') {
       setIsConvertStatusDialogOpen(true);
@@ -841,7 +847,7 @@ const EnquiryDetail = ({ enquiryId, onClose, onUpdate }) => {
           <div className="space-y-2">
             <h3 className="text-sm font-medium text-muted-foreground">Update Status</h3>
             <div className="flex flex-wrap gap-1.5 md:gap-2">
-              {ENQUIRY_STATUS_OPTIONS.filter(s => s.value !== enquiry.status).map((status) => (
+              {ENQUIRY_STATUS_OPTIONS.filter(s => s.value !== enquiry.status && s.value !== 'new').map((status) => (
                 <Button
                   key={status.value}
                   variant='outline'
