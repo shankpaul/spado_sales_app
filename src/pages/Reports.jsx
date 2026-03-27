@@ -490,13 +490,14 @@ const Reports = () => {
             <div>
               <Label htmlFor="status">Status</Label>
               <Select
-                value={filters.status}
-                onValueChange={(value) => setFilters({ ...filters, status: value })}
+                value={filters.status || 'all'}
+                onValueChange={(value) => setFilters({ ...filters, status: value === 'all' ? '' : value })}
               >
                 <SelectTrigger id="status">
                   <SelectValue placeholder="All Statuses" />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="all">All Statuses</SelectItem>
                   {ORDER_STATUSES.map((status) => (
                     <SelectItem key={status.value} value={status.value}>
                       {status.label}
@@ -509,13 +510,14 @@ const Reports = () => {
             <div>
               <Label htmlFor="payment_status">Payment Status</Label>
               <Select
-                value={filters.payment_status}
-                onValueChange={(value) => setFilters({ ...filters, payment_status: value })}
+                value={filters.payment_status || 'all'}
+                onValueChange={(value) => setFilters({ ...filters, payment_status: value === 'all' ? '' : value })}
               >
                 <SelectTrigger id="payment_status">
                   <SelectValue placeholder="All Payment Statuses" />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="all">All Payment Statuses</SelectItem>
                   {PAYMENT_STATUSES.map((status) => (
                     <SelectItem key={status.value} value={status.value}>
                       {status.label}
@@ -528,13 +530,14 @@ const Reports = () => {
             <div>
               <Label htmlFor="agent_id">Agent</Label>
               <Select
-                value={filters.agent_id}
-                onValueChange={(value) => setFilters({ ...filters, agent_id: value })}
+                value={filters.agent_id || 'all'}
+                onValueChange={(value) => setFilters({ ...filters, agent_id: value === 'all' ? '' : value })}
               >
                 <SelectTrigger id="agent_id">
                   <SelectValue placeholder="All Agents" />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="all">All Agents</SelectItem>
                   {agents.map((agent) => (
                     <SelectItem key={agent.id} value={agent.id.toString()}>
                       {agent.name}

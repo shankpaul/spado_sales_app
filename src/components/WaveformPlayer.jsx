@@ -12,9 +12,11 @@ const WaveformPlayer = ({ audioUrl, duration }) => {
   const wavesurferRef = useRef(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
+  const [loadError, setLoadError] = useState(false);
 
   useEffect(() => {
     if (waveformRef.current && audioUrl) {
+      setLoadError(false);
       // Initialize WaveSurfer
       wavesurferRef.current = WaveSurfer.create({
         container: waveformRef.current,
@@ -25,7 +27,6 @@ const WaveformPlayer = ({ audioUrl, duration }) => {
         barRadius: 3,
         height: 40,
         normalize: true,
-        backend: 'WebAudio',
       });
 
       // Load audio
@@ -37,6 +38,14 @@ const WaveformPlayer = ({ audioUrl, duration }) => {
       wavesurferRef.current.on('finish', () => setIsPlaying(false));
       wavesurferRef.current.on('audioprocess', (time) => {
         setCurrentTime(Math.floor(time));
+      });
+      // Fall back to native audio element on CORS / network errors
+      wavesurferRef.current.on('error', () => {
+        setLoadError(true);
+        if (wavesurferRef.current) {
+          wavesurferRef.current.destroy();
+          wavesurferRef.current = null;
+        }
       });
 
       return () => {
@@ -58,6 +67,19 @@ const WaveformPlayer = ({ audioUrl, duration }) => {
     const secs = seconds % 60;
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
+
+  if (loadError) {
+    return (
+      <div className="flex items-center gap-2 w-full">
+        <audio
+          controls
+          src={audioUrl}
+          className="w-full h-8"
+          style={{ height: '32px' }}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="flex items-center gap-2 w-full">

@@ -7,8 +7,9 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { toast } from 'sonner';
 import authService from '../services/authService';
 import pushNotificationService from '../services/pushNotifications';
-import { Loader2, Eye, EyeOff } from 'lucide-react';
+import { Loader2, Eye, EyeOff, Download } from 'lucide-react';
 import Logo from '../components/Logo';
+import usePWAInstall from '../hooks/usePWAInstall';
 
 /**
  * Login Page Component
@@ -17,6 +18,7 @@ import Logo from '../components/Logo';
  */
 const Login = () => {
   const navigate = useNavigate();
+  const { isInstallable, handleInstallClick } = usePWAInstall();
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -75,10 +77,6 @@ const Login = () => {
       });
 
       const userRole = response.user.role;
-      
-      toast.success('Login successful', {
-        description: `Welcome back, ${response.user.name || response.user.email}!`,
-      });
 
       // Initialize push notifications after successful login
       pushNotificationService.initialize().catch(error => {
@@ -196,6 +194,19 @@ const Login = () => {
             </form>
           </CardContent>
         </Card>
+
+        {!import.meta.env.DEV && isInstallable && (
+          <div className="mt-4">
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={handleInstallClick}
+            >
+              <Download className="mr-2 h-4 w-4" />
+              Install App
+            </Button>
+          </div>
+        )}
 
         <p className="text-center text-sm text-gray-600 mt-6">
           © 2026 Spado. All rights reserved.

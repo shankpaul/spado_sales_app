@@ -87,7 +87,6 @@ const Layout = ({ children }) => {
   const handleLogout = async () => {
     try {
       await authService.logout();
-      toast.success('Logged out successfully');
       navigate('/login');
     } catch (error) {
       toast.error('Failed to logout');
@@ -110,8 +109,7 @@ const Layout = ({ children }) => {
         { name: 'System Users', href: '/users', icon: UserCircle },
         { name: 'Employees', href: '/employees', icon: Briefcase },
         { name: 'Reports', href: '/reports', icon: BarChart3 },
-        { name: 'Financials', href: '/financials', icon: DollarSign },
-        { name: 'Settings', href: '/settings', icon: Settings },
+        // { name: 'Settings', href: '/settings', icon: Settings },
       ],
       sales_executive: [
         { name: 'Customers', href: '/customers', icon: Users },
