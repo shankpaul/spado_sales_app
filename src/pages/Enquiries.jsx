@@ -55,6 +55,7 @@ import { Badge2 } from '@/components/ui/badge2';
 import { Skeleton } from '../components/ui/skeleton';
 import EnquiryDetail from './EnquiryDetail';
 import EnquiryWizard from '../components/EnquiryWizard';
+import { formatDateTime } from '@/lib/utilities';
 
 /**
  * Enquiries Page Component
@@ -706,7 +707,7 @@ const Enquiries = () => {
                     <div className="flex items-center gap-3 text-xs text-muted-foreground">
                       <div className="flex items-center gap-1">
                         <Calendar className="h-3 w-3" />
-                        {formatDate(enquiry.created_at)}
+                        {formatDateTime(enquiry.updated_at)}
                       </div>
                       {enquiry.followup_date && (
                         <div className="flex items-center gap-1">
@@ -805,7 +806,7 @@ const Enquiries = () => {
                           <span className="text-muted-foreground">N/A</span>
                         )}
                       </td>
-                      <td className="px-4 py-3">{formatDate(enquiry.updated_at)}</td>
+                      <td className="px-4 py-3">{formatDateTime(enquiry.updated_at)}</td>
                     </tr>
                   ))}
                 </tbody>

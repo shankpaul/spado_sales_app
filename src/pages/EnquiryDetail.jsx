@@ -536,7 +536,7 @@ const EnquiryDetail = ({ enquiryId, onClose, onUpdate }) => {
                 Enquiry Details
               </h1>
               <p className="text-[10px] md:text-sm text-muted-foreground truncate  md:block">
-                Updated {formatDate(enquiry.updated_at)}
+                Updated {formatDateTime(enquiry.updated_at)}
               </p>
             </div>
           </div>
