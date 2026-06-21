@@ -284,7 +284,9 @@ const SubscriptionWizard = ({ open, onOpenChange, onSuccess, customerId = null, 
         subscriptionService.getAddons(),
       ]);
 
-      setPackages(packagesRes.packages || []);
+      const loadedPackages = packagesRes.packages || [];
+      loadedPackages.sort((a, b) => a.name.localeCompare(b.name));
+      setPackages(loadedPackages);
       setAddons(addonsRes.addons || []);
 
       // If customerId provided, fetch customer
@@ -312,8 +314,20 @@ const SubscriptionWizard = ({ open, onOpenChange, onSuccess, customerId = null, 
       setVehicleType(subscription.vehicle_type);
       setMonthsDuration(subscription.months_duration);
       setStartDate(subscription.start_date);
-      setPackageItems(subscription.packages || []);
-      setAddonItems(subscription.addons || []);
+      setPackageItems((subscription.packages || []).map(pkg => {
+        const discountVal = parseFloat(pkg.discount_value || pkg.discount) || 0;
+        return {
+          ...pkg,
+          enable_custom_discount: discountVal > 0
+        };
+      }));
+      setAddonItems((subscription.addons || []).map(addon => {
+        const discountVal = parseFloat(addon.discount_value || addon.discount) || 0;
+        return {
+          ...addon,
+          enable_custom_discount: discountVal > 0
+        };
+      }));
       setWashingSchedules(subscription.washing_schedules || []);
       setAddress({ area: subscription.area, map_url: subscription.map_url });
       setPaymentAmount(subscription.payment_amount || '');
@@ -459,6 +473,7 @@ const SubscriptionWizard = ({ open, onOpenChange, onSuccess, customerId = null, 
         discount: 0,
         discount_type: DISCOUNT_TYPES.FIXED,
         discount_value: 0,
+        enable_custom_discount: false,
         notes: '',
       },
     ]);
@@ -544,6 +559,7 @@ const SubscriptionWizard = ({ open, onOpenChange, onSuccess, customerId = null, 
         discount_value: 0,
         application_type: 'all_washes',
         applicable_wash_numbers: [],
+        enable_custom_discount: false,
       },
     ]);
   };
@@ -1194,7 +1210,24 @@ const SubscriptionWizard = ({ open, onOpenChange, onSuccess, customerId = null, 
 
 
                           <div>
-                            <Label className="text-xs">Discount</Label>
+                            <div className="flex items-center space-x-2 mb-1">
+                              <Checkbox
+                                id={`pkg-discount-enable-${index}`}
+                                checked={item.enable_custom_discount || false}
+                                onCheckedChange={(checked) => {
+                                  updatePackageItem(index, 'enable_custom_discount', !!checked);
+                                  if (!checked) {
+                                    updatePackageItem(index, 'discount_value', 0);
+                                  }
+                                }}
+                              />
+                              <label 
+                                htmlFor={`pkg-discount-enable-${index}`} 
+                                className="text-[10px] font-medium text-gray-600 cursor-pointer select-none"
+                              >
+                                Enable Custom Discount
+                              </label>
+                            </div>
                             <div className="flex gap-1">
                               <Input
                                 type="number"
@@ -1207,10 +1240,12 @@ const SubscriptionWizard = ({ open, onOpenChange, onSuccess, customerId = null, 
                                   updatePackageItem(index, 'discount_value', isNaN(numValue) ? 0 : numValue);
                                 }}
                                 className="h-8 text-sm"
+                                disabled={!item.enable_custom_discount}
                               />
                               <Select
                                 value={item.discount_type}
                                 onValueChange={(value) => updatePackageItem(index, 'discount_type', value)}
+                                disabled={!item.enable_custom_discount}
                               >
                                 <SelectTrigger className="h-8 w-16 text-xs">
                                   <SelectValue />
@@ -1371,7 +1406,24 @@ const SubscriptionWizard = ({ open, onOpenChange, onSuccess, customerId = null, 
 
                           <div className="grid grid-cols-2 gap-4">
                             <div>
-                              <Label className="text-xs">Discount</Label>
+                              <div className="flex items-center space-x-2 mb-1">
+                                <Checkbox
+                                  id={`addon-discount-enable-${index}`}
+                                  checked={item.enable_custom_discount || false}
+                                  onCheckedChange={(checked) => {
+                                    updateAddonItem(index, 'enable_custom_discount', !!checked);
+                                    if (!checked) {
+                                      updateAddonItem(index, 'discount_value', 0);
+                                    }
+                                  }}
+                                />
+                                <label 
+                                  htmlFor={`addon-discount-enable-${index}`} 
+                                  className="text-[10px] font-medium text-gray-600 cursor-pointer select-none"
+                                >
+                                  Enable Custom Discount
+                                </label>
+                              </div>
                               <div className="flex gap-1">
                                 <Input
                                   type="number"
@@ -1384,10 +1436,12 @@ const SubscriptionWizard = ({ open, onOpenChange, onSuccess, customerId = null, 
                                     updateAddonItem(index, 'discount_value', isNaN(numValue) ? 0 : numValue);
                                   }}
                                   className="h-8 text-sm"
+                                  disabled={!item.enable_custom_discount}
                                 />
                                 <Select
                                   value={item.discount_type}
                                   onValueChange={(value) => updateAddonItem(index, 'discount_type', value)}
+                                  disabled={!item.enable_custom_discount}
                                 >
                                   <SelectTrigger className="h-8 w-16 text-xs">
                                     <SelectValue />

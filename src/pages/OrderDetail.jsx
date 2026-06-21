@@ -279,7 +279,9 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
   }, [id]); // Re-subscribe if orderId changes
 
   const fetchOrderDetails = async (shouldCallUpdate = false) => {
-    setLoading(true);
+    if (!order) {
+      setLoading(true);
+    }
     try {
       const data = await orderService.getOrderById(id);
       setOrder(data.order);
@@ -539,7 +541,9 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
     toast.success('Copied to clipboard');
   };
 
-  if (loading) {
+  const isInitialLoading = !order || (loading && String(order.id) !== String(id));
+
+  if (isInitialLoading) {
     return (
       <div className="min-h-screen bg-white">
         {/* Header Skeleton */}

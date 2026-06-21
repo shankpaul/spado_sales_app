@@ -7,13 +7,24 @@ import { Button } from './ui/button';
  * WaveformPlayer Component
  * Displays audio waveform and playback controls
  */
-const WaveformPlayer = ({ audioUrl, duration }) => {
+const WaveformPlayer = ({ 
+  audioUrl, 
+  duration, 
+  isPlaying: controlledIsPlaying, 
+  onPlay, 
+  onPause, 
+  onFinish 
+}) => {
   const waveformRef = useRef(null);
   const wavesurferRef = useRef(null);
-  const [isPlaying, setIsPlaying] = useState(false);
+  const audioRef = useRef(null);
+  const [localIsPlaying, setLocalIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [loadError, setLoadError] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+
+  // If controlledIsPlaying is provided, use it; otherwise use localIsPlaying state
+  const isPlaying = controlledIsPlaying !== undefined ? controlledIsPlaying : localIsPlaying;
 
   // Check if URL is from a known problematic source (WhatsApp, etc.)
   const isProblematicUrl = (url) => {
@@ -24,6 +35,36 @@ const WaveformPlayer = ({ audioUrl, duration }) => {
     ];
     return problematicDomains.some(domain => url.includes(domain));
   };
+
+  // Control WaveSurfer playback based on controlledIsPlaying prop
+  useEffect(() => {
+    if (!wavesurferRef.current || controlledIsPlaying === undefined) return;
+    
+    if (controlledIsPlaying) {
+      if (!wavesurferRef.current.isPlaying()) {
+        wavesurferRef.current.play();
+      }
+    } else {
+      if (wavesurferRef.current.isPlaying()) {
+        wavesurferRef.current.pause();
+      }
+    }
+  }, [controlledIsPlaying]);
+
+  // Control native audio playback based on controlledIsPlaying prop
+  useEffect(() => {
+    if (!loadError || !audioRef.current || controlledIsPlaying === undefined) return;
+    
+    if (controlledIsPlaying) {
+      if (audioRef.current.paused) {
+        audioRef.current.play().catch(() => {});
+      }
+    } else {
+      if (!audioRef.current.paused) {
+        audioRef.current.pause();
+      }
+    }
+  }, [controlledIsPlaying, loadError]);
 
   useEffect(() => {
     if (!waveformRef.current || !audioUrl) return;
@@ -72,15 +113,24 @@ const WaveformPlayer = ({ audioUrl, duration }) => {
       });
       
       wavesurfer.on('play', () => {
-        if (mounted) setIsPlaying(true);
+        if (mounted) {
+          setLocalIsPlaying(true);
+          if (onPlay) onPlay();
+        }
       });
       
       wavesurfer.on('pause', () => {
-        if (mounted) setIsPlaying(false);
+        if (mounted) {
+          setLocalIsPlaying(false);
+          if (onPause) onPause();
+        }
       });
       
       wavesurfer.on('finish', () => {
-        if (mounted) setIsPlaying(false);
+        if (mounted) {
+          setLocalIsPlaying(false);
+          if (onFinish) onFinish();
+        }
       });
       
       wavesurfer.on('audioprocess', (time) => {
@@ -145,7 +195,23 @@ const WaveformPlayer = ({ audioUrl, duration }) => {
   }, [audioUrl]);
 
   const togglePlayPause = () => {
-    if (wavesurferRef.current) {
+    if (loadError && audioRef.current) {
+      if (audioRef.current.paused) {
+        if (onPlay) {
+          onPlay();
+        } else {
+          audioRef.current.play().catch(() => {});
+          setLocalIsPlaying(true);
+        }
+      } else {
+        if (onPause) {
+          onPause();
+        } else {
+          audioRef.current.pause();
+          setLocalIsPlaying(false);
+        }
+      }
+    } else if (wavesurferRef.current) {
       wavesurferRef.current.playPause();
     }
   };
@@ -167,12 +233,34 @@ const WaveformPlayer = ({ audioUrl, duration }) => {
         )}
         <div className="flex items-center gap-2 w-full p-2 bg-muted/50 rounded border">
           <audio
+            ref={audioRef}
             controls
             src={audioUrl}
             className="w-full"
             style={{ maxHeight: '40px' }}
             preload="metadata"
             controlsList="nodownload"
+            onPlay={() => {
+              if (onPlay) {
+                onPlay();
+              } else {
+                setLocalIsPlaying(true);
+              }
+            }}
+            onPause={() => {
+              if (onPause) {
+                onPause();
+              } else {
+                setLocalIsPlaying(false);
+              }
+            }}
+            onEnded={() => {
+              if (onFinish) {
+                onFinish();
+              } else {
+                setLocalIsPlaying(false);
+              }
+            }}
           >
             <p className="text-xs text-muted-foreground">
               Your browser does not support the audio element.

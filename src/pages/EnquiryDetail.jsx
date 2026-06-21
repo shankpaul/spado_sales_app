@@ -149,6 +149,48 @@ const EnquiryDetail = ({ enquiryId, onClose, onUpdate }) => {
   // Follow-ups state
   const [followUps, setFollowUps] = useState([]);
 
+  // Shared audio playing state
+  const [activeAudioUrl, setActiveAudioUrl] = useState(null);
+
+  const handleAudioPlay = (url) => {
+    setActiveAudioUrl(url);
+  };
+
+  const handleAudioPause = (url) => {
+    if (activeAudioUrl === url) {
+      setActiveAudioUrl(null);
+    }
+  };
+
+  const handleAudioFinish = (finishedUrl) => {
+    const finishedCommentIndex = comments.findIndex(c => c.voice_note_url === finishedUrl);
+    if (finishedCommentIndex === -1) {
+      setActiveAudioUrl(null);
+      return;
+    }
+    
+    // Find next comment with voice note
+    const nextCommentWithAudio = comments.slice(finishedCommentIndex + 1).find(c => c.voice_note_url);
+    if (nextCommentWithAudio) {
+      setActiveAudioUrl(nextCommentWithAudio.voice_note_url);
+    } else {
+      setActiveAudioUrl(null);
+    }
+  };
+
+  // Automatically scroll to the playing audio comment
+  useEffect(() => {
+    if (activeAudioUrl) {
+      const playingComment = comments.find(c => c.voice_note_url === activeAudioUrl);
+      if (playingComment) {
+        const element = document.getElementById(`comment-${playingComment.id}`);
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+      }
+    }
+  }, [activeAudioUrl, comments]);
+
   // Fetch enquiry details
   useEffect(() => {
     if (id) {
@@ -496,7 +538,9 @@ const EnquiryDetail = ({ enquiryId, onClose, onUpdate }) => {
     return followup <= today;
   };
 
-  if (loading || !enquiry) {
+  const isInitialLoading = !enquiry || (loading && String(enquiry.id) !== String(id));
+
+  if (isInitialLoading) {
     return (
       <div className="md:p-6">
         {/* Header Skeleton - Mobile App Style */}
@@ -984,6 +1028,7 @@ const EnquiryDetail = ({ enquiryId, onClose, onUpdate }) => {
                   {comments.map((comment) => (
                     <div
                       key={comment.id}
+                      id={`comment-${comment.id}`}
                       className={`flex gap-2 md:gap-3 p-3 md:p-4 rounded-lg transition-all ${
                         comment.is_customer_response
                           ? 'bg-blue-50 border border-blue-200'
@@ -1054,6 +1099,10 @@ const EnquiryDetail = ({ enquiryId, onClose, onUpdate }) => {
                             <WaveformPlayer 
                               audioUrl={comment.voice_note_url} 
                               duration={comment.voice_note_duration || 0}
+                              isPlaying={activeAudioUrl === comment.voice_note_url}
+                              onPlay={() => handleAudioPlay(comment.voice_note_url)}
+                              onPause={() => handleAudioPause(comment.voice_note_url)}
+                              onFinish={() => handleAudioFinish(comment.voice_note_url)}
                             />
                           </div>
                         )}

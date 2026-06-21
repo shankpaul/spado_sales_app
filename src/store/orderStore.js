@@ -384,7 +384,7 @@ const useOrderStore = create((set, get) => ({
       case 'order.created':
         // Fetch the new order and add to store
         try {
-          const order = await orderService.getOrder(order_id);
+          const order = await orderService.getOrderById(order_id);
           get().addOrder(order);
           toast.success(`New order created: ${data.order_number || order_id}`);
         } catch (error) {
@@ -399,7 +399,7 @@ const useOrderStore = create((set, get) => ({
       case 'order.assignee_response_updated':
         // Fetch updated order and update in store
         try {
-          const order = await orderService.getOrder(order_id);
+          const order = await orderService.getOrderById(order_id);
           get().updateOrder(order);
           
           // Show toast notification for status changes
@@ -417,7 +417,7 @@ const useOrderStore = create((set, get) => ({
       case 'order.cancelled':
         // Remove from upcoming/completed, update in orders list
         try {
-          const order = await orderService.getOrder(order_id);
+          const order = await orderService.getOrderById(order_id);
           get().updateOrder(order);
           toast.warning(`Order ${order.order_number} cancelled: ${data.cancel_reason || ''}`);
         } catch (error) {
@@ -427,7 +427,7 @@ const useOrderStore = create((set, get) => ({
       case 'order.journey_tracked':
         // Fetch updated order (journey info updated)
         try {
-          const order = await orderService.getOrder(order_id);
+          const order = await orderService.getOrderById(order_id);
           get().updateOrder(order);
         } catch (error) {
         }

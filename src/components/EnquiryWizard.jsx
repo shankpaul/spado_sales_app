@@ -110,7 +110,9 @@ const EnquiryWizard = ({ open, onOpenChange, onSuccess }) => {
           orderService.getPackages(),
           orderService.getAddons(),
         ]);
-        setPackages(packagesRes.packages || packagesRes || []);
+        const loadedPackages = packagesRes.packages || packagesRes || [];
+        loadedPackages.sort((a, b) => a.name.localeCompare(b.name));
+        setPackages(loadedPackages);
         setAddons(addonsRes.addons || addonsRes || []);
       } catch (error) {
       }

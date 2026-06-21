@@ -4,6 +4,20 @@ import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Skeleton } from '../components/ui/skeleton';
 import { Badge2 } from '../components/ui/badge2';
 import {
+  AreaChart,
+  Area,
+  LineChart,
+  Line,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+} from 'recharts';
+import {
   Sheet,
   SheetContent,
 } from '../components/ui/sheet';
@@ -56,7 +70,8 @@ import {
   MapPinCheck,
   MapPinX,
   UserSearch,
-  IndianRupee
+  IndianRupee,
+  Activity
 } from 'lucide-react';
 import {
   ORDER_STATUSES,
@@ -84,11 +99,11 @@ const Dashboard = () => {
   const { user } = useAuthStore();
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(true);
-  
+
   // Dashboard stats state
   const [dashboardStats, setDashboardStats] = useState(null);
   const [statsLoading, setStatsLoading] = useState(true);
-  
+
   // Use order store instead of local state
   const {
     upcomingOrders,
@@ -102,6 +117,7 @@ const Dashboard = () => {
   const [vehicleIdentifierOpen, setVehicleIdentifierOpen] = useState(false);
   const [serviceCheckerOpen, setServiceCheckerOpen] = useState(false);
   const [agentsAvailableOpen, setAgentsAvailableOpen] = useState(false);
+  const [quickToolsMenuOpen, setQuickToolsMenuOpen] = useState(false);
 
   // Vehicle Identifier States
   const [selectedBrand, setSelectedBrand] = useState('');
@@ -166,7 +182,7 @@ const Dashboard = () => {
   // Fetch dashboard stats on mount and set up auto-refresh every 10 minutes
   useEffect(() => {
     fetchDashboardStats();
-    
+
     // Refresh every 10 minutes (600000 ms)
     const refreshInterval = setInterval(() => {
       fetchDashboardStats();
@@ -203,10 +219,9 @@ const Dashboard = () => {
         try {
           setLoadingPackages(true);
           const response = await orderService.getPackages(serviceVehicleType, false);
-          setAvailablePackages(response.packages || []);
-        } catch (error) {
-          toast.error('Failed to load packages');
-          setAvailablePackages([]);
+          const loaded = response.packages || [];
+          loaded.sort((a, b) => a.name.localeCompare(b.name));
+          setAvailablePackages(loaded);
         } finally {
           setLoadingPackages(false);
         }
@@ -311,6 +326,7 @@ const Dashboard = () => {
             change={dashboardStats ? formatPercentage(dashboardStats.revenue.change_percentage) : '--'}
             icon={<IndianRupee className="h-4 w-4 text-primary-600" />}
             isLoading={statsLoading}
+            onClick={() => navigate('/reports')}
           />
           <StatCard
             title="Total Customers"
@@ -318,13 +334,16 @@ const Dashboard = () => {
             change={dashboardStats ? formatPercentage(dashboardStats.total_customers.change_percentage) : '--'}
             icon={<Users className="h-4 w-4 text-primary-600" />}
             isLoading={statsLoading}
+            onClick={() => navigate('/customers')}
           />
           <StatCard
             title="Today's Bookings"
-            value={dashboardStats ? dashboardStats.todays_bookings.current.toString() : '--'}
+            value={dashboardStats ? formatCurrency(dashboardStats.todays_bookings.current) : '--'}
             change={dashboardStats ? formatPercentage(dashboardStats.todays_bookings.change_percentage) : '--'}
             icon={<Calendar className="h-4 w-4 text-primary-600" />}
             isLoading={statsLoading}
+            vsLabel="vs yesterday"
+            onClick={() => navigate('/orders')}
           />
           <StatCard
             title="Today's Enquiries"
@@ -332,178 +351,338 @@ const Dashboard = () => {
             change={dashboardStats ? formatPercentage(dashboardStats.todays_enquiries.change_percentage) : '--'}
             icon={<Car className="h-4 w-4 text-primary-600" />}
             isLoading={statsLoading}
+            vsLabel="vs yesterday"
+            onClick={() => navigate('/enquiries')}
           />
         </div>
 
-      <div className="grid gap-4 md:grid-cols-2">
-        {/* <Card>
-          <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2">
-              <BarChart3 className="h-5 w-5 text-primary-600" />
-              Recent Activity
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {isLoading ? (
-              <div className="space-y-3">
-                <Skeleton className="h-12 w-full" />
-                <Skeleton className="h-12 w-full" />
-                <Skeleton className="h-12 w-full" />
-              </div>
-            ) : (
-              <div className="space-y-3 text-sm">
-                <ActivityItem text="New booking from John Doe" time="5 minutes ago" />
-                <ActivityItem text="Payment received for #12345" time="15 minutes ago" />
-                <ActivityItem text="Service completed for #12344" time="1 hour ago" />
-              </div>
-            )}
-          </CardContent>
-        </Card> */}
+        {/* Response Meter Section */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <ResponseMeterCard
+            title="Enquiries Response Meter (Last 30 Days)"
+            stats={dashboardStats?.response_meter}
+            isLoading={statsLoading}
+            onClick={() => navigate('/enquiries')}
+          />
+          <ResponseMeterCard
+            title="Enquiries Response Meter (Today)"
+            stats={dashboardStats?.todays_response_meter}
+            isLoading={statsLoading}
+            onClick={() => navigate('/enquiries')}
+          />
+        </div>
 
-        {/* <Card>
-          <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2">
-              <ClipboardList className="h-5 w-5 text-primary-600" />
-              Quick Actions
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              <QuickActionButton>New Booking</QuickActionButton>
-              <QuickActionButton>Add Customer</QuickActionButton>
-              <QuickActionButton>View Reports</QuickActionButton>
-              <QuickActionButton>Manage Staff</QuickActionButton>
-            </div>
-          </CardContent>
-        </Card> */}
+        {/* Target and Pending Payments Section */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <TargetAchievementCard
+            stats={dashboardStats?.target_stats}
+            isLoading={statsLoading}
+          />
+          <PendingPaymentsCard
+            stats={dashboardStats?.pending_payments}
+            isLoading={statsLoading}
+            onOrderClick={handleOpenOrderDetail}
+          />
+        </div>
+
+        {/* Charts Section */}
+        {statsLoading ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <Card className="bg-white border-none shadow-sm md:border md:shadow-none p-6">
+              <Skeleton className="h-6 w-48 mb-4" />
+              <Skeleton className="h-72 w-full rounded-2xl" />
+            </Card>
+            <Card className="bg-white border-none shadow-sm md:border md:shadow-none p-6">
+              <Skeleton className="h-6 w-48 mb-4" />
+              <Skeleton className="h-72 w-full rounded-2xl" />
+            </Card>
+            <Card className="bg-white border-none shadow-sm md:border md:shadow-none p-6">
+              <Skeleton className="h-6 w-48 mb-4" />
+              <Skeleton className="h-72 w-full rounded-2xl" />
+            </Card>
+            <Card className="bg-white border-none shadow-sm md:border md:shadow-none p-6">
+              <Skeleton className="h-6 w-48 mb-4" />
+              <Skeleton className="h-72 w-full rounded-2xl" />
+            </Card>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Chart 1: Monthly Revenue Trend */}
+            <Card className="bg-white border-none shadow-sm md:border md:shadow-none">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base font-semibold text-gray-900 flex items-center gap-2">
+                  <TrendingUp className="h-5 w-5 text-indigo-500" />
+                  Revenue Trend (30 Days)
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="pt-4">
+                <div className="h-72 w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart
+                      data={dashboardStats?.chart_data || []}
+                      margin={{ top: 10, right: 10, left: -10, bottom: 0 }}
+                    >
+                      <defs>
+                        <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#6366f1" stopOpacity={0.2} />
+                          <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
+                      <XAxis
+                        dataKey="date"
+                        tickLine={false}
+                        axisLine={false}
+                        stroke="#9ca3af"
+                        fontSize={11}
+                      />
+                      <YAxis
+                        tickLine={false}
+                        axisLine={false}
+                        stroke="#9ca3af"
+                        fontSize={11}
+                        tickFormatter={(val) => `₹${val}`}
+                      />
+                      <Tooltip
+                        formatter={(value) => [`₹${value.toLocaleString('en-IN')}`, 'Revenue']}
+                        contentStyle={{ backgroundColor: '#fff', border: '1px solid #e5e7eb', borderRadius: '12px' }}
+                      />
+                      <Area
+                        type="monotone"
+                        dataKey="revenue"
+                        stroke="#6366f1"
+                        strokeWidth={2}
+                        fillOpacity={1}
+                        fill="url(#colorRevenue)"
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Chart 2: Bookings Trend */}
+            <Card className="bg-white border-none shadow-sm md:border md:shadow-none">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base font-semibold text-gray-900 flex items-center gap-2">
+                  <Calendar className="h-5 w-5 text-emerald-500" />
+                  Bookings Trend (30 Days)
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="pt-4">
+                <div className="h-72 w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart
+                      data={dashboardStats?.chart_data || []}
+                      margin={{ top: 10, right: 10, left: -10, bottom: 0 }}
+                    >
+                      <defs>
+                        <linearGradient id="colorBookings" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#10b981" stopOpacity={0.2} />
+                          <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
+                      <XAxis
+                        dataKey="date"
+                        tickLine={false}
+                        axisLine={false}
+                        stroke="#9ca3af"
+                        fontSize={11}
+                      />
+                      <YAxis
+                        tickLine={false}
+                        axisLine={false}
+                        stroke="#9ca3af"
+                        fontSize={11}
+                      />
+                      <Tooltip
+                        formatter={(value) => [value, 'Bookings']}
+                        contentStyle={{ backgroundColor: '#fff', border: '1px solid #e5e7eb', borderRadius: '12px' }}
+                      />
+                      <Area
+                        type="monotone"
+                        dataKey="bookings"
+                        stroke="#10b981"
+                        strokeWidth={2}
+                        fillOpacity={1}
+                        fill="url(#colorBookings)"
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Chart 3: Enquiries Trend */}
+            <Card className="bg-white border-none shadow-sm md:border md:shadow-none">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base font-semibold text-gray-900 flex items-center gap-2">
+                  <Car className="h-5 w-5 text-orange-500" />
+                  Enquiries Trend (30 Days)
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="pt-4">
+                <div className="h-72 w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart
+                      data={dashboardStats?.chart_data || []}
+                      margin={{ top: 10, right: 10, left: -10, bottom: 0 }}
+                    >
+                      <defs>
+                        <linearGradient id="colorEnquiries" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#f97316" stopOpacity={0.2} />
+                          <stop offset="95%" stopColor="#f97316" stopOpacity={0} />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
+                      <XAxis
+                        dataKey="date"
+                        tickLine={false}
+                        axisLine={false}
+                        stroke="#9ca3af"
+                        fontSize={11}
+                      />
+                      <YAxis
+                        tickLine={false}
+                        axisLine={false}
+                        stroke="#9ca3af"
+                        fontSize={11}
+                      />
+                      <Tooltip
+                        formatter={(value) => [value, 'Enquiries']}
+                        contentStyle={{ backgroundColor: '#fff', border: '1px solid #e5e7eb', borderRadius: '12px' }}
+                      />
+                      <Area
+                        type="monotone"
+                        dataKey="enquiries"
+                        stroke="#f97316"
+                        strokeWidth={2}
+                        fillOpacity={1}
+                        fill="url(#colorEnquiries)"
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Chart 4: New Customers */}
+            <Card className="bg-white border-none shadow-sm md:border md:shadow-none">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base font-semibold text-gray-900 flex items-center gap-2">
+                  <Users className="h-5 w-5 text-cyan-500" />
+                  New Customers (30 Days)
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="pt-4">
+                <div className="h-72 w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart
+                      data={dashboardStats?.chart_data || []}
+                      margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
+                      <XAxis
+                        dataKey="date"
+                        tickLine={false}
+                        axisLine={false}
+                        stroke="#9ca3af"
+                        fontSize={11}
+                      />
+                      <YAxis
+                        tickLine={false}
+                        axisLine={false}
+                        stroke="#9ca3af"
+                        fontSize={11}
+                      />
+                      <Tooltip
+                        formatter={(value) => [value, 'New Customers']}
+                        contentStyle={{ backgroundColor: '#fff', border: '1px solid #e5e7eb', borderRadius: '12px' }}
+                      />
+                      <Bar
+                        dataKey="new_customers"
+                        fill="#06b6d4"
+                        radius={[4, 4, 0, 0]}
+                      />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
       </div>
-    </div>
     );
   };
 
   // Sales Executive Dashboard
-  const SalesExecutiveDashboard = () => (
-    <div className="space-y-6">
-      {/* this feature will enabled later */}
-      {/* <div className="grid grid-cols-2 gap-3 md:gap-4 lg:grid-cols-4">
-        <StatCard
-          title="My Sales Today"
-          value="$2,450"
-          change="+15.3%"
-          icon={<DollarSign className="h-4 w-4 text-primary-600" />}
-          isLoading={isLoading}
-        />
-        <StatCard
-          title="New Customers"
-          value="24"
-          change="+12.0%"
-          icon={<UserCheck className="h-4 w-4 text-primary-600" />}
-          isLoading={isLoading}
-        />
-        <StatCard
-          title="Pending Bookings"
-          value="8"
-          change="-3.5%"
-          icon={<Calendar className="h-4 w-4 text-primary-600" />}
-          isLoading={isLoading}
-        />
-        <StatCard
-          title="Completed Today"
-          value="18"
-          change="+7.8%"
-          icon={<Car className="h-4 w-4 text-primary-600" />}
-          isLoading={isLoading}
-        />
-      </div> */}
+  const SalesExecutiveDashboard = () => {
+    // Format currency for display
+    const formatCurrency = (amount) => {
+      return new Intl.NumberFormat('en-IN', {
+        style: 'currency',
+        currency: 'INR',
+        minimumFractionDigits: 0,
+      }).format(amount || 0);
+    };
 
-      {/* Quick Links - Mobile Only */}
-      <div className="md:hidden grid grid-cols-3 gap-2">
-        <QuickLinkCard
-          icon={<Car className="h-5 w-5" />}
-          label="Vehicle Type"
-          onClick={() => setVehicleIdentifierOpen(true)}
-        />
-        <QuickLinkCard
-          icon={<MapPin className="h-5 w-5" />}
-          label="Service Availability"
-          onClick={() => setServiceCheckerOpen(true)}
-        />
-        <QuickLinkCard
-          icon={<Users2 className="h-5 w-5" />}
-          label="Agents"
-          onClick={() => setAgentsAvailableOpen(true)}
-        />
-      </div>
+    // Format percentage change
+    const formatPercentage = (percentage) => {
+      const sign = percentage > 0 ? '+' : '';
+      return `${sign}${percentage.toFixed(1)}%`;
+    };
 
-      {/* Desktop Grid Layout with Quick Links Column */}
-      <div className="grid gap-4 md:grid-cols-3">
-        {/* Orders Column - Takes 2 columns on desktop */}
-        <div className="md:col-span-2 space-y-4">
-          <div className="border-none flex flex-col gap-4">
-            <div className="text-lg flex items-center justify-between">
-              <span className="font-semibold text-xl text-gray-900 flex items-center gap-2">
-                Today's Upcoming Works
-                <span className="text-sm font-medium text-muted-foreground bg-gray-100 px-2 py-0.5 rounded-full">{upcomingOrders.length}</span>
-              </span>
-            </div>
-            <div>
-              {loadingOrders ? (
-                <div className="space-y-3">
-                  <Skeleton className="h-20 w-full rounded-2xl" />
-                  <Skeleton className="h-20 w-full rounded-2xl" />
-                </div>
-              ) : upcomingOrders.length > 0 ? (
-                <div className={cn("space-y-3 overflow-y-auto pr-1", completedOrders.length === 0 ? "max-h-[calc(100vh-20rem)]" : "max-h-96")}>
-                  {upcomingOrders.map((order) => (
-                    <BookingItem
-                      key={order.id}
-                      order={order}
-                      onClick={() => handleOpenOrderDetail(order.id)}
-                    />
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-10 bg-white rounded-2xl border border-dashed border-gray-200">
-                  <Calendar className="h-10 w-10 mx-auto mb-3 text-gray-300" />
-                  <p className="text-muted-foreground font-medium">No upcoming orders for today</p>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {(loadingOrders || completedOrders.length > 0) && (
-            <div className="border-none flex flex-col gap-4">
-              <div className="text-lg flex items-center justify-between">
-                <span className="font-semibold text-xl text-gray-900 flex items-center gap-2">
-                  Completed Today
-                  <span className="text-sm font-medium text-green-600 bg-green-50 px-2 py-0.5 rounded-full">{completedOrders.length}</span>
-                </span>
-              </div>
-              <div>
-                {loadingOrders ? (
-                  <div className="space-y-3">
-                    <Skeleton className="h-20 w-full rounded-2xl" />
-                    <Skeleton className="h-20 w-full rounded-2xl" />
-                  </div>
-                ) : (
-                  <div className="space-y-3 max-h-96 overflow-y-auto pr-1 pb-2">
-                    {completedOrders.map((order) => (
-                      <BookingItem
-                        key={order.id}
-                        order={order}
-                        onClick={() => handleOpenOrderDetail(order.id)}
-                      />
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
+    return (
+      <div className="space-y-6">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
+          <StatCard
+            title="My Sales This Month"
+            value={dashboardStats ? formatCurrency(dashboardStats.revenue.current) : '--'}
+            change={dashboardStats ? formatPercentage(dashboardStats.revenue.change_percentage) : '--'}
+            icon={<IndianRupee className="h-4 w-4 text-primary-600" />}
+            isLoading={statsLoading}
+            onClick={() => navigate('/orders')}
+          />
+          <StatCard
+            title="My Todays Sales"
+            value={dashboardStats ? formatCurrency(dashboardStats.todays_bookings.current) : '--'}
+            change={dashboardStats ? formatPercentage(dashboardStats.todays_bookings.change_percentage) : '--'}
+            icon={<Calendar className="h-4 w-4 text-primary-600" />}
+            isLoading={statsLoading}
+            vsLabel="vs yesterday"
+            onClick={() => navigate('/orders')}
+          />
+          <TargetAchievementCard
+            stats={dashboardStats?.target_stats}
+            isLoading={statsLoading}
+          />
+          <PendingPaymentsCard
+            stats={dashboardStats?.pending_payments}
+            isLoading={statsLoading}
+            onOrderClick={handleOpenOrderDetail}
+          />
         </div>
 
-        {/* Quick Links Column - Desktop Only */}
-        <div className="hidden md:block">
-          <Card className="bg-white">
+        {/* Response Meter Section */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <ResponseMeterCard
+            title="My Enquiries Response Meter (Last 30 Days)"
+            stats={dashboardStats?.response_meter}
+            isLoading={statsLoading}
+            onClick={() => navigate('/enquiries')}
+          />
+          <ResponseMeterCard
+            title="My Enquiries Response Meter (Today)"
+            stats={dashboardStats?.todays_response_meter}
+            isLoading={statsLoading}
+            onClick={() => navigate('/enquiries')}
+          />
+        </div>
+
+        {/* Quick Tools - Mobile Only */}
+        <div className="md:hidden">
+          <Card className="bg-white mb-4">
             <CardHeader>
               <CardTitle className="text-lg flex items-center gap-2">
                 <Zap className="h-5 w-5 text-primary-600" />
@@ -535,9 +714,111 @@ const Dashboard = () => {
             </CardContent>
           </Card>
         </div>
-      </div>
-    </div >
-  );
+
+        {/* Desktop Grid Layout with Quick Links Column */}
+        <div className="grid gap-4 md:grid-cols-3">
+          {/* Orders Column - Takes 2 columns on desktop */}
+          <div className="md:col-span-2 space-y-4">
+            <div className="border-none flex flex-col gap-4">
+              <div className="text-lg flex items-center justify-between">
+                <span className="font-semibold text-xl text-gray-900 flex items-center gap-2">
+                  Today's Upcoming Works
+                  <span className="text-sm font-medium text-muted-foreground bg-gray-100 px-2 py-0.5 rounded-full">{upcomingOrders.length}</span>
+                </span>
+              </div>
+              <div>
+                {loadingOrders ? (
+                  <div className="space-y-3">
+                    <Skeleton className="h-20 w-full rounded-2xl" />
+                    <Skeleton className="h-20 w-full rounded-2xl" />
+                  </div>
+                ) : upcomingOrders.length > 0 ? (
+                  <div className={cn("space-y-3 overflow-y-auto pr-1", completedOrders.length === 0 ? "max-h-[calc(100vh-20rem)]" : "max-h-96")}>
+                    {upcomingOrders.map((order) => (
+                      <BookingItem
+                        key={order.id}
+                        order={order}
+                        onClick={() => handleOpenOrderDetail(order.id)}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-10 bg-white rounded-2xl border border-dashed border-gray-200">
+                    <Calendar className="h-10 w-10 mx-auto mb-3 text-gray-300" />
+                    <p className="text-muted-foreground font-medium">No upcoming orders for today</p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {(loadingOrders || completedOrders.length > 0) && (
+              <div className="border-none flex flex-col gap-4">
+                <div className="text-lg flex items-center justify-between">
+                  <span className="font-semibold text-xl text-gray-900 flex items-center gap-2">
+                    Completed Today
+                    <span className="text-sm font-medium text-green-600 bg-green-50 px-2 py-0.5 rounded-full">{completedOrders.length}</span>
+                  </span>
+                </div>
+                <div>
+                  {loadingOrders ? (
+                    <div className="space-y-3">
+                      <Skeleton className="h-20 w-full rounded-2xl" />
+                      <Skeleton className="h-20 w-full rounded-2xl" />
+                    </div>
+                  ) : (
+                    <div className="space-y-3 max-h-96 overflow-y-auto pr-1 pb-2">
+                      {completedOrders.map((order) => (
+                        <BookingItem
+                          key={order.id}
+                          order={order}
+                          onClick={() => handleOpenOrderDetail(order.id)}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Quick Links Column - Desktop Only */}
+          <div className="hidden md:block">
+            <Card className="bg-white">
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Zap className="h-5 w-5 text-primary-600" />
+                  Quick Tools
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                <QuickLinkButton
+                  className="bg-gray-50 hover:bg-gray-100"
+                  icon={<Car className="h-5 w-5" />}
+                  label="Identify Vehicle Type"
+                  description="Check vehicle category"
+                  onClick={() => setVehicleIdentifierOpen(true)}
+                />
+                <QuickLinkButton
+                  icon={<CheckCircle2 className="h-5 w-5" />}
+                  label="Service Area Checker"
+                  className="bg-gray-50 hover:bg-gray-100"
+                  description="Check area is serviceable"
+                  onClick={() => setServiceCheckerOpen(true)}
+                />
+                <QuickLinkButton
+                  icon={<Users2 className="h-5 w-5" />}
+                  label="Agents Available Today"
+                  className="bg-gray-50 hover:bg-gray-100"
+                  description="View available agents"
+                  onClick={() => setAgentsAvailableOpen(true)}
+                />
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      </div >
+    );
+  };
 
   // Accountant Dashboard
   const AccountantDashboard = () => {
@@ -565,6 +846,8 @@ const Dashboard = () => {
             change="+18.2%"
             icon={<IndianRupee className="h-4 w-4 text-primary-600" />}
             isLoading={isLoading}
+            vsLabel="vs yesterday"
+            onClick={() => navigate('/transactions')}
           />
           <StatCard
             title="Pending Payments"
@@ -572,6 +855,7 @@ const Dashboard = () => {
             change="-5.3%"
             icon={<TrendingUp className="h-4 w-4 text-primary-600" />}
             isLoading={isLoading}
+            onClick={() => navigate('/transactions')}
           />
           <StatCard
             title="Transactions Today"
@@ -579,6 +863,8 @@ const Dashboard = () => {
             change="+9.7%"
             icon={<BarChart3 className="h-4 w-4 text-primary-600" />}
             isLoading={isLoading}
+            vsLabel="vs yesterday"
+            onClick={() => navigate('/transactions')}
           />
           <StatCard
             title="Monthly Revenue"
@@ -586,49 +872,50 @@ const Dashboard = () => {
             change={dashboardStats ? formatPercentage(dashboardStats.revenue.change_percentage) : '--'}
             icon={<DollarSign className="h-4 w-4 text-primary-600" />}
             isLoading={statsLoading}
+            onClick={() => navigate('/reports')}
           />
         </div>
 
-      <div className="grid gap-4 md:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Recent Transactions</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {isLoading ? (
-              <div className="space-y-3">
-                <Skeleton className="h-12 w-full" />
-                <Skeleton className="h-12 w-full" />
-                <Skeleton className="h-12 w-full" />
-              </div>
-            ) : (
-              <div className="space-y-3 text-sm">
-                <TransactionItem amount="$125.00" customer="John Doe" status="Completed" />
-                <TransactionItem amount="$89.50" customer="Jane Smith" status="Completed" />
-                <TransactionItem amount="$250.00" customer="Bob Wilson" status="Pending" />
-              </div>
-            )}
-          </CardContent>
-        </Card>
+        <div className="grid gap-4 md:grid-cols-2">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Recent Transactions</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {isLoading ? (
+                <div className="space-y-3">
+                  <Skeleton className="h-12 w-full" />
+                  <Skeleton className="h-12 w-full" />
+                  <Skeleton className="h-12 w-full" />
+                </div>
+              ) : (
+                <div className="space-y-3 text-sm">
+                  <TransactionItem amount="$125.00" customer="John Doe" status="Completed" />
+                  <TransactionItem amount="$89.50" customer="Jane Smith" status="Completed" />
+                  <TransactionItem amount="$250.00" customer="Bob Wilson" status="Pending" />
+                </div>
+              )}
+            </CardContent>
+          </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Revenue Summary</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {isLoading ? (
-              <Skeleton className="h-40 w-full" />
-            ) : (
-              <div className="space-y-4">
-                <SummaryItem label="Cash Payments" value="$18,450" percentage="41%" />
-                <SummaryItem label="Card Payments" value="$22,780" percentage="50%" />
-                <SummaryItem label="Online Payments" value="$4,000" percentage="9%" />
-              </div>
-            )}
-          </CardContent>
-        </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Revenue Summary</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {isLoading ? (
+                <Skeleton className="h-40 w-full" />
+              ) : (
+                <div className="space-y-4">
+                  <SummaryItem label="Cash Payments" value="$18,450" percentage="41%" />
+                  <SummaryItem label="Card Payments" value="$22,780" percentage="50%" />
+                  <SummaryItem label="Online Payments" value="$4,000" percentage="9%" />
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
       </div>
-    </div>
     );
   };
 
@@ -647,32 +934,6 @@ const Dashboard = () => {
 
   return (
     <div className="min-h-screen bg-gray-50/50">
-      {/* Mobile Sticky Header */}
-      <div className="sticky top-0 z-20 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/60 border-b md:hidden">
-        <div className="px-4 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <LetterAvatar name={user?.name} size="md" />
-            <div>
-              <p className="text-xs text-muted-foreground font-medium">Welcome back,</p>
-              <h2 className="text-sm font-bold truncate max-w-[150px]">{user?.name || user?.email}</h2>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              className="rounded-full h-10 w-10"
-              onClick={() => navigate('/customers')}
-            >
-              <UserSearch className="h-5 w-5" />
-            </Button>
-            <Button variant="ghost" size="icon" className="rounded-full h-10 w-10">
-              <Bell className="h-5 w-5" />
-            </Button>
-          </div>
-        </div>
-      </div>
-
       <div className="p-4 md:p-6 space-y-6">
         {/* Desktop Header - Hidden on Mobile */}
         <div className="hidden md:block">
@@ -708,6 +969,64 @@ const Dashboard = () => {
           </SheetContent>
         </Sheet>
 
+        {/* Floating Action Button for Quick Tools on Mobile */}
+        <div className="fixed bottom-20 right-4 z-40 md:hidden">
+          <button
+            onClick={() => setQuickToolsMenuOpen(true)}
+            className="h-12 w-12 rounded-full shadow-lg bg-primary hover:bg-primary/95 text-primary-foreground flex items-center justify-center border border-primary/20 active:scale-95 transition-all focus:outline-none"
+            title="Quick Tools"
+          >
+            <Zap className="h-6 w-6 text-yellow-400 fill-yellow-400 animate-pulse" />
+          </button>
+        </div>
+
+        {/* Quick Tools Floating Menu Dialog */}
+        <Dialog open={quickToolsMenuOpen} onOpenChange={setQuickToolsMenuOpen}>
+          <DialogContent className="w-[90vw] max-w-md p-6 rounded-2xl">
+            <DialogHeader className="text-left flex-shrink-0">
+              <DialogTitle className="flex items-center gap-2 text-lg font-bold">
+                <Zap className="h-5 w-5 text-primary-600 fill-primary-600 animate-pulse shrink-0" />
+                Quick Tools
+              </DialogTitle>
+              <DialogDescription>
+                Select a utility tool to continue.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-3 py-3">
+              <QuickLinkButton
+                className="bg-gray-50 hover:bg-primary-50/50"
+                icon={<Car className="h-5 w-5" />}
+                label="Identify Vehicle Type"
+                description="Check vehicle category"
+                onClick={() => {
+                  setQuickToolsMenuOpen(false);
+                  setVehicleIdentifierOpen(true);
+                }}
+              />
+              <QuickLinkButton
+                className="bg-gray-50 hover:bg-primary-50/50"
+                icon={<CheckCircle2 className="h-5 w-5" />}
+                label="Service Area Checker"
+                description="Check area is serviceable"
+                onClick={() => {
+                  setQuickToolsMenuOpen(false);
+                  setServiceCheckerOpen(true);
+                }}
+              />
+              <QuickLinkButton
+                className="bg-gray-50 hover:bg-primary-50/50"
+                icon={<Users2 className="h-5 w-5" />}
+                label="Agents Available Today"
+                description="View available agents"
+                onClick={() => {
+                  setQuickToolsMenuOpen(false);
+                  setAgentsAvailableOpen(true);
+                }}
+              />
+            </div>
+          </DialogContent>
+        </Dialog>
+
         {/* Vehicle Identifier Sheet */}
         <Sheet open={vehicleIdentifierOpen} onOpenChange={setVehicleIdentifierOpen}>
           <SheetContent side="bottom" className="h-screen p-0 flex flex-col sm:h-auto sm:max-w-md sm:p-6 sm:top-1/2 sm:left-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 sm:right-auto sm:bottom-auto sm:rounded-lg">
@@ -728,7 +1047,7 @@ const Dashboard = () => {
                 <X className="h-5 w-5" />
               </Button>
             </div>
-            
+
             {/* Desktop Dialog Header */}
             <DialogHeader className="text-left flex-shrink-0 hidden sm:flex">
               <DialogTitle className="flex items-center gap-2">
@@ -739,7 +1058,7 @@ const Dashboard = () => {
                 Select the vehicle brand and model to identify its type category.
               </DialogDescription>
             </DialogHeader>
-            
+
             <div className="space-y-4 p-4 pt-12 flex-1 overflow-y-auto sm:py-4">
               <div className="space-y-2">
                 <Label htmlFor="brand">Brand</Label>
@@ -758,7 +1077,7 @@ const Dashboard = () => {
                   </SelectContent>
                 </Select>
               </div>
-              
+
               {selectedBrand && (
                 <div className="space-y-2">
                   <Label htmlFor="model">Model</Label>
@@ -784,7 +1103,7 @@ const Dashboard = () => {
                       </div>
                       <p className="text-2xl font-bold text-primary uppercase">{identifiedType}</p>
                     </div>
-                     <VehicleIcon vehicleType={identifiedType} size={82} />
+                    <VehicleIcon vehicleType={identifiedType} size={82} />
                   </div>
                 </div>
               )}
@@ -824,7 +1143,7 @@ const Dashboard = () => {
                 <X className="h-5 w-5" />
               </Button>
             </div>
-            
+
             {/* Desktop Dialog Header */}
             <DialogHeader className="text-left flex-shrink-0 hidden sm:flex">
               <DialogTitle className="flex items-center gap-2">
@@ -835,15 +1154,15 @@ const Dashboard = () => {
                 Check if our service is available at your location.
               </DialogDescription>
             </DialogHeader>
-            
+
             <div className="space-y-4 p-4 pt-12 flex-1 overflow-y-auto sm:py-4">
               {/* Customer Phone */}
               <div className="space-y-2">
                 <Label htmlFor="service-phone">Customer Phone <span className="text-muted-foreground">(optional)</span></Label>
-                <Input 
-                  id="service-phone" 
+                <Input
+                  id="service-phone"
                   type="tel"
-                  placeholder="Enter phone number" 
+                  placeholder="Enter phone number"
                   value={servicePhone}
                   onChange={(e) => setServicePhone(e.target.value)}
                 />
@@ -880,8 +1199,8 @@ const Dashboard = () => {
               {serviceVehicleType && (
                 <div className="space-y-2">
                   <Label htmlFor="service-package">Package (Optional)</Label>
-                  <Select 
-                    value={servicePackageName} 
+                  <Select
+                    value={servicePackageName}
                     onValueChange={setServicePackageName}
                     disabled={loadingPackages}
                   >
@@ -902,10 +1221,10 @@ const Dashboard = () => {
               {/* Map Link */}
               <div className="space-y-2">
                 <Label htmlFor="service-map-link">Google Maps Link</Label>
-                <Input 
-                  id="service-map-link" 
+                <Input
+                  id="service-map-link"
                   type="url"
-                  placeholder="Paste Google Maps link" 
+                  placeholder="Paste Google Maps link"
                   value={serviceMapLink}
                   onChange={(e) => {
                     setServiceMapLink(e.target.value);
@@ -924,9 +1243,9 @@ const Dashboard = () => {
               {/* Location Name */}
               <div className="space-y-2">
                 <Label htmlFor="service-location">Location Name</Label>
-                <Input 
-                  id="service-location" 
-                  placeholder="Enter location/area name" 
+                <Input
+                  id="service-location"
+                  placeholder="Enter location/area name"
                   value={serviceLocation}
                   onChange={(e) => {
                     setServiceLocation(e.target.value);
@@ -940,33 +1259,29 @@ const Dashboard = () => {
 
               {/* Availability Result */}
               {availabilityResult && (
-                <div className={`p-4 rounded-lg border ${
-                  availabilityResult.available 
-                    ? 'bg-green-50 border-green-200' 
-                    : 'bg-red-50 border-red-200'
-                }`}>
+                <div className={`p-4 rounded-lg border ${availabilityResult.available
+                  ? 'bg-green-50 border-green-200'
+                  : 'bg-red-50 border-red-200'
+                  }`}>
                   <div className="flex items-start gap-3">
-                    <div className={`p-2 rounded-full ${
-                      availabilityResult.available 
-                        ? 'bg-green-100' 
-                        : 'bg-red-100'
-                    }`}>
+                    <div className={`p-2 rounded-full ${availabilityResult.available
+                      ? 'bg-green-100'
+                      : 'bg-red-100'
+                      }`}>
                       {availabilityResult.available ? (
-                        <MapPinCheck className={`h-6 w-6 ${
-                          availabilityResult.available 
-                            ? 'text-green-600' 
-                            : 'text-red-600'
-                        }`} />
+                        <MapPinCheck className={`h-6 w-6 ${availabilityResult.available
+                          ? 'text-green-600'
+                          : 'text-red-600'
+                          }`} />
                       ) : (
                         <MapPinX className="h-6 w-6 text-red-600" />
                       )}
                     </div>
                     <div className="flex-1">
-                      <h3 className={`font-bold mb-1 ${
-                        availabilityResult.available 
-                          ? 'text-green-900' 
-                          : 'text-red-900'
-                      }`}>
+                      <h3 className={`font-bold mb-1 ${availabilityResult.available
+                        ? 'text-green-900'
+                        : 'text-red-900'
+                        }`}>
                         {availabilityResult.available ? 'Service Available!' : 'Service Unavailable'}
                       </h3>
                       {availabilityResult.available ? (
@@ -985,8 +1300,8 @@ const Dashboard = () => {
 
               {/* Action Buttons */}
               <div className="flex gap-2 pt-2">
-                <Button 
-                  onClick={handleCheckAvailability} 
+                <Button
+                  onClick={handleCheckAvailability}
                   className="flex-1"
                   disabled={checkingAvailability}
                 >
@@ -999,8 +1314,8 @@ const Dashboard = () => {
                     'Check Availability'
                   )}
                 </Button>
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   onClick={resetServiceAvailability}
                   disabled={checkingAvailability}
                 >
@@ -1031,7 +1346,7 @@ const Dashboard = () => {
                 <X className="h-5 w-5" />
               </Button>
             </div>
-            
+
             {/* Desktop Dialog Header */}
             <DialogHeader className="text-left flex-shrink-0 hidden sm:flex">
               <DialogTitle className="flex items-center gap-2">
@@ -1042,7 +1357,7 @@ const Dashboard = () => {
                 View agents available for service today.
               </DialogDescription>
             </DialogHeader>
-            
+
             <div className="space-y-4 p-4 pt-12 flex-1 overflow-y-auto sm:py-4">
               {loadingAgents ? (
                 <div className="space-y-3">
@@ -1083,8 +1398,14 @@ const Dashboard = () => {
 };
 
 // Helper Components
-const StatCard = ({ title, value, change, icon, isLoading }) => (
-  <Card className="overflow-hidden border-none shadow-sm md:border-1 md:shadow-none active:scale-[0.98] transition-all duration-200">
+const StatCard = ({ title, value, change, icon, isLoading, vsLabel = "vs last month", onClick }) => (
+  <Card
+    className={cn(
+      "overflow-hidden border-none shadow-sm md:border md:shadow-none transition-all duration-200",
+      onClick && "cursor-pointer hover:shadow-md hover:border-primary-100 hover:bg-gray-50/50 active:scale-[0.98]"
+    )}
+    onClick={onClick}
+  >
     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 bg-white">
       <CardTitle className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{title}</CardTitle>
       <div className="p-2 bg-primary/5 rounded-lg">
@@ -1107,7 +1428,7 @@ const StatCard = ({ title, value, change, icon, isLoading }) => (
             )}>
               {change}
             </span>
-            <span className="text-[10px] text-muted-foreground font-medium">vs last month</span>
+            <span className="text-[10px] text-muted-foreground font-medium">{vsLabel}</span>
           </div>
         </>
       )}
@@ -1284,5 +1605,337 @@ const QuickLinkButton = ({ icon, label, description, onClick, className }) => (
 
 // Dialogs should be added to the return statement in Dashboard component
 // Move these to where dialogs are rendered
+
+const CircularProgress = ({ percentage, color = "text-indigo-600", strokeWidth = 8, size = 80 }) => {
+  const radius = (size - strokeWidth) / 2;
+  const circumference = radius * 2 * Math.PI;
+  const offset = circumference - (percentage / 100) * circumference;
+
+  return (
+    <div className="relative flex items-center justify-center" style={{ width: size, height: size }}>
+      <svg className="transform -rotate-90 w-full h-full" viewBox={`0 0 ${size} ${size}`}>
+        {/* Track circle */}
+        <circle
+          className="text-gray-100"
+          strokeWidth={strokeWidth}
+          stroke="currentColor"
+          fill="transparent"
+          r={radius}
+          cx={size / 2}
+          cy={size / 2}
+        />
+        {/* Progress circle */}
+        <circle
+          className={cn("transition-all duration-500 ease-out", color)}
+          strokeWidth={strokeWidth}
+          strokeDasharray={circumference}
+          strokeDashoffset={offset}
+          strokeLinecap="round"
+          stroke="currentColor"
+          fill="transparent"
+          r={radius}
+          cx={size / 2}
+          cy={size / 2}
+        />
+      </svg>
+      <div className="absolute text-center">
+        <span className="text-sm font-bold text-gray-800">{Math.round(percentage)}%</span>
+        <span className="block text-[8px] font-semibold text-muted-foreground uppercase leading-none mt-0.5">Rate</span>
+      </div>
+    </div>
+  );
+};
+
+const ResponseMeterCard = ({ title, stats, isLoading, onClick }) => {
+  const { total_count = 0, contacted = 0, pending = 0, converted = 0, response_rate = 0 } = stats || {};
+
+  const getProgressColor = (rate) => {
+    if (rate >= 75) return "text-emerald-500";
+    if (rate >= 50) return "text-amber-500";
+    return "text-rose-500";
+  };
+
+  return (
+    <Card
+      className={cn(
+        "overflow-hidden border-none shadow-sm md:border md:shadow-none transition-all duration-200 bg-white",
+        onClick && "cursor-pointer hover:shadow-md hover:border-primary-100 hover:bg-gray-50/50 active:scale-[0.98]"
+      )}
+      onClick={onClick}
+    >
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+        <CardTitle className="text-sm font-bold text-gray-900 flex items-center gap-2">
+          <Activity className="h-4 w-4 text-indigo-500" />
+          {title}
+        </CardTitle>
+        <span className="text-[10px] font-semibold text-muted-foreground bg-gray-100 px-2 py-0.5 rounded-full">
+          Response Rate
+        </span>
+      </CardHeader>
+      <CardContent>
+        {isLoading ? (
+          <div className="flex items-center justify-between py-2">
+            <div className="grid grid-cols-4 gap-2 flex-1 pr-2">
+              <Skeleton className="h-8 w-full" />
+              <Skeleton className="h-8 w-full" />
+              <Skeleton className="h-8 w-full" />
+              <Skeleton className="h-8 w-full" />
+            </div>
+            <Skeleton className="h-16 w-16 rounded-full animate-pulse ml-2" />
+          </div>
+        ) : (
+          <div className="flex items-center justify-between">
+            <div className="grid grid-cols-4 gap-2 flex-1 pr-2">
+              <div className="space-y-1">
+                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">New</span>
+                <span className="text-lg font-bold text-gray-900">{total_count}</span>
+              </div>
+              <div className="space-y-1">
+                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">Contacted</span>
+                <span className="text-lg font-bold text-indigo-600">{contacted}</span>
+              </div>
+              <div className="space-y-1 relative">
+                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">Pending</span>
+                <div className="flex items-center gap-1">
+                  <span className={cn(
+                    "text-lg font-bold px-1.5 py-0.5 rounded-md",
+                    pending > 0 ? "bg-red-50 text-red-600 font-extrabold" : "text-gray-900"
+                  )}>
+                    {pending}
+                  </span>
+                  {pending > 0 && (
+                    <span className="relative flex h-2 w-2">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+                    </span>
+                  )}
+                </div>
+              </div>
+              <div className="space-y-1">
+                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">Converted</span>
+                <span className="text-lg font-bold text-emerald-600">{converted}</span>
+              </div>
+            </div>
+            <div className="flex-shrink-0">
+              <CircularProgress
+                percentage={response_rate}
+                color={getProgressColor(response_rate)}
+                size={70}
+                strokeWidth={7}
+              />
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+};
+
+const TargetAchievementCard = ({ stats, isLoading }) => {
+  const { target_amount = 0, achieved_amount = 0 } = stats || {};
+  const percentage = target_amount > 0 ? (achieved_amount / target_amount) * 100 : 0;
+
+  const formatCurrency = (amount) => {
+    return new Intl.NumberFormat('en-IN', {
+      style: 'currency',
+      currency: 'INR',
+      minimumFractionDigits: 0,
+    }).format(amount || 0);
+  };
+
+  const size = 64;
+  const strokeWidth = 6;
+  const radius = (size - strokeWidth) / 2;
+  const circumference = radius * 2 * Math.PI;
+  const offset = circumference - (Math.min(percentage, 100) / 100) * circumference;
+
+  return (
+    <Card className="overflow-hidden border-none shadow-sm md:border md:shadow-none bg-white flex flex-col h-full">
+      <CardHeader className="flex flex-row items-center justify-between pb-2 bg-white">
+        <CardTitle className="text-sm font-bold text-gray-900 flex items-center gap-2">
+          <TrendingUp className="h-4 w-4 text-emerald-500" />
+          Achievement
+        </CardTitle>
+        <span className="text-[10px] font-semibold text-muted-foreground bg-gray-100 px-2 py-0.5 rounded-full">
+          Goal
+        </span>
+      </CardHeader>
+      <CardContent className="bg-white flex flex-col justify-center flex-1 py-2">
+        {isLoading ? (
+          <div className="flex items-center gap-3 w-full py-1">
+            <Skeleton className="h-16 w-16 rounded-full flex-shrink-0" />
+            <div className="flex-1 space-y-1.5">
+              <Skeleton className="h-4 w-full" />
+              <Skeleton className="h-3 w-3/4" />
+            </div>
+          </div>
+        ) : (
+          <div className="flex items-center justify-between w-full">
+            {/* Left side: Round graph */}
+            <div className="relative flex items-center justify-center flex-shrink-0" style={{ width: size, height: size }}>
+              <svg className="transform -rotate-90 w-full h-full" viewBox={`0 0 ${size} ${size}`}>
+                {/* Track circle */}
+                <circle
+                  className="text-gray-100"
+                  strokeWidth={strokeWidth}
+                  stroke="currentColor"
+                  fill="transparent"
+                  r={radius}
+                  cx={size / 2}
+                  cy={size / 2}
+                />
+                {/* Progress circle */}
+                <circle
+                  className="text-emerald-500 transition-all duration-500 ease-out"
+                  strokeWidth={strokeWidth}
+                  strokeDasharray={circumference}
+                  strokeDashoffset={offset}
+                  strokeLinecap="round"
+                  stroke="currentColor"
+                  fill="transparent"
+                  r={radius}
+                  cx={size / 2}
+                  cy={size / 2}
+                />
+              </svg>
+              {/* Center content */}
+              <div className="absolute text-center flex items-center justify-center">
+                <span className="text-xs font-extrabold text-gray-900 tracking-tight leading-none">
+                  {Math.round(percentage)}%
+                </span>
+              </div>
+            </div>
+
+            {/* Right side: Target & Achieved details */}
+            <div className="flex-1 pl-3 flex flex-col justify-center space-y-1">
+              <div>
+                <p className="text-[9px] text-muted-foreground uppercase font-bold tracking-wider leading-none">Achieved</p>
+                <p className="text-sm font-extrabold text-emerald-600 mt-0.5">{formatCurrency(achieved_amount)}</p>
+              </div>
+              <div>
+                <p className="text-[9px] text-muted-foreground uppercase font-bold tracking-wider leading-none">Target</p>
+                <p className="text-xs font-bold text-gray-500 mt-0.5">{formatCurrency(target_amount)}</p>
+              </div>
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+};
+
+const PendingPaymentsCard = ({ stats, isLoading, onOrderClick }) => {
+  const { total_amount = 0, count = 0, orders = [] } = stats || {};
+  const [isOpen, setIsOpen] = useState(false);
+
+  const formatCurrency = (amount) => {
+    return new Intl.NumberFormat('en-IN', {
+      style: 'currency',
+      currency: 'INR',
+      minimumFractionDigits: 0,
+    }).format(amount || 0);
+  };
+
+  const getPaymentColorClasses = (amount) => {
+    if (amount === 0) {
+      return {
+        text: "text-gray-500",
+        badge: "bg-gray-50 text-gray-600 border-gray-100/50",
+        iconBg: "bg-gray-50 text-gray-500",
+      };
+    }
+    if (amount > 100) {
+      return {
+        text: "text-red-600",
+        badge: "bg-red-50 text-red-600 border-red-100/50",
+        iconBg: "bg-red-50 text-red-500",
+      };
+    }
+    return {
+      text: "text-amber-600",
+      badge: "bg-amber-50 text-amber-600 border-amber-100/50",
+      iconBg: "bg-amber-50 text-amber-500",
+    };
+  };
+
+  const colors = getPaymentColorClasses(total_amount);
+
+  return (
+    <>
+      <Card 
+        className={cn(
+          "overflow-hidden border-none shadow-sm md:border md:shadow-none transition-all duration-200 bg-white flex flex-col h-full",
+          count > 0 && "cursor-pointer hover:shadow-md hover:border-primary-100 hover:bg-gray-50/50 active:scale-[0.98]"
+        )}
+        onClick={() => count > 0 && setIsOpen(true)}
+      >
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 bg-white">
+          <CardTitle className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+            Pending Payments
+          </CardTitle>
+          <div className={cn("p-2 rounded-lg", colors.iconBg)}>
+            <Clock10 className="h-4 w-4" />
+          </div>
+        </CardHeader>
+        <CardContent className="bg-white flex-1 flex flex-col justify-center">
+          {isLoading ? (
+            <div className="space-y-2">
+              <Skeleton className="h-7 w-24" />
+              <Skeleton className="h-3 w-16" />
+            </div>
+          ) : (
+            <>
+              <div className={cn("text-2xl font-bold tracking-tight", colors.text)}>{formatCurrency(total_amount)}</div>
+              <div className="flex items-center gap-1.5 mt-1">
+                <span className={cn("text-[11px] font-bold px-1.5 py-0.5 rounded-md border", colors.badge)}>
+                  {count} {count === 1 ? 'order' : 'orders'} pending
+                </span>
+              </div>
+            </>
+          )}
+        </CardContent>
+      </Card>
+
+      <Dialog open={isOpen} onOpenChange={setIsOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Clock10 className={cn("h-5 w-5", total_amount > 100 ? "text-red-500" : (total_amount === 0 ? "text-gray-500" : "text-amber-500"))} />
+              Pending Payment Orders
+            </DialogTitle>
+            <DialogDescription>
+              Showing orders with unpaid balances. Click any order to view details.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 max-h-[350px] overflow-y-auto pr-1 py-2">
+            {orders.map((order) => {
+              const orderAmount = order.total_amount || 0;
+              const orderColor = orderAmount > 100 ? 'text-red-600' : (orderAmount === 0 ? 'text-gray-500' : 'text-amber-600');
+              return (
+                <div
+                  key={order.id}
+                  onClick={() => {
+                    setIsOpen(false);
+                    onOrderClick && onOrderClick(order.id);
+                  }}
+                  className="flex items-center justify-between p-3 rounded-xl border border-gray-100 hover:bg-gray-50 active:scale-[0.99] transition-all cursor-pointer text-sm"
+                >
+                  <div>
+                    <p className="font-bold text-gray-900">#{order.order_number}</p>
+                    <p className="text-xs text-muted-foreground truncate max-w-[180px]">{order.customer_name || 'N/A'}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className={cn("font-bold", orderColor)}>{formatCurrency(orderAmount)}</p>
+                    <p className="text-[10px] text-muted-foreground">{format(parseISO(order.booking_date), 'dd MMM yyyy')}</p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+};
 
 export default Dashboard;

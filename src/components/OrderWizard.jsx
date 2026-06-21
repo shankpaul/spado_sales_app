@@ -5,6 +5,7 @@ import {
   SheetContent,
 } from './ui/sheet';
 import { Button } from './ui/button';
+import { Checkbox } from './ui/checkbox';
 import { calculateBookingDuration, reverseGeocode } from '../lib/utilities';
 import CustomerForm from './CustomerForm';
 import { Input } from './ui/input';
@@ -126,11 +127,19 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
   const [packages, setPackages] = useState([]);
   const [addons, setAddons] = useState([]);
 
+  const getTodayDateString = () => {
+    const today = new Date();
+    const yyyy = today.getFullYear();
+    const mm = String(today.getMonth() + 1).padStart(2, '0');
+    const dd = String(today.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  };
+
   // Form states
   const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [packageItems, setPackageItems] = useState([]);
   const [addonItems, setAddonItems] = useState([]);
-  const [bookingDate, setBookingDate] = useState('');
+  const [bookingDate, setBookingDate] = useState(getTodayDateString());
   const [bookingTimeFrom, setBookingTimeFrom] = useState('');
   const [bookingTimeTo, setBookingTimeTo] = useState('');
   const [selectedAgent, setSelectedAgent] = useState('');
@@ -442,7 +451,7 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
     setSelectedCustomer(data.selectedCustomer || null);
     setPackageItems(data.packageItems || []);
     setAddonItems(data.addonItems || []);
-    setBookingDate(data.bookingDate || '');
+    setBookingDate(data.bookingDate || getTodayDateString());
     setBookingTimeFrom(data.bookingTimeFrom || '');
     setBookingTimeTo(data.bookingTimeTo || '');
     setSelectedAgent(data.selectedAgent || '');
@@ -493,7 +502,9 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
         orderService.getPackages(),
         orderService.getAddons(),
       ]);
-      setPackages(packagesRes.packages || packagesRes || []);
+      const loadedPackages = packagesRes.packages || packagesRes || [];
+      loadedPackages.sort((a, b) => a.name.localeCompare(b.name));
+      setPackages(loadedPackages);
       setAddons(addonsRes.addons || addonsRes || []);
       // Fetch agents from store if not already loaded
       if (agents.length === 0) {
@@ -588,31 +599,39 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
         }
 
         // Set packages with all necessary fields
-        const orderPackages = order.packages?.map(pkg => ({
-          package_id: String(pkg.package_id), // Convert to string for Select component
-          package_name: pkg.package_name || pkg.name,
-          vehicle_type: pkg.vehicle_type,
-          quantity: pkg.quantity || 1,
-          unit_price: parseFloat(pkg.price) || 0,
-          discount_value: parseFloat(pkg.discount) || 0,
-          discount_type: pkg.discount_type,
-          total_price: parseFloat(pkg.total_price) || 0,
-          notes: pkg.notes || '',
-          package: pkg, // Include full package details
-        })) || [];
+        const orderPackages = order.packages?.map(pkg => {
+          const discountVal = parseFloat(pkg.discount) || 0;
+          return {
+            package_id: String(pkg.package_id), // Convert to string for Select component
+            package_name: pkg.package_name || pkg.name,
+            vehicle_type: pkg.vehicle_type,
+            quantity: pkg.quantity || 1,
+            unit_price: parseFloat(pkg.price) || 0,
+            discount_value: discountVal,
+            discount_type: pkg.discount_type,
+            total_price: parseFloat(pkg.total_price) || 0,
+            notes: pkg.notes || '',
+            package: pkg, // Include full package details
+            enable_custom_discount: discountVal > 0,
+          };
+        }) || [];
         setPackageItems(orderPackages);
 
         // Set addons
-        const orderAddons = order.addons?.map(addon => ({
-          addon_id: String(addon.addon_id), // Convert to string for Select component
-          addon_name: addon.addon_name,
-          quantity: addon.quantity || 1,
-          unit_price: parseFloat(addon.price) || 0,
-          discount_value: parseFloat(addon.discount) || 0,
-          discount_type: addon.discount_type,
-          total_price: parseFloat(addon.total_price) || 0,
-          addon: addon.addon, // Include full addon details
-        })) || [];
+        const orderAddons = order.addons?.map(addon => {
+          const discountVal = parseFloat(addon.discount) || 0;
+          return {
+            addon_id: String(addon.addon_id), // Convert to string for Select component
+            addon_name: addon.addon_name,
+            quantity: addon.quantity || 1,
+            unit_price: parseFloat(addon.price) || 0,
+            discount_value: discountVal,
+            discount_type: addon.discount_type,
+            total_price: parseFloat(addon.total_price) || 0,
+            addon: addon.addon, // Include full addon details
+            enable_custom_discount: discountVal > 0,
+          };
+        }) || [];
         setAddonItems(orderAddons);
 
         // Set booking details
@@ -679,7 +698,7 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
     setSelectedCustomer(null);
     setPackageItems([]);
     setAddonItems([]);
-    setBookingDate('');
+    setBookingDate(getTodayDateString());
     setBookingTimeFrom('');
     setBookingTimeTo('');
     setCustomerPhone('');
@@ -860,6 +879,7 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
         unit_price: 0,
         discount_type: DISCOUNT_TYPES.FIXED,
         discount_value: 0,
+        enable_custom_discount: false,
       },
     ]);
   };
@@ -985,6 +1005,7 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
         unit_price: 0,
         discount_type: DISCOUNT_TYPES.FIXED,
         discount_value: 0,
+        enable_custom_discount: false,
       },
     ]);
   };
@@ -1700,7 +1721,26 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
                     </div>
 
                     <div>
-                      <Label className="text-xs">Discount</Label>
+                      <div className="flex items-center space-x-2 mb-1">
+                        <Checkbox
+                          id={`pkg-discount-enable-${index}`}
+                          checked={item.enable_custom_discount || false}
+                          disabled={item.is_reward}
+                          onCheckedChange={(checked) => {
+                            updatePackageItem(index, 'enable_custom_discount', !!checked);
+                            if (!checked) {
+                              // Clear the discount value if disabled
+                              updatePackageItem(index, 'discount_value', 0);
+                            }
+                          }}
+                        />
+                        <label 
+                          htmlFor={`pkg-discount-enable-${index}`} 
+                          className="text-[10px] font-medium text-gray-600 cursor-pointer select-none"
+                        >
+                          Enable Custom Discount
+                        </label>
+                      </div>
                       <div className="flex gap-1">
                         <Input
                           type="number"
@@ -1713,12 +1753,12 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
                             updatePackageItem(index, 'discount_value', isNaN(numValue) ? 0 : numValue);
                           }}
                           className="h-8 text-sm"
-                          disabled={item.is_reward}
+                          disabled={item.is_reward || !item.enable_custom_discount}
                         />
                         <Select
                           value={item.discount_type}
                           onValueChange={(value) => updatePackageItem(index, 'discount_type', value)}
-                          disabled={item.is_reward}
+                          disabled={item.is_reward || !item.enable_custom_discount}
                         >
                           <SelectTrigger className="h-8 w-16 text-xs">
                             <SelectValue />
@@ -1882,7 +1922,26 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
 
 
                     <div>
-                      <Label className="text-xs">Discount</Label>
+                      <div className="flex items-center space-x-2 mb-1">
+                        <Checkbox
+                          id={`addon-discount-enable-${index}`}
+                          checked={item.enable_custom_discount || false}
+                          disabled={item.is_reward}
+                          onCheckedChange={(checked) => {
+                            updateAddonItem(index, 'enable_custom_discount', !!checked);
+                            if (!checked) {
+                              // Clear the discount value if disabled
+                              updateAddonItem(index, 'discount_value', 0);
+                            }
+                          }}
+                        />
+                        <label 
+                          htmlFor={`addon-discount-enable-${index}`} 
+                          className="text-[10px] font-medium text-gray-600 cursor-pointer select-none"
+                        >
+                          Enable Custom Discount
+                        </label>
+                      </div>
                       <div className="flex gap-1">
                         <Input
                           type="number"
@@ -1895,12 +1954,12 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
                             updateAddonItem(index, 'discount_value', isNaN(numValue) ? 0 : numValue);
                           }}
                           className="h-8 text-sm"
-                          disabled={item.is_reward}
+                          disabled={item.is_reward || !item.enable_custom_discount}
                         />
                         <Select
                           value={item.discount_type}
                           onValueChange={(value) => updateAddonItem(index, 'discount_type', value)}
-                          disabled={item.is_reward}
+                          disabled={item.is_reward || !item.enable_custom_discount}
                         >
                           <SelectTrigger className="h-8 w-16 text-xs">
                             <SelectValue />

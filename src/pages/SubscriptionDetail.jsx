@@ -108,7 +108,9 @@ const SubscriptionDetail = () => {
   }, [id]);
 
   const fetchSubscriptionDetails = async () => {
-    setLoading(true);
+    if (!subscription) {
+      setLoading(true);
+    }
     try {
       const data = await subscriptionService.getSubscriptionById(id);
       setSubscription(data.subscription);

@@ -13,6 +13,7 @@ import {
   SelectValue,
 } from './ui/select';
 import { toast } from 'sonner';
+import { Tabs, TabsList, TabsTrigger } from './ui/tabs';
 import offerService from '../services/offerService';
 import orderService from '../services/orderService';
 import {
@@ -52,7 +53,7 @@ const OfferForm = () => {
   const [saving, setSaving] = useState(false);
   const [packages, setPackages] = useState([]);
   const [addons, setAddons] = useState([]);
-  const [vehicleTypeFilter, setVehicleTypeFilter] = useState('all');
+  const [vehicleTypeFilter, setVehicleTypeFilter] = useState('hatchback');
 
   // Form state
   const [formData, setFormData] = useState({
@@ -82,7 +83,11 @@ const OfferForm = () => {
       try {
         const packagesResp = await orderService.getPackages();
         const addonsResp = await orderService.getAddons();
-        setPackages(packagesResp.packages || packagesResp || []);
+        
+        const loadedPackages = packagesResp.packages || packagesResp || [];
+        loadedPackages.sort((a, b) => a.name.localeCompare(b.name));
+        setPackages(loadedPackages);
+        
         setAddons(addonsResp.addons || addonsResp || []);
       } catch (error) {
         toast.error('Failed to load packages and addons');
@@ -444,24 +449,20 @@ const OfferForm = () => {
                 Package & Addon Configuration
               </h2>
               
-              {/* Vehicle Type Filter */}
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  <Filter className="inline h-4 w-4 mr-1" />
-                  Filter by Vehicle Type
+              {/* Vehicle Type Tabs */}
+              <div className="mb-6">
+                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
+                  <Car className="inline h-4 w-4 mr-1 text-gray-500" />
+                  Vehicle Type
                 </label>
-                <Select value={vehicleTypeFilter} onValueChange={setVehicleTypeFilter}>
-                  <SelectTrigger className="w-full md:w-64">
-                    <SelectValue placeholder="All Vehicle Types" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Vehicle Types</SelectItem>
-                    <SelectItem value="hatchback">Hatchback</SelectItem>
-                    <SelectItem value="sedan">Sedan</SelectItem>
-                    <SelectItem value="suv">SUV</SelectItem>
-                     <SelectItem value="luxury">Luxury</SelectItem>
-                  </SelectContent>
-                </Select>
+                <Tabs value={vehicleTypeFilter} onValueChange={setVehicleTypeFilter} className="w-full">
+                  <TabsList className="grid w-full grid-cols-4 max-w-md bg-gray-100 p-1 rounded-lg">
+                    <TabsTrigger value="hatchback" className="rounded-md py-1.5 text-xs font-semibold capitalize transition-all">Hatchback</TabsTrigger>
+                    <TabsTrigger value="sedan" className="rounded-md py-1.5 text-xs font-semibold capitalize transition-all">Sedan</TabsTrigger>
+                    <TabsTrigger value="suv" className="rounded-md py-1.5 text-xs font-semibold capitalize transition-all">SUV</TabsTrigger>
+                    <TabsTrigger value="luxury" className="rounded-md py-1.5 text-xs font-semibold capitalize transition-all">Luxury</TabsTrigger>
+                  </TabsList>
+                </Tabs>
               </div>
 
               <div className="space-y-6">
@@ -472,13 +473,13 @@ const OfferForm = () => {
                   </label>
                   <div className="border rounded-lg p-4 max-h-64 overflow-y-auto bg-white shadow-xs">
                     {packages
-                      .filter(pkg => vehicleTypeFilter === 'all' || pkg.vehicle_type?.toLowerCase() === vehicleTypeFilter.toLowerCase())
+                      .filter(pkg => pkg.vehicle_type?.toLowerCase() === vehicleTypeFilter.toLowerCase())
                       .length === 0 ? (
-                      <p className="text-sm text-gray-500">No packages available</p>
+                      <p className="text-sm text-gray-500">No packages available for this vehicle type</p>
                     ) : (
                       <div className="space-y-2">
                         {packages
-                          .filter(pkg => vehicleTypeFilter === 'all' || pkg.vehicle_type?.toLowerCase() === vehicleTypeFilter.toLowerCase())
+                          .filter(pkg => pkg.vehicle_type?.toLowerCase() === vehicleTypeFilter.toLowerCase())
                           .map((pkg) => (
                             <div key={pkg.id} className="flex items-start space-x-2">
                               <Checkbox
@@ -512,13 +513,13 @@ const OfferForm = () => {
                     </label>
                     <div className="border rounded-lg p-4 max-h-64 overflow-y-auto bg-white shadow-xs">
                       {packages
-                        .filter(pkg => vehicleTypeFilter === 'all' || pkg.vehicle_type?.toLowerCase() === vehicleTypeFilter.toLowerCase())
+                        .filter(pkg => pkg.vehicle_type?.toLowerCase() === vehicleTypeFilter.toLowerCase())
                         .length === 0 ? (
-                        <p className="text-sm text-gray-500">No packages available</p>
+                        <p className="text-sm text-gray-500">No packages available for this vehicle type</p>
                       ) : (
                         <div className="space-y-2">
                           {packages
-                            .filter(pkg => vehicleTypeFilter === 'all' || pkg.vehicle_type?.toLowerCase() === vehicleTypeFilter.toLowerCase())
+                            .filter(pkg => pkg.vehicle_type?.toLowerCase() === vehicleTypeFilter.toLowerCase())
                             .map((pkg) => (
                               <div key={pkg.id} className="flex items-start space-x-2">
                                 <Checkbox

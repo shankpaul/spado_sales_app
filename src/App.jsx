@@ -23,6 +23,7 @@ const Users = lazy(() => import('./pages/Users'));
 const Employees = lazy(() => import('./pages/Employees'));
 const Profile = lazy(() => import('./pages/Profile'));
 const Reports = lazy(() => import('./pages/Reports'));
+const TodaysWork = lazy(() => import('./pages/TodaysWork'));
 
 // Loading fallback component
 const LoadingFallback = () => (
@@ -70,6 +71,17 @@ function App() {
               <ProtectedRoute>
                 <Layout>
                   <Dashboard />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/todays-work"
+            element={
+              <ProtectedRoute allowedRoles={['admin', 'sales_executive']}>
+                <Layout>
+                  <TodaysWork />
                 </Layout>
               </ProtectedRoute>
             }

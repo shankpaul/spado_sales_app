@@ -101,6 +101,7 @@ const Layout = ({ children }) => {
 
     const roleBasedItems = {
       admin: [
+        { name: 'Todays Work', href: '/todays-work', icon: ClipboardList },
         { name: 'Customers', href: '/customers', icon: Users },
         { name: 'Enquiries', href: '/enquiries', icon: PackageOpen },
         { name: 'Orders', href: '/orders', icon: Calendar },
@@ -112,6 +113,7 @@ const Layout = ({ children }) => {
         // { name: 'Settings', href: '/settings', icon: Settings },
       ],
       sales_executive: [
+        { name: 'Todays Work', href: '/todays-work', icon: ClipboardList },
         { name: 'Customers', href: '/customers', icon: Users },
         { name: 'Enquiries', href: '/enquiries', icon: PackageOpen },
         { name: 'Orders', href: '/orders', icon: Calendar },
@@ -182,7 +184,7 @@ const Layout = ({ children }) => {
   };
 
   return (
-    <div className="min-h-screen overflow-x-hidden">
+    <div className="min-h-screen overflow-x-clip">
 
       {/* Mobile Sidebar Overlay */}
       {sidebarOpen && (
@@ -260,45 +262,59 @@ const Layout = ({ children }) => {
 
       {/* Main Content */}
       <div className={`transition-all duration-300 ${sidebarCollapsed ? 'lg:pl-20' : 'lg:pl-64'}`}>
-        {/* Desktop Header */}
-        <header className="hidden lg:block sticky top-0 z-30 bg-white border-b border-gray-200">
+        {/* Sticky Header */}
+        <header className="sticky top-0 z-30 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/60 border-b border-gray-200">
           <div className="flex items-center justify-between px-4 py-1">
             <div className="flex items-center gap-4">
               <button
-                onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+                onClick={() => {
+                  if (window.innerWidth < 1024) {
+                    setSidebarOpen(true);
+                  } else {
+                    setSidebarCollapsed(!sidebarCollapsed);
+                  }
+                }}
                 className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
                 title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
               >
-                {sidebarCollapsed ? (
-                  <PanelLeft className="h-5 w-5 text-gray-600" />
-                ) : (
-                  <PanelRight className="h-5 w-5 text-gray-600" />
-                )}
+                <Menu className="h-5 w-5 text-gray-600 lg:hidden" />
+                <span className="hidden lg:inline">
+                  {sidebarCollapsed ? (
+                    <PanelLeft className="h-5 w-5 text-gray-600" />
+                  ) : (
+                    <PanelRight className="h-5 w-5 text-gray-600" />
+                  )}
+                </span>
               </button>
-              <Breadcrumb>
-                <BreadcrumbList>
-                  {breadcrumbs.map((crumb, index) => (
-                    <React.Fragment key={crumb.href}>
-                      <BreadcrumbItem>
-                        {index === breadcrumbs.length - 1 ? (
-                          <BreadcrumbPage>{crumb.name}</BreadcrumbPage>
-                        ) : (
-                          <BreadcrumbLink asChild>
-                            <Link to={crumb.href}>{crumb.name}</Link>
-                          </BreadcrumbLink>
-                        )}
-                      </BreadcrumbItem>
-                      {index < breadcrumbs.length - 1 && <BreadcrumbSeparator />}
-                    </React.Fragment>
-                  ))}
-                </BreadcrumbList>
-              </Breadcrumb>
+              <div className="hidden sm:block">
+                <Breadcrumb>
+                  <BreadcrumbList>
+                    {breadcrumbs.map((crumb, index) => (
+                      <React.Fragment key={crumb.href}>
+                        <BreadcrumbItem>
+                          {index === breadcrumbs.length - 1 ? (
+                            <BreadcrumbPage>{crumb.name}</BreadcrumbPage>
+                          ) : (
+                            <BreadcrumbLink asChild>
+                              <Link to={crumb.href}>{crumb.name}</Link>
+                            </BreadcrumbLink>
+                          )}
+                        </BreadcrumbItem>
+                        {index < breadcrumbs.length - 1 && <BreadcrumbSeparator />}
+                      </React.Fragment>
+                    ))}
+                  </BreadcrumbList>
+                </Breadcrumb>
+              </div>
+              <div className="sm:hidden text-sm font-bold text-gray-900 truncate max-w-[150px]">
+                {breadcrumbs[breadcrumbs.length - 1]?.name}
+              </div>
             </div>
             <div className="flex items-center gap-4">
               <Popover>
                 <PopoverTrigger asChild>
                   <button className="flex items-center gap-3 hover:bg-gray-50 rounded-lg p-2 transition-colors">
-                    <div className="text-right">
+                    <div className="text-right hidden sm:block">
                       <p className="text-sm font-medium text-gray-900">
                         {user?.name || user?.email}
                       </p>
