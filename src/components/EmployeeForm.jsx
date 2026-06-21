@@ -31,6 +31,7 @@ const EmployeeForm = ({ employee, onSubmit, onCancel }) => {
     resignation_date: '',
     contact_number: '',
     status: 'active',
+    monthly_target_amount: '',
   });
 
   const [errors, setErrors] = useState({});
@@ -51,6 +52,7 @@ const EmployeeForm = ({ employee, onSubmit, onCancel }) => {
         resignation_date: employee.resignation_date || '',
         contact_number: employee.contact_number || '',
         status: employee.status || 'active',
+        monthly_target_amount: employee.monthly_target_amount || '',
       });
     }
   }, [employee]);
@@ -174,6 +176,7 @@ const EmployeeForm = ({ employee, onSubmit, onCancel }) => {
       if (formData.employee_number) submitData.employee_number = formData.employee_number.trim();
       if (formData.job_title) submitData.job_title = formData.job_title.trim();
       if (formData.contact_number) submitData.contact_number = formData.contact_number.trim();
+      submitData.monthly_target_amount = formData.monthly_target_amount ? parseFloat(formData.monthly_target_amount) : 0;
       
       // Add scheme-specific fields
       if (formData.scheme === 'salary' && formData.fixed_salary) {
@@ -268,6 +271,20 @@ const EmployeeForm = ({ employee, onSubmit, onCancel }) => {
           value={formData.job_title}
           onChange={handleChange}
           placeholder="Senior Field Agent"
+        />
+      </div>
+
+      {/* Monthly Target Amount */}
+      <div className="space-y-2">
+        <Label htmlFor="monthly_target_amount">Monthly Target Amount (₹)</Label>
+        <Input
+          id="monthly_target_amount"
+          name="monthly_target_amount"
+          type="number"
+          step="0.01"
+          value={formData.monthly_target_amount}
+          onChange={handleChange}
+          placeholder="0"
         />
       </div>
 

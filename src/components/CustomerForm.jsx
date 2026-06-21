@@ -119,7 +119,7 @@ const CustomerForm = forwardRef(({ customer = null, onSuccess, onCancel, showAct
   useEffect(() => {
     if (formData.state) {
       const newCities = locationService.getCities(formData.state, formData.district);
-      
+
       // If current city is set but not in the default list, preserve it (could be from reverse geocoding)
       if (formData.city && !newCities.includes(formData.city)) {
         setCities([...newCities, formData.city]);
@@ -137,7 +137,7 @@ const CustomerForm = forwardRef(({ customer = null, onSuccess, onCancel, showAct
         setAreas(fetchedAreas);
       }
     };
-    
+
     loadAreas();
   }, [formData.state, formData.district]);
 
@@ -164,7 +164,7 @@ const CustomerForm = forwardRef(({ customer = null, onSuccess, onCancel, showAct
           localAreas: areas,
           limit: 8,
         });
-        
+
         setAreaSuggestions(suggestions);
         // Show dropdown if we have suggestions and field is focused
         if (suggestions.length > 0 && isAreaFocused) {
@@ -190,7 +190,7 @@ const CustomerForm = forwardRef(({ customer = null, onSuccess, onCancel, showAct
       try {
         // Backend API handles all parsing, expansion, and geocoding
         const addressData = await reverseGeocode(value);
-        
+
         if (addressData) {
           // If identified city is not in the cities list, add it FIRST
           // This ensures the ComboBox has the option available when we set the value
@@ -430,7 +430,7 @@ const CustomerForm = forwardRef(({ customer = null, onSuccess, onCancel, showAct
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          
+
           <div className="space-y-2">
             <Label htmlFor="area" className="flex items-center gap-2">
               <MapPin className="h-4 w-4 text-primary/70" />
@@ -455,7 +455,7 @@ const CustomerForm = forwardRef(({ customer = null, onSuccess, onCancel, showAct
                   const spaceBelow = window.innerHeight - rect.bottom;
                   const spaceAbove = rect.top;
                   const dropdownHeight = 240; // max-h-60 = 240px
-                  
+
                   // Position above if not enough space below
                   setDropdownPosition(spaceBelow < dropdownHeight && spaceAbove > spaceBelow ? 'top' : 'bottom');
                 }}
@@ -471,13 +471,12 @@ const CustomerForm = forwardRef(({ customer = null, onSuccess, onCancel, showAct
               {areaLoading && (
                 <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />
               )}
-              
+
               {/* Suggestions Dropdown */}
               {showAreaSuggestions && areaSuggestions.length > 0 && (
-                <div 
-                  className={`absolute z-50 w-full bg-popover border rounded-md shadow-md max-h-60 overflow-auto ${
-                    dropdownPosition === 'top' ? 'bottom-full mb-1' : 'top-full mt-1'
-                  }`}
+                <div
+                  className={`absolute z-50 w-full bg-popover border rounded-md shadow-md max-h-60 overflow-auto ${dropdownPosition === 'top' ? 'bottom-full mb-1' : 'top-full mt-1'
+                    }`}
                 >
                   {areaSuggestions.map((suggestion, index) => (
                     <button

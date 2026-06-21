@@ -77,7 +77,11 @@ const useOrderStore = create((set, get) => ({
    */
   fetchAgents: () => {
     orderService.getUsersByRole('agent')
-      .then(response => set({ agents: response.users || [] }))
+      .then(response => {
+        const allAgents = response.users || response || [];
+        const activeAgents = allAgents.filter(agent => !agent.locked);
+        set({ agents: activeAgents });
+      })
       .catch(error => {});
   },
 

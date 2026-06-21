@@ -127,7 +127,7 @@ const CustomerDetails = ({ customer, open, onOpenChange }) => {
       statusValue,
       type === 'order' ? ORDER_STATUSES : PAYMENT_STATUSES
     );
-    
+
     const variantMap = {
       gray: 'secondary',
       blue: 'default',
@@ -136,7 +136,7 @@ const CustomerDetails = ({ customer, open, onOpenChange }) => {
       yellow: 'warning',
       purple: 'outline',
     };
-    
+
     return variantMap[color] || 'secondary';
   };
 
@@ -151,14 +151,14 @@ const CustomerDetails = ({ customer, open, onOpenChange }) => {
             View customer information and order history
           </DialogDescription>
         </DialogHeader>
-        
+
         <Tabs defaultValue="details" className="flex-1 overflow-hidden flex flex-col mt-4">
           <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="details">Details</TabsTrigger>
             <TabsTrigger value="orders">Orders ({customerOrders.length})</TabsTrigger>
             <TabsTrigger value="loyalty">Loyalty Points</TabsTrigger>
           </TabsList>
-          
+
           <TabsContent value="details" className="flex-1 overflow-y-auto space-y-6 mt-4">
             {/* Summary Stats */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -216,7 +216,7 @@ const CustomerDetails = ({ customer, open, onOpenChange }) => {
                     </div>
                   )}
                 </div>
-                
+
                 <div>
                   <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Address</label>
                   <div className="flex items-start gap-2 mt-1">
@@ -380,7 +380,7 @@ const CustomerDetails = ({ customer, open, onOpenChange }) => {
                                   ) : (
                                     <ArrowDownCircle className="h-4 w-4 text-red-600" />
                                   )}
-                                  <Badge 
+                                  <Badge
                                     variant={transaction.transaction_type === 'credit' ? 'success' : 'secondary'}
                                   >
                                     {transaction.transaction_type === 'credit' ? 'Credit' : 'Debit'}

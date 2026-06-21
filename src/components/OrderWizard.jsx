@@ -2159,7 +2159,7 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="unassigned">Unassigned</SelectItem>
-                  {agents.map((agent) => (
+                  {agents.filter(agent => !agent.locked).map((agent) => (
                     <SelectItem key={agent.id} value={String(agent.id)}>
                       {agent.name}
                     </SelectItem>

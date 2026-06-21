@@ -598,6 +598,10 @@ const Employees = () => {
                       <p className="text-sm font-medium text-primary">{selectedEmployee.total_incentive_percentage}%</p>
                     </div>
                   )}
+                  <div>
+                    <label className="text-xs text-gray-500">Monthly Target Amount</label>
+                    <p className="text-sm font-medium text-primary">{formatCurrency(selectedEmployee.monthly_target_amount)}</p>
+                  </div>
                 </div>
               </div>
 

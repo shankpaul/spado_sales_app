@@ -177,14 +177,14 @@ const Offers = () => {
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="mb-6">
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
             <div>
               <h1 className="text-3xl font-bold text-gray-900">Offers</h1>
               <p className="text-gray-600 mt-1">
                 Manage promotional offers and discounts
               </p>
             </div>
-            <Button onClick={handleCreate}>
+            <Button onClick={handleCreate} className="w-full sm:w-auto">
               <Plus className="h-4 w-4 mr-2" />
               Create Offer
             </Button>
@@ -281,60 +281,65 @@ const Offers = () => {
             {offers.map((offer) => (
               <Card
                 key={offer.id}
-                className="p-6 hover:shadow-lg transition-shadow cursor-pointer"
+                className="p-4 sm:p-6 hover:shadow-lg transition-all cursor-pointer bg-white"
                 onClick={() => navigate(`/offers/${offer.id}/edit`)}
               >
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-2">
-                      <h3 className="text-lg font-semibold text-gray-900">{offer.name}</h3>
-                      {renderStatusBadge(offer)}
-                      {offer.coupon_code && (
-                        <Badge2 className="bg-purple-100 text-purple-800">
-                          <Tag className="h-3 w-3 mr-1" />
-                          {offer.coupon_code}
-                        </Badge2>
-                      )}
+                <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex flex-wrap items-center gap-2 mb-2">
+                      <h3 className="text-lg font-semibold text-gray-900 truncate">{offer.name}</h3>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        {renderStatusBadge(offer)}
+                        {offer.coupon_code && (
+                          <Badge2 className="bg-purple-100 text-purple-800">
+                            <Tag className="h-3 w-3 mr-1" />
+                            {offer.coupon_code}
+                          </Badge2>
+                        )}
+                      </div>
                     </div>
 
                     {offer.description && (
-                      <p className="text-gray-600 text-sm mb-3">{offer.description}</p>
+                      <p className="text-gray-600 text-sm mb-3 line-clamp-2 sm:line-clamp-none">{offer.description}</p>
                     )}
 
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm mt-3 pt-3 border-t border-gray-50 sm:border-t-0 sm:pt-0">
                       <div>
-                        <span className="text-gray-500">Type:</span>
-                        <span className="ml-2 font-medium">
+                        <span className="text-gray-400 text-[10px] uppercase tracking-wider block">Type</span>
+                        <span className="font-semibold text-gray-800 mt-0.5 block truncate">
                           {OFFER_TYPE_LABELS[offer.offer_type]}
                         </span>
                       </div>
                       <div>
-                        <span className="text-gray-500">Discount:</span>
-                        <span className="ml-2 font-medium text-green-600">
+                        <span className="text-gray-400 text-[10px] uppercase tracking-wider block">Discount</span>
+                        <span className="font-semibold text-emerald-600 mt-0.5 block truncate">
                           {formatDiscount(offer)}
                         </span>
                       </div>
-                      <div className="flex items-center">
-                        <Calendar className="h-4 w-4 text-gray-400 mr-1" />
-                        <span className="text-gray-700 text-xs">
-                          {formatDateRange(offer.start_date, offer.end_date)}
+                      <div>
+                        <span className="text-gray-400 text-[10px] uppercase tracking-wider block">Validity</span>
+                        <span className="text-gray-600 text-xs mt-0.5 flex items-center gap-1">
+                          <Calendar className="h-3.5 w-3.5 text-gray-400 shrink-0" />
+                          <span className="truncate">{formatDateRange(offer.start_date, offer.end_date)}</span>
                         </span>
                       </div>
-                      <div className="flex items-center">
-                        <TrendingUp className="h-4 w-4 text-gray-400 mr-1" />
-                        <span className="text-gray-700 text-xs">
-                          Usage: {formatUsage(offer)}
+                      <div>
+                        <span className="text-gray-400 text-[10px] uppercase tracking-wider block">Usage</span>
+                        <span className="text-gray-600 text-xs mt-0.5 flex items-center gap-1">
+                          <TrendingUp className="h-3.5 w-3.5 text-gray-400 shrink-0" />
+                          <span className="truncate">{formatUsage(offer)}</span>
                         </span>
                       </div>
                     </div>
                   </div>
 
                   {/* Action Buttons */}
-                  <div className="flex items-center gap-2 ml-4">
+                  <div className="flex items-center justify-end gap-2 mt-4 pt-3 border-t border-gray-100 sm:border-t-0 sm:pt-0 sm:mt-0 sm:ml-4 w-full sm:w-auto shrink-0">
                     <Button
                       variant="ghost"
                       size="sm"
                       onClick={(e) => handleEdit(offer.id, e)}
+                      className="h-9 w-9 p-0 rounded-full hover:bg-gray-100"
                     >
                       <Edit className="h-4 w-4" />
                     </Button>
@@ -342,9 +347,10 @@ const Offers = () => {
                       variant="ghost"
                       size="sm"
                       onClick={(e) => handleArchive(offer, e)}
+                      className="h-9 w-9 p-0 rounded-full hover:bg-gray-100"
                     >
                       {offer.archived_at ? (
-                        <Archive Restore className="h-4 w-4" />
+                        <ArchiveRestore className="h-4 w-4" />
                       ) : (
                         <Archive className="h-4 w-4" />
                       )}
@@ -353,7 +359,7 @@ const Offers = () => {
                       variant="ghost"
                       size="sm"
                       onClick={(e) => handleDelete(offer.id, e)}
-                      className="text-red-600 hover:text-red-700"
+                      className="h-9 w-9 p-0 rounded-full hover:bg-red-50 text-red-600 hover:text-red-700"
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>

@@ -509,7 +509,7 @@ const Orders = () => {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">All Agents</SelectItem>
-                      {agents && agents.map((agent) => (
+                      {agents && agents.filter(agent => !agent.locked).map((agent) => (
                         <SelectItem key={agent.id} value={String(agent.id)}>
                           {agent.name}
                         </SelectItem>

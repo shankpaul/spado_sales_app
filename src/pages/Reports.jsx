@@ -27,6 +27,7 @@ import {
 } from 'recharts';
 import * as XLSX from 'xlsx';
 import { saveAs } from 'file-saver';
+import { ENQUIRY_STATUS_LABELS } from '../constants/enquiryConstants';
 import {
   Download,
   Filter,
@@ -312,12 +313,12 @@ const Reports = () => {
     // Summary sheet
     const summaryData = [{
       'Total Leads': summary.total_leads,
+      'Pending': summary.new_count,
+      'Contacted': summary.contacted_count,
       'Converted': summary.converted_count,
       'Interested': summary.interested_count,
-      'Lost': summary.lost_count,
       'Needs Follow-up': summary.needs_followup_count,
-      'New': summary.new_count,
-      'Contacted': summary.contacted_count,
+      'Lost': summary.lost_count,
       'Conversion Rate (%)': summary.conversion_rate.toFixed(2),
       'Lost Rate (%)': summary.lost_rate.toFixed(2),
       'Avg Conversion Time (hours)': summary.avg_conversion_time_hours?.toFixed(2) || 'N/A',
@@ -813,7 +814,7 @@ const Reports = () => {
   // Enquiries Report View
   const renderEnquiriesReport = () => {
     const ENQUIRY_SOURCES = ['whatsapp', 'phone_call', 'walk_in', 'website', 'referral', 'social_media', 'google_ads'];
-    const ENQUIRY_STATUSES = ['new', 'contacted', 'interested', 'needs_followup', 'converted', 'lost'];
+    const ENQUIRY_STATUSES = ['new', 'contacted', 'converted', 'interested', 'needs_followup', 'lost'];
 
     return (
       <>
@@ -901,7 +902,7 @@ const Reports = () => {
                     <SelectItem value="all">All Statuses</SelectItem>
                     {ENQUIRY_STATUSES.map((status) => (
                       <SelectItem key={status} value={status}>
-                        {status.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                        {ENQUIRY_STATUS_LABELS[status] || status.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -1057,11 +1058,11 @@ const Reports = () => {
                 <CardContent>
                   <ResponsiveContainer width="100%" height={300}>
                     <BarChart data={[
-                      { name: 'New', value: reportData.summary.new_count },
+                      { name: 'Pending', value: reportData.summary.new_count },
                       { name: 'Contacted', value: reportData.summary.contacted_count },
+                      { name: 'Converted', value: reportData.summary.converted_count },
                       { name: 'Interested', value: reportData.summary.interested_count },
                       { name: 'Needs Follow-up', value: reportData.summary.needs_followup_count },
-                      { name: 'Converted', value: reportData.summary.converted_count },
                       { name: 'Lost', value: reportData.summary.lost_count },
                     ]}>
                       <CartesianGrid strokeDasharray="3 3" />

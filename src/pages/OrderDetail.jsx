@@ -51,6 +51,7 @@ import { Textarea } from '../components/ui/textarea';
 import { Checkbox } from '../components/ui/checkbox';
 import { DatePicker } from '../components/ui/date-picker';
 import { Label } from '../components/ui/label';
+import { RadioGroup, RadioGroupItem } from '../components/ui/radio-group';
 import { toast } from 'sonner';
 import orderService from '../services/orderService';
 import OrderWizard from '../components/OrderWizard';
@@ -186,6 +187,7 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
   const [pendingStatus, setPendingStatus] = useState(null);
   const [changingStatus, setChangingStatus] = useState(false);
   const [paymentReceived, setPaymentReceived] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState('');
 
   // Quick booking edit dialog state
   const [isBookingEditOpen, setIsBookingEditOpen] = useState(false);
@@ -254,10 +256,10 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
     if (id) {
       // Load main order data first (blocks UI until loaded)
       fetchOrderDetails();
-      
+
       // Load secondary data in background (non-blocking)
       // These run independently and don't affect the loading state
-     
+
     }
   }, [id]);
 
@@ -267,7 +269,7 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
 
     // Subscribe to this specific order's channel
     ablyClient.subscribeToOrder(id, (eventName, eventData) => {
-      
+
       // Reload order data when updates come in
       fetchOrderDetails(true); // true = should call onUpdate callback
     });
@@ -286,7 +288,7 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
       const data = await orderService.getOrderById(id);
       setOrder(data.order);
       setNoteText(data.notes || '');
-       setTimeout(() => {
+      setTimeout(() => {
         fetchTimeline();
         fetchReassignments();
         // Only fetch agents if not already loaded in store
@@ -298,7 +300,7 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
       if (shouldCallUpdate && onUpdate) {
         onUpdate(data.order);
       }
-      
+
     } catch (error) {
       toast.error('Failed to load order details');
       navigate('/orders');
@@ -347,15 +349,21 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
 
   // Perform the actual status change
   const performStatusChange = async (newStatus) => {
+    if (newStatus === 'completed' && !paymentMethod) {
+      toast.error('Payment method is mandatory');
+      return;
+    }
+
     setChangingStatus(true);
     try {
-      await orderService.updateOrderStatus(id, newStatus);
+      await orderService.updateOrderStatus(id, newStatus, newStatus === 'completed' ? paymentMethod : '');
       toast.success('Status updated successfully');
       await fetchOrderDetails(true); // Pass true to trigger onUpdate
       // Fetch timeline in background without blocking
       setTimeout(() => fetchTimeline(), 0);
       setIsStatusConfirmOpen(false);
       setPaymentReceived(false); // Reset checkbox
+      setPaymentMethod(''); // Reset payment method
     } catch (error) {
       toast.error('Failed to update status');
     } finally {
@@ -732,7 +740,7 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
                           </DropdownMenuItem>
 
                           {order.status === 'confirmed' && (
-                            <DropdownMenuItem 
+                            <DropdownMenuItem
                               onClick={() => handleStatusChange('in_progress')}
                               disabled={!order?.assigned_to}
                             >
@@ -742,9 +750,10 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
                           )}
 
                           {(order.status === 'confirmed' || order.status === 'in_progress') && (
-                            <DropdownMenuItem 
+                            <DropdownMenuItem
                               onClick={() => handleStatusChange('completed')}
                               disabled={!order?.assigned_to}
+                              className="text-green-600 focus:text-green-600"
                             >
                               <CheckCircle2 className="h-4 w-4 mr-2" />
                               Mark as Completed
@@ -1070,13 +1079,13 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
                         <Badge2 variant="outline" className="text-xs">{order.addons.length} items</Badge2>
                       </div>
                       <div className="space-y-4">
-                       
+
                         {order.addons.map((item, index) => (
                           <div key={index} className="flex gap-4 border-b last:border-0">
                             <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center flex-shrink-0">
                               <BadgePlus size={20} className="text-gray-600" />
                             </div>
-                            
+
                             <div className="flex-1 min-w-0">
                               <h4 className="font-semibold text-sm mb-2 capitalize">{item.addon_name}</h4>
                               <div className="text-sm ">
@@ -1194,11 +1203,11 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
                           <div className="flex flex-col items-center">
                             <div className="w-5 h-5 text-muted-foreground rounded-full flex items-center justify-center flex-shrink-0 ">
                               {event.type === 'status_changed' ? (
-                                <CheckCircle2  size={14} />
+                                <CheckCircle2 size={14} />
                               ) : event.type === 'cancelled' ? (
-                                <XCircle  size={14} />
+                                <XCircle size={14} />
                               ) : (
-                                <Clock  size={14} />
+                                <Clock size={14} />
                               )}
                             </div>
                             {index < timeline.length - 1 && (
@@ -1229,7 +1238,7 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
                     {reassignments.length > 0 ? (
                       reassignments.map((item, index) => (
                         <div key={index} className="flex items-start gap-3 py-2 border-b last:border-0">
-                            <LetterAvatar name={item.assigned_to} size="sm" className="text-primary" />
+                          <LetterAvatar name={item.assigned_to} size="sm" className="text-primary" />
                           <div className="flex-1">
                             <div className="flex items-center gap-2 mb-1">
                               <span className="font-medium">{item.assigned_to}</span>
@@ -1265,19 +1274,19 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
               </Tabs>
             </div>
 
-             {order.offer && <div className="p-4 border flex  items-center gap-2 rounded-lg bg-green-50">
+            {order.offer && <div className="p-4 border flex  items-center gap-2 rounded-lg bg-green-50">
               <BadgePercent className='text-green-600' />
               <span className="text-sm text-green-700">{order.offer.name} applied
-               </span>
-             </div>
-        }
+              </span>
+            </div>
+            }
 
             <div className="p-4 border rounded-lg bg-slate-50">
               {/* Payment Details */}
               <div >
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="font-semibold text-lg">Payment Details</h3>
-                  
+
                   <div className="flex items-center gap-2">
                     {order.payment_method && (
                       <Badge2 variant="outline" className="text-xs uppercase">
@@ -1427,7 +1436,7 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
                 <div className="p-4 border-b">
                   <h3 className="font-semibold">Customer Feedback</h3>
                 </div>
-               
+
                 <div className="p-4 space-y-4">
                   {order.rating && (
                     <div>
@@ -1478,13 +1487,13 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
               </div>
               <div className="p-4 space-y-3">
                 <div className="flex items-center gap-3">
-                  <LetterAvatar name={order.assigned_to?.name} size="md" className="text-primary" />
+                  <LetterAvatar name={order.assigned_to?.name} size="md" className="text-white" />
                   <div className="flex-1 min-w-0">
                     <div className="font-medium text-sm">
                       {
                         order.assigned_to?.name ? <>
-                        {order.assigned_to?.name}
-                          <Badge2 variant="info" className="mx-2 capitalize">{order.assignee_response}</Badge2></>:
+                          {order.assigned_to?.name}
+                          <Badge2 variant="info" className="mx-2 capitalize">{order.assignee_response}</Badge2></> :
                           'Unassigned'
                       }
                     </div>
@@ -1498,7 +1507,7 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
 
                 {(() => {
                   const currentAgentId = order.assigned_to?.id;
-                  const availableAgents = agents.filter(agent => agent.id !== currentAgentId);
+                  const availableAgents = agents.filter(agent => agent.id !== currentAgentId && !agent.locked);
                   const canReassign = !['in_progress', 'completed', 'cancelled'].includes(order.status);
 
                   return canReassign && (
@@ -1532,10 +1541,10 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
             <div className="border rounded-lg">
               <div className="p-4 border-b flex items-center justify-between">
                 <h3 className="font-semibold">Customer</h3>
-                </div>
+              </div>
               <div className="p-4">
                 <div className="flex items-center gap-3">
-                  <LetterAvatar name={order.customer?.name} size="md" className="text-primary" />
+                  <LetterAvatar name={order.customer?.name} size="md" className="text-white" />
                   <div className="flex-1">
                     <div className="font-medium">{order.customer?.name}</div>
                     <div className="text-xs text-muted-foreground">
@@ -1549,7 +1558,7 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
               <div>
                 <div className="p-4 border-b flex items-center justify-between">
                   <h3 className="font-semibold">Service Address</h3>
-                 </div>
+                </div>
                 <div className="p-4">
                   {order.address.latitude && order.address.longitude ? (
                     <div className="mb-4 rounded-sm overflow-hidden border">
@@ -1591,7 +1600,7 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
               <div>
                 <div className="p-4 border-b flex items-center justify-between">
                   <h3 className="font-semibold">Contact Information</h3>
-                  </div>
+                </div>
                 <div className="p-4 space-y-2">
                   {order.customer?.email && (
                     <Badge2
@@ -1711,7 +1720,10 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
       {/* Status Change Confirmation Dialog */}
       <AlertDialog open={isStatusConfirmOpen} onOpenChange={(open) => {
         setIsStatusConfirmOpen(open);
-        if (!open) setPaymentReceived(false); // Reset checkbox when dialog closes
+        if (!open) {
+          setPaymentReceived(false);
+          setPaymentMethod(''); // Reset payment method when dialog closes
+        }
       }}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -1745,6 +1757,31 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
               </div>
             </div>
 
+            <div className="p-4 border rounded-lg bg-white space-y-3">
+              <Label className="text-sm font-semibold text-gray-900 block">
+                Payment Method *
+              </Label>
+              <RadioGroup
+                value={paymentMethod}
+                onValueChange={setPaymentMethod}
+                className="flex gap-4"
+                disabled={changingStatus}
+              >
+                <div className="flex items-center gap-2">
+                  <RadioGroupItem value="cash" id="payment-cash" />
+                  <Label htmlFor="payment-cash" className="text-sm font-medium cursor-pointer select-none">
+                    Cash
+                  </Label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <RadioGroupItem value="upi" id="payment-upi" />
+                  <Label htmlFor="payment-upi" className="text-sm font-medium cursor-pointer select-none">
+                    UPI
+                  </Label>
+                </div>
+              </RadioGroup>
+            </div>
+
             <div className="flex items-start gap-3 p-4 border rounded-lg bg-white">
               <Checkbox
                 id="payment-received"
@@ -1759,13 +1796,15 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
                 I confirm that the payment of {formatCurrency(order?.total_amount || 0)} has been received for this order
               </label>
             </div>
+
+
           </div>
 
           <AlertDialogFooter>
             <AlertDialogCancel disabled={changingStatus}>Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => performStatusChange(pendingStatus)}
-              disabled={changingStatus || !paymentReceived}
+              disabled={changingStatus || !paymentReceived || (pendingStatus === 'completed' && !paymentMethod)}
               className="bg-green-600 hover:bg-green-700"
             >
               {changingStatus && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}

@@ -240,19 +240,25 @@ const Users = () => {
 
       {/* Users List */}
       {loading ? (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {[...Array(6)].map((_, i) => (
-            <Card key={i} className="p-6">
-              <div className="flex items-start gap-4">
-                <Skeleton className="h-12 w-12 rounded-full" />
-                <div className="flex-1 space-y-2">
-                  <Skeleton className="h-4 w-3/4" />
-                  <Skeleton className="h-3 w-1/2" />
-                  <Skeleton className="h-3 w-2/3" />
+        <div className="space-y-6">
+          <div className="flex items-center justify-center py-10 gap-2 bg-white rounded-xl border border-gray-100 shadow-xs">
+            <Loader2 className="h-6 w-6 animate-spin text-primary-500" />
+            <span className="text-gray-500 text-sm font-medium animate-pulse">Loading users...</span>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {[...Array(6)].map((_, i) => (
+              <Card key={i} className="p-6 bg-white border border-gray-100">
+                <div className="flex items-start gap-4">
+                  <Skeleton className="h-12 w-12 rounded-full" />
+                  <div className="flex-1 space-y-2">
+                    <Skeleton className="h-4 w-3/4" />
+                    <Skeleton className="h-3 w-1/2" />
+                    <Skeleton className="h-3 w-2/3" />
+                  </div>
                 </div>
-              </div>
-            </Card>
-          ))}
+              </Card>
+            ))}
+          </div>
         </div>
       ) : filteredUsers.length === 0 ? (
         <Card className="p-12 text-center">

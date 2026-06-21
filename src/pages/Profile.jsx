@@ -92,9 +92,9 @@ const Profile = () => {
           <Skeleton className="h-8 w-48" />
           <Skeleton className="h-10 w-32" />
         </div>
-        <div className="grid gap-6 md:grid-cols-2">
-          <Skeleton className="h-96" />
-          <Skeleton className="h-96" />
+        <div className="flex flex-col items-center justify-center py-24 bg-white rounded-xl border border-gray-200 shadow-xs">
+          <Loader2 className="h-8 w-8 animate-spin text-primary-500 mb-3" />
+          <p className="text-gray-500 text-sm font-medium animate-pulse">Loading user profile...</p>
         </div>
       </div>
     );

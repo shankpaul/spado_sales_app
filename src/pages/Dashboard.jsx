@@ -1606,7 +1606,7 @@ const QuickLinkButton = ({ icon, label, description, onClick, className }) => (
 // Dialogs should be added to the return statement in Dashboard component
 // Move these to where dialogs are rendered
 
-const CircularProgress = ({ percentage, color = "text-indigo-600", strokeWidth = 8, size = 80 }) => {
+const CircularProgress = ({ percentage, color = "text-indigo-600", strokeWidth = 8, size = 80, label = "Rate" }) => {
   const radius = (size - strokeWidth) / 2;
   const circumference = radius * 2 * Math.PI;
   const offset = circumference - (percentage / 100) * circumference;
@@ -1640,18 +1640,21 @@ const CircularProgress = ({ percentage, color = "text-indigo-600", strokeWidth =
       </svg>
       <div className="absolute text-center">
         <span className="text-sm font-bold text-gray-800">{Math.round(percentage)}%</span>
-        <span className="block text-[8px] font-semibold text-muted-foreground uppercase leading-none mt-0.5">Rate</span>
+        <span className="block text-[8px] font-semibold text-muted-foreground uppercase leading-none mt-0.5">{label}</span>
       </div>
     </div>
   );
 };
 
 const ResponseMeterCard = ({ title, stats, isLoading, onClick }) => {
-  const { total_count = 0, contacted = 0, pending = 0, converted = 0, response_rate = 0 } = stats || {};
+  const { total_count = 0, contacted = 0, pending = 0, converted = 0 } = stats || {};
+
+  // Calculate Conversion Rate: (Converted / Total) * 100
+  const conversionRate = total_count > 0 ? (converted / total_count) * 100 : 0;
 
   const getProgressColor = (rate) => {
-    if (rate >= 75) return "text-emerald-500";
-    if (rate >= 50) return "text-amber-500";
+    if (rate >= 40) return "text-emerald-500";
+    if (rate >= 20) return "text-amber-500";
     return "text-rose-500";
   };
 
@@ -1668,15 +1671,14 @@ const ResponseMeterCard = ({ title, stats, isLoading, onClick }) => {
           <Activity className="h-4 w-4 text-indigo-500" />
           {title}
         </CardTitle>
-        <span className="text-[10px] font-semibold text-muted-foreground bg-gray-100 px-2 py-0.5 rounded-full">
-          Response Rate
+        <span className="text-[10px] hidden md:flex font-semibold text-muted-foreground bg-gray-100 px-2 py-0.5 rounded-full">
+          Conversion Rate
         </span>
       </CardHeader>
       <CardContent>
         {isLoading ? (
           <div className="flex items-center justify-between py-2">
-            <div className="grid grid-cols-4 gap-2 flex-1 pr-2">
-              <Skeleton className="h-8 w-full" />
+            <div className="grid grid-cols-3 gap-2 flex-1 pr-2">
               <Skeleton className="h-8 w-full" />
               <Skeleton className="h-8 w-full" />
               <Skeleton className="h-8 w-full" />
@@ -1685,15 +1687,7 @@ const ResponseMeterCard = ({ title, stats, isLoading, onClick }) => {
           </div>
         ) : (
           <div className="flex items-center justify-between">
-            <div className="grid grid-cols-4 gap-2 flex-1 pr-2">
-              <div className="space-y-1">
-                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">New</span>
-                <span className="text-lg font-bold text-gray-900">{total_count}</span>
-              </div>
-              <div className="space-y-1">
-                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">Contacted</span>
-                <span className="text-lg font-bold text-indigo-600">{contacted}</span>
-              </div>
+            <div className="grid grid-cols-3 gap-2 flex-1 pr-2">
               <div className="space-y-1 relative">
                 <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">Pending</span>
                 <div className="flex items-center gap-1">
@@ -1712,16 +1706,21 @@ const ResponseMeterCard = ({ title, stats, isLoading, onClick }) => {
                 </div>
               </div>
               <div className="space-y-1">
+                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">Contacted</span>
+                <span className="text-lg font-bold text-indigo-600">{contacted}</span>
+              </div>
+              <div className="space-y-1">
                 <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">Converted</span>
                 <span className="text-lg font-bold text-emerald-600">{converted}</span>
               </div>
             </div>
             <div className="flex-shrink-0">
               <CircularProgress
-                percentage={response_rate}
-                color={getProgressColor(response_rate)}
+                percentage={conversionRate}
+                color={getProgressColor(conversionRate)}
                 size={70}
                 strokeWidth={7}
+                label="Conv."
               />
             </div>
           </div>
@@ -1756,7 +1755,7 @@ const TargetAchievementCard = ({ stats, isLoading }) => {
           <TrendingUp className="h-4 w-4 text-emerald-500" />
           Achievement
         </CardTitle>
-        <span className="text-[10px] font-semibold text-muted-foreground bg-gray-100 px-2 py-0.5 rounded-full">
+        <span className="text-[10px] hidden md:flex font-semibold text-muted-foreground bg-gray-100 px-2 py-0.5 rounded-full">
           Goal
         </span>
       </CardHeader>
@@ -1862,7 +1861,7 @@ const PendingPaymentsCard = ({ stats, isLoading, onOrderClick }) => {
 
   return (
     <>
-      <Card 
+      <Card
         className={cn(
           "overflow-hidden border-none shadow-sm md:border md:shadow-none transition-all duration-200 bg-white flex flex-col h-full",
           count > 0 && "cursor-pointer hover:shadow-md hover:border-primary-100 hover:bg-gray-50/50 active:scale-[0.98]"

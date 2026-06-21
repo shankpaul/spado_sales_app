@@ -71,7 +71,7 @@ const TodaysWork = () => {
       {/* Header */}
       <div>
         <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-2">
-          <ClipboardList className="h-8 w-8 text-primary" />
+          <ClipboardList className="h-8 w-8 text-primary" strokeWidth={1.5} />
           Today's Work
         </h1>
         <p className="text-gray-600 mt-1">
