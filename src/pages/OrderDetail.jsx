@@ -1802,14 +1802,14 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
 
           <AlertDialogFooter>
             <AlertDialogCancel disabled={changingStatus}>Cancel</AlertDialogCancel>
-            <AlertDialogAction
+            <Button
               onClick={() => performStatusChange(pendingStatus)}
               disabled={changingStatus || !paymentReceived || (pendingStatus === 'completed' && !paymentMethod)}
-              className="bg-green-600 hover:bg-green-700"
+              className="bg-green-600 hover:bg-green-700 text-white font-medium"
             >
               {changingStatus && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               Yes, Mark as Completed
-            </AlertDialogAction>
+            </Button>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

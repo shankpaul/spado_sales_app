@@ -39,6 +39,7 @@ import orderService from '../services/orderService';
 import customerService from '../services/customerService';
 import offerService from '../services/offerService';
 import loyaltyService from '../services/loyaltyService';
+import enquiryService from '../services/enquiryService';
 import useOrderStore from '../store/orderStore';
 import { getBrands, getModelsByBrand, getVehicleType, getVehicleTypes } from '../lib/vehicleData';
 import {
@@ -149,6 +150,8 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
     district: '',
     state: '',
     map_link: '',
+    latitude: 0,
+    longitude: 0,
   });
   const [customerPhone, setCustomerPhone] = useState(''); // Order-specific customer phone
   const [notes, setNotes] = useState('');
@@ -260,6 +263,8 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
             city: addressDetails.city || prev.city,
             district: addressDetails.district || prev.district,
             state: addressDetails.state || prev.state,
+            latitude: addressDetails.latitude !== undefined ? addressDetails.latitude : prev.latitude,
+            longitude: addressDetails.longitude !== undefined ? addressDetails.longitude : prev.longitude,
           }));
           
           toast.success('Address details populated from map link');
@@ -436,9 +441,15 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
         } else {
           clearDraft();
         }
-      } else if (customerId) {
-        // If no draft but customerId provided, pre-select customer
-        fetchCustomerById(customerId);
+      } else {
+        if (customerId) {
+          // If no draft but customerId provided, pre-select customer
+          fetchCustomerById(customerId);
+        }
+        if (enquiryId) {
+          // If no draft but enquiryId provided, load enquiry details
+          fetchEnquiryById(enquiryId);
+        }
       }
     } catch (error) {
       clearDraft();
@@ -527,15 +538,44 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
       });
       // Prefill address from customer
       if (customer) {
+        const lat = customer.latitude || 0;
+        const lng = customer.longitude || 0;
+        const mapLink = customer.map_link || (lat && lng ? `https://maps.google.com/?q=${lat},${lng}` : '');
         setAddress({
           area: customer.area || '',
           city: customer.city || '',
           district: customer.district || '',
           state: customer.state || '',
-          map_link: customer.map_link || '',
+          map_link: mapLink,
+          latitude: lat,
+          longitude: lng,
         });
       }
     } catch (error) {
+    }
+  };
+
+  // Fetch enquiry by ID
+  const fetchEnquiryById = async (id) => {
+    try {
+      const enquiry = await enquiryService.getEnquiryById(id);
+      if (enquiry) {
+        const lat = enquiry.latitude || 0;
+        const lng = enquiry.longitude || 0;
+        const mapLink = enquiry.map_link || (lat && lng ? `https://maps.google.com/?q=${lat},${lng}` : '');
+        setAddress(prev => ({
+          ...prev,
+          area: enquiry.area || '',
+          city: enquiry.city || '',
+          district: enquiry.district || '',
+          state: enquiry.state || '',
+          map_link: mapLink,
+          latitude: lat,
+          longitude: lng,
+        }));
+      }
+    } catch (error) {
+      console.error('Failed to fetch enquiry details:', error);
     }
   };
 
@@ -643,12 +683,17 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
         setSelectedAgent(order.assigned_to?.id?.toString() || '');
 
         // Set address from order.address object
+        const lat = order.address?.latitude || 0;
+        const lng = order.address?.longitude || 0;
+        const mapLink = order.address?.map_link || (lat && lng ? `https://maps.google.com/?q=${lat},${lng}` : '');
         setAddress({
           area: order.address?.area || '',
           city: order.address?.city || '',
           district: order.address?.district || '',
           state: order.address?.state || '',
-          map_link: order.address?.map_link || '',
+          map_link: mapLink,
+          latitude: lat,
+          longitude: lng,
         });
 
         // Set notes
@@ -703,7 +748,7 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
     setBookingTimeTo('');
     setCustomerPhone('');
     setSelectedAgent('');
-    setAddress({ area: '', city: '', district: '', state: '', map_link: '' });
+    setAddress({ area: '', city: '', district: '', state: '', map_link: '', latitude: 0, longitude: 0 });
     setNotes('');
     setOrderStatus('');
     setSubmitError('');

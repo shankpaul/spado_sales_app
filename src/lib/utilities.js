@@ -261,7 +261,11 @@ export const reverseGeocode = async (latitudeOrMapLink, longitude) => {
     const response = await apiClient.post('/utilities/reverse_geocode', requestData);
     
     if (response.data.success && response.data.address) {
-      return response.data.address;
+      return {
+        ...response.data.address,
+        latitude: response.data.latitude,
+        longitude: response.data.longitude,
+      };
     }
     
     throw new Error('Reverse geocoding failed');

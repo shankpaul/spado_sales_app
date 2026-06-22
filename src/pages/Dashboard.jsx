@@ -359,13 +359,13 @@ const Dashboard = () => {
         {/* Response Meter Section */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <ResponseMeterCard
-            title="Enquiries Response Meter (Last 30 Days)"
+            title="Leads Conversion (Last 30 Days)"
             stats={dashboardStats?.response_meter}
             isLoading={statsLoading}
             onClick={() => navigate('/enquiries')}
           />
           <ResponseMeterCard
-            title="Enquiries Response Meter (Today)"
+            title="Leads Conversion (Today)"
             stats={dashboardStats?.todays_response_meter}
             isLoading={statsLoading}
             onClick={() => navigate('/enquiries')}

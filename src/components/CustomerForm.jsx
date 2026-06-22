@@ -80,7 +80,7 @@ const CustomerForm = forwardRef(({ customer = null, onSuccess, onCancel, showAct
         country: 'India',
         latitude: customer.latitude || null,
         longitude: customer.longitude || null,
-        map_link: customer.map_link || '',
+        map_link: customer.map_link || (customer.latitude && customer.longitude ? `https://maps.google.com/?q=${customer.latitude},${customer.longitude}` : ''),
       });
     } else {
       setFormData({
