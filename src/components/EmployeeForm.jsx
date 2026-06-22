@@ -246,20 +246,20 @@ const EmployeeForm = ({ employee, onSubmit, onCancel }) => {
         {errors.name && <p className="text-sm text-red-500">{errors.name}</p>}
       </div>
 
-      {/* Employee Number (readonly for edit, auto-generated for new) */}
-      {employee && (
-        <div className="space-y-2">
-          <Label htmlFor="employee_number">Employee Number</Label>
-          <Input
-            id="employee_number"
-            name="employee_number"
-            type="text"
-            value={formData.employee_number}
-            disabled
-            className="bg-gray-100"
-          />
-        </div>
-      )}
+      {/* Employee Number */}
+      <div className="space-y-2">
+        <Label htmlFor="employee_number">Employee Number</Label>
+        <Input
+          id="employee_number"
+          name="employee_number"
+          type="text"
+          value={formData.employee_number}
+          onChange={handleChange}
+          disabled={!!employee}
+          placeholder={employee ? "" : "Leave blank to auto-generate"}
+          className={employee ? "bg-gray-100" : ""}
+        />
+      </div>
 
       {/* Job Title */}
       <div className="space-y-2">

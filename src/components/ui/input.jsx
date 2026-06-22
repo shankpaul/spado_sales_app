@@ -3,6 +3,15 @@ import * as React from "react"
 import { cn } from "@/lib/utils"
 
 const Input = React.forwardRef(({ className, type, ...props }, ref) => {
+  const handleWheel = (e) => {
+    if (type === "number") {
+      e.target.blur();
+    }
+    if (props.onWheel) {
+      props.onWheel(e);
+    }
+  };
+
   return (
     <input
       type={type}
@@ -11,6 +20,7 @@ const Input = React.forwardRef(({ className, type, ...props }, ref) => {
         className
       )}
       ref={ref}
+      onWheel={handleWheel}
       {...props} />
   );
 })
