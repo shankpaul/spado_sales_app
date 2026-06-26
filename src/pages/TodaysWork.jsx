@@ -305,7 +305,7 @@ const BookingItem = ({ order, onClick }) => {
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between mb-0.5">
             <h3 className="text-sm font-bold text-gray-900 truncate pr-2">
-              {order.customer_name || 'Unnamed Customer'}
+              {order.customer.name || 'Unnamed Customer'}
             </h3>
             <span className="text-sm font-extrabold text-primary whitespace-nowrap">
               {formatCurrency(order.total_amount)}

@@ -75,11 +75,12 @@ const Layout = ({ children }) => {
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const [notificationSettingsOpen, setNotificationSettingsOpen] = useState(false);
+  const [profileSubmenuOpen, setProfileSubmenuOpen] = useState(false);
 
   // Initialize real-time updates for all authenticated pages
   useEffect(() => {
     initializeRealtime();
-    
+
     // Note: We don't disconnect on unmount because real-time
     // should stay connected across all pages. It will disconnect on logout.
   }, [initializeRealtime]);
@@ -239,23 +240,23 @@ const Layout = ({ children }) => {
               <NavItem key={item.name} item={item} mobile={true} collapsed={sidebarCollapsed} />
             ))}
 
-            {isInstallable && (
-              <div className="pt-4 mt-4 border-t border-gray-200">
-                <button
-                  onClick={handleInstallClick}
-                  className={`flex items-center cursor-pointer gap-3 w-full rounded-lg transition-colors px-4 py-2 text-sm  bg-primary/5 hover:bg-primary/10 border border-primary/20 font-medium ${sidebarCollapsed ? 'justify-center px-0' : ''}`}
-                  title="Install App"
-                >
-                  <Download className="h-5 w-5" />
-                  {!sidebarCollapsed && <span>Install App</span>}
-                </button>
-              </div>
-            )}
           </nav>
 
-          {/* Realtime Connection Status */}
-          <div className={`p-4 border-t border-gray-200 ${sidebarCollapsed ? 'flex justify-center' : ''}`}>
-            <RealtimeStatus collapsed={sidebarCollapsed} />
+          {/* Sidebar Bottom Area (Install button + Connection Status) */}
+          <div className="p-4 pb-20 lg:pb-4 border-t border-gray-200 space-y-3 flex-shrink-0">
+            {isInstallable && (
+              <Button
+                onClick={handleInstallClick}
+                className={`flex items-center justify-center cursor-pointer gap-3 w-full rounded-xl transition-all duration-200 px-4 py-2.5 text-sm bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-md shadow-blue-500/20 hover:shadow-lg hover:shadow-blue-500/30 font-semibold border border-transparent hover:-translate-y-0.5 active:translate-y-0 active:scale-95 ${sidebarCollapsed ? 'justify-center px-0' : ''}`}
+                title="Install App"
+              >
+                <Download className="h-5 w-5 animate-bounce" style={{ animationDuration: '2s' }} />
+                {!sidebarCollapsed && <span>Install App</span>}
+              </Button>
+            )}
+            <div className={sidebarCollapsed ? 'flex justify-center' : ''}>
+              <RealtimeStatus collapsed={sidebarCollapsed} />
+            </div>
           </div>
         </div>
       </aside>
@@ -263,7 +264,7 @@ const Layout = ({ children }) => {
       {/* Main Content */}
       <div className={`transition-all duration-300 ${sidebarCollapsed ? 'lg:pl-20' : 'lg:pl-64'}`}>
         {/* Sticky Header */}
-        <header className="sticky top-0 z-30 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/60 border-b border-gray-200">
+        <header className="hidden lg:block sticky top-0 z-30 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/60 border-b border-gray-200">
           <div className="flex items-center justify-between px-4 py-1">
             <div className="flex items-center gap-4">
               <button
@@ -314,14 +315,7 @@ const Layout = ({ children }) => {
               <Popover>
                 <PopoverTrigger asChild>
                   <button className="flex items-center gap-3 hover:bg-gray-50 rounded-lg p-2 transition-colors">
-                    <div className="text-right hidden sm:block">
-                      <p className="text-sm font-medium text-gray-900">
-                        {user?.name || user?.email}
-                      </p>
-                      <p className="text-xs text-gray-500 capitalize">
-                        {user?.role?.replace('_', ' ')}
-                      </p>
-                    </div>
+
                     <div className='flex items-center cursor-pointer'>
                       <div className="h-10 w-10 rounded-full bg-secondary hover:bg-gray-200 flex items-center justify-center">
                         <UserCircle strokeWidth={1.5} className="h-6 w-6 text-foreground" />
@@ -331,6 +325,14 @@ const Layout = ({ children }) => {
                   </button>
                 </PopoverTrigger>
                 <PopoverContent className="w-56 p-2" align="end">
+                  <div className="px-3 py-2 border-b mb-1.5">
+                    <p className="text-sm font-semibold text-gray-900 truncate capitalize">
+                      {user?.name || user?.email}
+                    </p>
+                    <p className="text-xs text-gray-500 capitalize mt-0.5">
+                      {user?.role?.replace('_', ' ')}
+                    </p>
+                  </div>
                   <div className="space-y-1">
                     <Link
                       to="/profile"
@@ -393,8 +395,25 @@ const Layout = ({ children }) => {
               </Link>
             )}
 
+            {/* Enquiries */}
+            {navigationItems.find(i => i.name === 'Enquiries') && (
+              <Link
+                to="/enquiries"
+                className={`flex flex-col items-center justify-center flex-1 h-full gap-1 transition-colors ${location.pathname === '/enquiries' ? 'text-primary font-semibold' : 'text-gray-500'}`}
+              >
+                <PackageOpen className={`h-5 w-5 ${location.pathname === '/enquiries' ? 'stroke-2' : 'stroke-[1.5]'}`} />
+                <span className="text-[10px]">Enquiries</span>
+              </Link>
+            )}
+
             {/* More Menu */}
-            <Popover open={moreMenuOpen} onOpenChange={setMoreMenuOpen}>
+            <Popover
+              open={moreMenuOpen}
+              onOpenChange={(open) => {
+                setMoreMenuOpen(open);
+                if (!open) setProfileSubmenuOpen(false);
+              }}
+            >
               <PopoverTrigger asChild>
                 <button
                   className={`flex flex-col items-center justify-center flex-1 h-full gap-1 transition-colors ${moreMenuOpen ? 'text-primary' : 'text-gray-500'}`}
@@ -403,10 +422,10 @@ const Layout = ({ children }) => {
                   <span className="text-[10px]">More</span>
                 </button>
               </PopoverTrigger>
-              <PopoverContent className="w-56 p-2 mb-2" align="center" side="top">
+              <PopoverContent className="w-56 p-2 mb-2 max-h-[80vh] overflow-y-auto" align="center" side="top">
                 <div className="grid grid-cols-1 gap-1">
                   {navigationItems
-                    .filter(item => !['Dashboard', 'Orders'].includes(item.name))
+                    .filter(item => !['Dashboard', 'Orders', 'Enquiries'].includes(item.name))
                     .map((item) => {
                       const Icon = item.icon;
                       const isActive = location.pathname === item.href;
@@ -431,74 +450,84 @@ const Layout = ({ children }) => {
                           setMoreMenuOpen(false);
                           handleInstallClick();
                         }}
-                        className="flex items-center gap-3 px-3 py-2 text-sm rounded-md transition-colors bg-primary/10 text-primary hover:bg-primary/20 font-medium"
+                        className="flex items-center gap-3 w-full px-3 py-2 text-sm rounded-lg transition-all duration-200 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold shadow-sm hover:shadow-md hover:-translate-y-0.5 active:translate-y-0 active:scale-95"
                       >
-                        <Download className="h-4 w-4" />
+                        <Download className="h-4 w-4 animate-bounce" style={{ animationDuration: '2s' }} />
                         <span>Install Spado App</span>
                       </button>
                     </>
                   )}
-                </div>
-              </PopoverContent>
-            </Popover>
 
-            {/* Profile Menu */}
-            <Popover open={profileMenuOpen} onOpenChange={setProfileMenuOpen}>
-              <PopoverTrigger asChild>
-                <button
-                  className={`flex flex-col items-center justify-center flex-1 h-full gap-1 transition-colors ${location.pathname === '/profile' || profileMenuOpen ? 'text-primary font-semibold' : 'text-gray-500'}`}
-                >
-                  <UserCircle className={`h-5 w-5 ${location.pathname === '/profile' || profileMenuOpen ? 'stroke-2' : 'stroke-[1.5]'}`} />
-                  <span className="text-[10px]">Profile</span>
-                </button>
-              </PopoverTrigger>
-              <PopoverContent className="w-56 p-2 mb-2" align="end" side="top">
-                <div className="space-y-1">
-                  <div className="px-3 py-2 border-b mb-1">
-                    <p className="text-sm font-medium text-gray-900 truncate">
-                      {user?.name || user?.email}
-                    </p>
-                    <p className="text-xs text-gray-500 capitalize">
-                      {user?.role?.replace('_', ' ')}
-                    </p>
-                  </div>
-                  <Link
-                    to="/profile"
-                    onClick={() => setProfileMenuOpen(false)}
-                    className="flex items-center gap-3 px-3 py-2 text-sm rounded-md hover:bg-gray-100 transition-colors"
-                  >
-                    <User className="h-4 w-4" />
-                    <span>Profile Info</span>
-                  </Link>
-                  <Link
-                    to="/profile"
-                    onClick={() => setProfileMenuOpen(false)}
-                    className="flex items-center gap-3 px-3 py-2 text-sm rounded-md hover:bg-gray-100 transition-colors"
-                  >
-                    <KeyRound className="h-4 w-4" />
-                    <span>Change Password</span>
-                  </Link>
-                  <button
-                    onClick={() => {
-                      setProfileMenuOpen(false);
-                      setNotificationSettingsOpen(true);
-                    }}
-                    className="w-full flex items-center gap-3 px-3 py-2 text-sm rounded-md hover:bg-gray-100 transition-colors"
-                  >
-                    <Bell className="h-4 w-4" />
-                    <span>Notifications</span>
-                  </button>
+                  {/* Collapsible Profile Menu */}
                   <div className="border-t my-1" />
                   <button
-                    onClick={() => {
-                      setProfileMenuOpen(false);
-                      handleLogout();
-                    }}
-                    className="w-full flex items-center gap-3 px-3 py-2 text-sm rounded-md hover:bg-gray-100 transition-colors text-red-600"
+                    onClick={() => setProfileSubmenuOpen(!profileSubmenuOpen)}
+                    className="w-full flex items-center justify-between px-3 py-2 text-sm rounded-md hover:bg-gray-100 text-gray-700 transition-colors text-left"
                   >
-                    <LogOut className="h-4 w-4" />
-                    <span>Logout</span>
+                    <div className="flex items-center gap-3">
+                      <UserCircle className="h-4 w-4" />
+                      <span>Profile</span>
+                    </div>
+                    <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${profileSubmenuOpen ? 'rotate-180' : ''}`} />
                   </button>
+
+                  {profileSubmenuOpen && (
+                    <div className="pl-4 pr-1 py-1 mt-1 space-y-1 bg-gray-50/50 rounded-md border border-gray-100">
+                      <div className="px-3 py-1.5 bg-gray-50 rounded-md">
+                        <p className="text-xs font-semibold text-gray-900 truncate capitalize">
+                          {user?.name || user?.email}
+                        </p>
+                        <p className="text-[10px] text-gray-500 capitalize mt-0.5">
+                          {user?.role?.replace('_', ' ')}
+                        </p>
+                      </div>
+                      <Link
+                        to="/profile"
+                        onClick={() => {
+                          setMoreMenuOpen(false);
+                          setProfileSubmenuOpen(false);
+                        }}
+                        className="flex items-center gap-3 px-3 py-2 text-sm rounded-md hover:bg-gray-100 text-gray-700 transition-colors"
+                      >
+                        <User className="h-4 w-4" />
+                        <span>View Profile</span>
+                      </Link>
+                      <Link
+                        to="/profile"
+                        onClick={() => {
+                          setMoreMenuOpen(false);
+                          setProfileSubmenuOpen(false);
+                        }}
+                        className="flex items-center gap-3 px-3 py-2 text-sm rounded-md hover:bg-gray-100 text-gray-700 transition-colors"
+                      >
+                        <KeyRound className="h-4 w-4" />
+                        <span>Change Password</span>
+                      </Link>
+                      <button
+                        onClick={() => {
+                          setMoreMenuOpen(false);
+                          setProfileSubmenuOpen(false);
+                          setNotificationSettingsOpen(true);
+                        }}
+                        className="w-full flex items-center gap-3 px-3 py-2 text-sm rounded-md hover:bg-gray-100 text-gray-700 transition-colors text-left"
+                      >
+                        <Bell className="h-4 w-4" />
+                        <span>Notifications</span>
+                      </button>
+                      <div className="border-t my-1" />
+                      <button
+                        onClick={() => {
+                          setMoreMenuOpen(false);
+                          setProfileSubmenuOpen(false);
+                          handleLogout();
+                        }}
+                        className="w-full flex items-center gap-3 px-3 py-2 text-sm rounded-md hover:bg-gray-100 text-red-600 transition-colors text-left"
+                      >
+                        <LogOut className="h-4 w-4" />
+                        <span>Logout</span>
+                      </button>
+                    </div>
+                  )}
                 </div>
               </PopoverContent>
             </Popover>

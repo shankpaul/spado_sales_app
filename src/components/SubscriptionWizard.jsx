@@ -25,6 +25,13 @@ import { Badge } from './ui/badge';
 import VehicleIcon from './VehicleIcon';
 import { ConfirmDialog } from './ui/confirm-dialog';
 import {
+  Drawer,
+  DrawerContent,
+  DrawerHeader,
+  DrawerTitle,
+  DrawerDescription,
+} from './ui/drawer';
+import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -2061,8 +2068,8 @@ const SubscriptionWizard = ({ open, onOpenChange, onSuccess, customerId = null, 
             </SheetContent>
           </Sheet>
 
-          {/* Identify Vehicle Type Dialog */}
-          <Dialog open={identifyDialog.open} onOpenChange={(open) => setIdentifyDialog({ open })}>
+          {/* Identify Vehicle Type Dialog - Desktop */}
+          <Dialog open={identifyDialog.open && !isMobile} onOpenChange={(open) => setIdentifyDialog({ open })}>
             <DialogContent className="sm:max-w-md">
               <DialogHeader>
                 <DialogTitle>Identify Vehicle Type</DialogTitle>
@@ -2146,6 +2153,92 @@ const SubscriptionWizard = ({ open, onOpenChange, onSuccess, customerId = null, 
               </div>
             </DialogContent>
           </Dialog>
+
+          {/* Identify Vehicle Type Drawer - Mobile */}
+          <Drawer open={identifyDialog.open && isMobile} onOpenChange={(open) => setIdentifyDialog({ open })}>
+            <DrawerContent className="max-h-[90vh]">
+              <DrawerHeader className="px-4 text-left">
+                <DrawerTitle>Identify Vehicle Type</DrawerTitle>
+                <DrawerDescription>
+                  Select your vehicle brand and model to auto-detect the vehicle type
+                </DrawerDescription>
+              </DrawerHeader>
+
+              <div className="px-4 pb-4 space-y-4 overflow-y-auto">
+                <div>
+                  <Label>Brand</Label>
+                  <Select value={identifyBrand} onValueChange={setIdentifyBrand}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select brand" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {getBrands().map((brand) => (
+                        <SelectItem key={brand} value={brand}>{brand}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <Label>Model</Label>
+                  <Select value={identifyModel} onValueChange={setIdentifyModel} disabled={!identifyBrand}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select model" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {identifyBrand && getModelsByBrand(identifyBrand).map((model) => (
+                        <SelectItem key={model.name} value={model.name}>{model.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {identifyBrand && identifyModel && (
+                  <Card className="p-3 bg-secondary/50">
+                    <div className="flex items-center gap-2">
+                      <Car className="h-5 w-5 text-primary" />
+                      <div>
+                        <p className="text-sm font-medium">
+                          Detected: {getVehicleType(identifyBrand, identifyModel) || 'Unknown'}
+                        </p>
+                        <p className="text-xs text-muted-foreground">{identifyBrand} {identifyModel}</p>
+                      </div>
+                    </div>
+                  </Card>
+                )}
+
+                <div className="flex gap-2 pt-2">
+                  <Button
+                    variant="outline"
+                    className="flex-1"
+                    onClick={() => {
+                      setIdentifyDialog({ open: false });
+                      setIdentifyBrand('');
+                      setIdentifyModel('');
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    className="flex-1"
+                    disabled={!identifyBrand || !identifyModel}
+                    onClick={() => {
+                      const detectedType = getVehicleType(identifyBrand, identifyModel);
+                      if (detectedType) {
+                        setVehicleType(detectedType.toString().toLowerCase());
+                        toast.success(`Vehicle identified as ${detectedType}`);
+                      }
+                      setIdentifyDialog({ open: false });
+                      setIdentifyBrand('');
+                      setIdentifyModel('');
+                    }}
+                  >
+                    Apply
+                  </Button>
+                </div>
+              </div>
+            </DrawerContent>
+          </Drawer>
 
           {/* Clear Draft Confirmation Dialog */}
           <ConfirmDialog

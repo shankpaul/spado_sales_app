@@ -951,6 +951,16 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
                   >
                     Confirm
                   </Button>}
+                  {(order.status === 'confirmed' || order.status === 'in_progress') && (
+                    <Button
+                      variant="success"
+                      onClick={() => handleStatusChange('completed')}
+                      className="flex-1"
+                      disabled={!order?.assigned_to}
+                    >
+                      Complete Order
+                    </Button>
+                  )}
                   <Button
                     variant="destructive"
                     onClick={() => setIsCancelDialogOpen(true)}
@@ -1717,8 +1727,8 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Status Change Confirmation Dialog */}
-      <AlertDialog open={isStatusConfirmOpen} onOpenChange={(open) => {
+      {/* Status Change Confirmation Dialog - Desktop */}
+      <AlertDialog open={isStatusConfirmOpen && !isMobile} onOpenChange={(open) => {
         setIsStatusConfirmOpen(open);
         if (!open) {
           setPaymentReceived(false);
@@ -1813,6 +1823,108 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Status Change Confirmation Drawer - Mobile */}
+      <Drawer open={isStatusConfirmOpen && isMobile} onOpenChange={(open) => {
+        setIsStatusConfirmOpen(open);
+        if (!open) {
+          setPaymentReceived(false);
+          setPaymentMethod(''); // Reset payment method when drawer closes
+        }
+      }}>
+        <DrawerContent className="max-h-[90vh]">
+          <DrawerHeader className="px-4 text-left">
+            <DrawerTitle>Mark Order as Completed</DrawerTitle>
+            <DrawerDescription>
+              Are you sure you want to mark this order as completed? This action cannot be undone and will make the order non-editable.
+            </DrawerDescription>
+          </DrawerHeader>
+
+          <div className="px-4 pb-4 space-y-4 overflow-y-auto">
+            <div className="rounded-lg bg-yellow-50 border border-yellow-200 p-4">
+              <div className="flex gap-3">
+                <div className="flex-shrink-0">
+                  <XCircle className="h-5 w-5 text-yellow-600" />
+                </div>
+                <div className="text-sm text-yellow-800">
+                  <p className="font-medium mb-1">Important:</p>
+                  <ul className="list-disc list-inside space-y-1">
+                    <li>You will not be able to edit this order after completion</li>
+                    <li>This action cannot be reversed</li>
+                    <li>The order will be marked as finalized</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-lg bg-blue-50 border border-blue-200 p-4">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium text-blue-900">Order Amount:</span>
+                <span className="text-lg font-bold text-blue-900">{formatCurrency(order?.total_amount || 0)}</span>
+              </div>
+            </div>
+
+            <div className="p-4 border rounded-lg bg-white space-y-3">
+              <Label className="text-sm font-semibold text-gray-900 block">
+                Payment Method *
+              </Label>
+              <RadioGroup
+                value={paymentMethod}
+                onValueChange={setPaymentMethod}
+                className="flex gap-4"
+                disabled={changingStatus}
+              >
+                <div className="flex items-center gap-2">
+                  <RadioGroupItem value="cash" id="mobile-payment-cash" />
+                  <Label htmlFor="mobile-payment-cash" className="text-sm font-medium cursor-pointer select-none">
+                    Cash
+                  </Label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <RadioGroupItem value="upi" id="mobile-payment-upi" />
+                  <Label htmlFor="mobile-payment-upi" className="text-sm font-medium cursor-pointer select-none">
+                    UPI
+                  </Label>
+                </div>
+              </RadioGroup>
+            </div>
+
+            <div className="flex items-start gap-3 p-4 border rounded-lg bg-white">
+              <Checkbox
+                id="mobile-payment-received"
+                checked={paymentReceived}
+                onCheckedChange={setPaymentReceived}
+                disabled={changingStatus}
+              />
+              <label
+                htmlFor="mobile-payment-received"
+                className="text-sm font-medium leading-none cursor-pointer select-none"
+              >
+                I confirm that the payment of {formatCurrency(order?.total_amount || 0)} has been received for this order
+              </label>
+            </div>
+
+            <div className="flex gap-2 pt-2">
+              <Button
+                variant="outline"
+                onClick={() => setIsStatusConfirmOpen(false)}
+                disabled={changingStatus}
+                className="flex-1"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={() => performStatusChange(pendingStatus)}
+                disabled={changingStatus || !paymentReceived || (pendingStatus === 'completed' && !paymentMethod)}
+                className="flex-1 bg-green-600 hover:bg-green-700 text-white font-medium"
+              >
+                {changingStatus && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                Yes, Mark as Completed
+              </Button>
+            </div>
+          </div>
+        </DrawerContent>
+      </Drawer>
 
       {/* Quick Booking Edit - Mobile (Drawer) */}
       <Drawer open={isBookingEditOpen && isMobile} onOpenChange={setIsBookingEditOpen}>
@@ -2384,8 +2496,8 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
         </DialogContent>
       </Dialog>
 
-      {/* Cancel Dialog */}
-      <AlertDialog open={isCancelDialogOpen} onOpenChange={setIsCancelDialogOpen}>
+      {/* Cancel Dialog - Desktop */}
+      <AlertDialog open={isCancelDialogOpen && !isMobile} onOpenChange={setIsCancelDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Cancel Order</AlertDialogTitle>
@@ -2437,6 +2549,67 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Cancel Drawer - Mobile */}
+      <Drawer open={isCancelDialogOpen && isMobile} onOpenChange={setIsCancelDialogOpen}>
+        <DrawerContent className="max-h-[90vh]">
+          <DrawerHeader className="px-4 text-left">
+            <DrawerTitle>Cancel Order</DrawerTitle>
+            <DrawerDescription>
+              Please select a reason for cancelling this order. This action cannot be undone.
+            </DrawerDescription>
+          </DrawerHeader>
+
+          <div className="px-4 pb-4 space-y-4 overflow-y-auto">
+            <div>
+              <label className="text-sm font-medium">Cancellation Reason *</label>
+              <Select value={cancelReason} onValueChange={setCancelReason}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select reason" />
+                </SelectTrigger>
+                <SelectContent>
+                  {CANCELLATION_REASONS.map((reason) => (
+                    <SelectItem key={reason} value={reason}>
+                      {reason}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {cancelReason === 'Other' && (
+              <div>
+                <label className="text-sm font-medium">Please specify *</label>
+                <Textarea
+                  value={customReason}
+                  onChange={(e) => setCustomReason(e.target.value)}
+                  placeholder="Enter cancellation reason..."
+                  rows={3}
+                />
+              </div>
+            )}
+
+            <div className="flex gap-2 pt-2">
+              <Button
+                variant="outline"
+                onClick={() => setIsCancelDialogOpen(false)}
+                disabled={cancelling}
+                className="flex-1"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleCancelOrder}
+                disabled={cancelling || !cancelReason || (cancelReason === 'Other' && !customReason.trim())}
+                className="flex-1 bg-destructive hover:bg-destructive/90 text-white font-medium"
+              >
+                {cancelling && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                Confirm Cancellation
+              </Button>
+            </div>
+          </div>
+        </DrawerContent>
+      </Drawer>
     </div>
   );
 };

@@ -28,6 +28,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from '../components/ui/dialog';
+import {
+  Drawer,
+  DrawerContent,
+  DrawerHeader,
+  DrawerTitle,
+  DrawerDescription,
+} from '../components/ui/drawer';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import {
@@ -99,6 +106,13 @@ const Dashboard = () => {
   const { user } = useAuthStore();
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(true);
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   // Dashboard stats state
   const [dashboardStats, setDashboardStats] = useState(null);
@@ -1027,29 +1041,10 @@ const Dashboard = () => {
           </DialogContent>
         </Dialog>
 
-        {/* Vehicle Identifier Sheet */}
-        <Sheet open={vehicleIdentifierOpen} onOpenChange={setVehicleIdentifierOpen}>
-          <SheetContent side="bottom" className="h-screen p-0 flex flex-col sm:h-auto sm:max-w-md sm:p-6 sm:top-1/2 sm:left-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 sm:right-auto sm:bottom-auto sm:rounded-lg">
-            {/* Mobile App Header */}
-            <div className="flex items-center justify-between p-4 border-b bg-white sticky top-0 z-10 flex-shrink-0 sm:hidden">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-primary/10 rounded-full">
-                  <Car className="h-5 w-5 text-primary" />
-                </div>
-                <h2 className="text-lg font-bold">Vehicle Type Identifier</h2>
-              </div>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setVehicleIdentifierOpen(false)}
-                className="rounded-full h-10 w-10"
-              >
-                <X className="h-5 w-5" />
-              </Button>
-            </div>
-
-            {/* Desktop Dialog Header */}
-            <DialogHeader className="text-left flex-shrink-0 hidden sm:flex">
+        {/* Vehicle Identifier Dialog - Desktop */}
+        <Dialog open={vehicleIdentifierOpen && !isMobile} onOpenChange={setVehicleIdentifierOpen}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
                 <Car className="h-5 w-5 text-primary" />
                 Identify Vehicle Type
@@ -1059,7 +1054,7 @@ const Dashboard = () => {
               </DialogDescription>
             </DialogHeader>
 
-            <div className="space-y-4 p-4 pt-12 flex-1 overflow-y-auto sm:py-4">
+            <div className="space-y-4 py-4">
               <div className="space-y-2">
                 <Label htmlFor="brand">Brand</Label>
                 <Select value={selectedBrand} onValueChange={(value) => {
@@ -1117,35 +1112,90 @@ const Dashboard = () => {
                 </Button>
               </div>
             </div>
-          </SheetContent>
-        </Sheet>
+          </DialogContent>
+        </Dialog>
 
-        {/* Service Availability Sheet */}
-        <Sheet open={serviceCheckerOpen} onOpenChange={(open) => {
+        {/* Vehicle Identifier Drawer - Mobile */}
+        <Drawer open={vehicleIdentifierOpen && isMobile} onOpenChange={setVehicleIdentifierOpen}>
+          <DrawerContent className="max-h-[90vh]">
+            <DrawerHeader className="px-4 text-left">
+              <DrawerTitle className="flex items-center gap-2">
+                <Car className="h-5 w-5 text-primary" />
+                Identify Vehicle Type
+              </DrawerTitle>
+              <DrawerDescription>
+                Select the vehicle brand and model to identify its type category.
+              </DrawerDescription>
+            </DrawerHeader>
+
+            <div className="px-4 pb-4 space-y-4 overflow-y-auto">
+              <div className="space-y-2">
+                <Label htmlFor="mobile-brand">Brand</Label>
+                <Select value={selectedBrand} onValueChange={(value) => {
+                  setSelectedBrand(value);
+                  setSelectedModel('');
+                  setIdentifiedType('');
+                }}>
+                  <SelectTrigger id="mobile-brand">
+                    <SelectValue placeholder="Select brand" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {getBrands().map((brand) => (
+                      <SelectItem key={brand} value={brand}>{brand}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {selectedBrand && (
+                <div className="space-y-2">
+                  <Label htmlFor="mobile-model">Model</Label>
+                  <Select value={selectedModel} onValueChange={setSelectedModel}>
+                    <SelectTrigger id="mobile-model">
+                      <SelectValue placeholder="Select model" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {getModelsByBrand(selectedBrand).map((model) => (
+                        <SelectItem key={model.name} value={model.name}>{model.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              {identifiedType && (
+                <div className="p-4 rounded-lg bg-blue-50 border border-primary/20">
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-sm font-semibold text-primary">Identified Type</span>
+                      </div>
+                      <p className="text-2xl font-bold text-primary uppercase">{identifiedType}</p>
+                    </div>
+                    <VehicleIcon vehicleType={identifiedType} size={82} />
+                  </div>
+                </div>
+              )}
+
+              <div className="flex gap-2 pt-2">
+                <Button onClick={handleIdentifyVehicle} className="flex-1">
+                  Identify
+                </Button>
+                <Button variant="outline" onClick={resetVehicleIdentifier}>
+                  Reset
+                </Button>
+              </div>
+            </div>
+          </DrawerContent>
+        </Drawer>
+
+        {/* Service Availability Dialog - Desktop */}
+        <Dialog open={serviceCheckerOpen && !isMobile} onOpenChange={(open) => {
           setServiceCheckerOpen(open);
           if (!open) resetServiceAvailability();
         }}>
-          <SheetContent side="bottom" className="h-screen p-0 flex flex-col sm:h-auto sm:max-w-md sm:p-6 sm:top-1/2 sm:left-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 sm:right-auto sm:bottom-auto sm:rounded-lg">
-            {/* Mobile App Header */}
-            <div className="flex items-center justify-between p-4 border-b bg-white sticky top-0 z-10 flex-shrink-0 sm:hidden">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-primary/10 rounded-full">
-                  <CheckCircle2 className="h-5 w-5 text-primary" />
-                </div>
-                <h2 className="text-lg font-bold">Service Availability</h2>
-              </div>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setServiceCheckerOpen(false)}
-                className="rounded-full h-10 w-10"
-              >
-                <X className="h-5 w-5" />
-              </Button>
-            </div>
-
-            {/* Desktop Dialog Header */}
-            <DialogHeader className="text-left flex-shrink-0 hidden sm:flex">
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
                 <CheckCircle2 className="h-5 w-5 text-primary" />
                 Service Availability Check
@@ -1155,7 +1205,7 @@ const Dashboard = () => {
               </DialogDescription>
             </DialogHeader>
 
-            <div className="space-y-4 p-4 pt-12 flex-1 overflow-y-auto sm:py-4">
+            <div className="space-y-4 py-4">
               {/* Customer Phone */}
               <div className="space-y-2">
                 <Label htmlFor="service-phone">Customer Phone <span className="text-muted-foreground">(optional)</span></Label>
@@ -1299,6 +1349,193 @@ const Dashboard = () => {
               )}
 
               {/* Action Buttons */}
+              <div className="flex gap-2 pt-2 pb-2">
+                <Button
+                  onClick={handleCheckAvailability}
+                  className="flex-1"
+                  disabled={checkingAvailability}
+                >
+                  {checkingAvailability ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Checking...
+                    </>
+                  ) : (
+                    'Check Availability'
+                  )}
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={resetServiceAvailability}
+                  disabled={checkingAvailability}
+                >
+                  Reset
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Service Availability Drawer - Mobile */}
+        <Drawer open={serviceCheckerOpen && isMobile} onOpenChange={(open) => {
+          setServiceCheckerOpen(open);
+          if (!open) resetServiceAvailability();
+        }}>
+          <DrawerContent className="max-h-[90vh]">
+            <DrawerHeader className="px-4 text-left">
+              <DrawerTitle className="flex items-center gap-2">
+                <CheckCircle2 className="h-5 w-5 text-primary" />
+                Service Availability Check
+              </DrawerTitle>
+              <DrawerDescription>
+                Check if our service is available at your location.
+              </DrawerDescription>
+            </DrawerHeader>
+
+            <div className="px-4 pb-4 space-y-4 overflow-y-auto">
+              {/* Customer Phone */}
+              <div className="space-y-2">
+                <Label htmlFor="mobile-service-phone">Customer Phone <span className="text-muted-foreground">(optional)</span></Label>
+                <Input
+                  id="mobile-service-phone"
+                  type="tel"
+                  placeholder="Enter phone number"
+                  value={servicePhone}
+                  onChange={(e) => setServicePhone(e.target.value)}
+                />
+              </div>
+
+              {/* Vehicle Type */}
+              <div className="space-y-2">
+                <Label htmlFor="mobile-service-vehicle-type">Vehicle Type <span className="text-muted-foreground">(optional)</span></Label>
+                <Select value={serviceVehicleType} onValueChange={setServiceVehicleType}>
+                  <SelectTrigger id="mobile-service-vehicle-type">
+                    <SelectValue placeholder="Select vehicle type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {getVehicleTypes().map((type) => (
+                      <SelectItem key={type} value={type.toLowerCase()}>
+                        {type}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Informational Note */}
+              <div className="bg-muted/50 border border-border rounded-lg p-3 text-sm text-muted-foreground">
+                <p className="flex items-start gap-2">
+                  <svg className="h-4 w-4 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <span>Provide more accurate results based on multiple criteria (customer eligibility, service history, vehicle-specific distance limits).</span>
+                </p>
+              </div>
+
+              {/* Package Selection */}
+              {serviceVehicleType && (
+                <div className="space-y-2">
+                  <Label htmlFor="mobile-service-package">Package (Optional)</Label>
+                  <Select
+                    value={servicePackageName}
+                    onValueChange={setServicePackageName}
+                    disabled={loadingPackages}
+                  >
+                    <SelectTrigger id="mobile-service-package">
+                      <SelectValue placeholder={loadingPackages ? "Loading packages..." : "Select package"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availablePackages.map((pkg) => (
+                        <SelectItem key={pkg.id} value={pkg.name}>
+                          {pkg.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              {/* Map Link */}
+              <div className="space-y-2">
+                <Label htmlFor="mobile-service-map-link">Google Maps Link</Label>
+                <Input
+                  id="mobile-service-map-link"
+                  type="url"
+                  placeholder="Paste Google Maps link"
+                  value={serviceMapLink}
+                  onChange={(e) => {
+                    setServiceMapLink(e.target.value);
+                    if (e.target.value) setServiceLocation('');
+                  }}
+                />
+              </div>
+
+              {/* OR Divider */}
+              <div className="flex items-center gap-2">
+                <div className="flex-1 border-t" />
+                <span className="text-xs text-muted-foreground font-medium">OR</span>
+                <div className="flex-1 border-t" />
+              </div>
+
+              {/* Location Name */}
+              <div className="space-y-2">
+                <Label htmlFor="mobile-service-location">Location Name</Label>
+                <Input
+                  id="mobile-service-location"
+                  placeholder="Enter location/area name"
+                  value={serviceLocation}
+                  onChange={(e) => {
+                    setServiceLocation(e.target.value);
+                    if (e.target.value) setServiceMapLink('');
+                  }}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Either map link or location name is required
+                </p>
+              </div>
+
+              {/* Availability Result */}
+              {availabilityResult && (
+                <div className={`p-4 rounded-lg border ${availabilityResult.available
+                  ? 'bg-green-50 border-green-200'
+                  : 'bg-red-50 border-red-200'
+                  }`}>
+                  <div className="flex items-start gap-3">
+                    <div className={`p-2 rounded-full ${availabilityResult.available
+                      ? 'bg-green-100'
+                      : 'bg-red-100'
+                      }`}>
+                      {availabilityResult.available ? (
+                        <MapPinCheck className={`h-6 w-6 ${availabilityResult.available
+                          ? 'text-green-600'
+                          : 'text-red-600'
+                          }`} />
+                      ) : (
+                        <MapPinX className="h-6 w-6 text-red-600" />
+                      )}
+                    </div>
+                    <div className="flex-1">
+                      <h3 className={`font-bold mb-1 ${availabilityResult.available
+                        ? 'text-green-900'
+                        : 'text-red-900'
+                        }`}>
+                        {availabilityResult.available ? 'Service Available!' : 'Service Unavailable'}
+                      </h3>
+                      {availabilityResult.available ? (
+                        <div className="space-y-1 text-sm text-green-800">
+                          <p><strong>Distance:</strong> {availabilityResult.distance_km} km</p>
+                          <p><strong>Duration:</strong> ~{availabilityResult.duration_minutes} minutes</p>
+                          <p><strong>Nearest Office:</strong> {availabilityResult.nearest_office?.name}</p>
+                        </div>
+                      ) : (
+                        <p className="text-sm text-red-800">{availabilityResult.reason}</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Action Buttons */}
               <div className="flex gap-2 pt-2">
                 <Button
                   onClick={handleCheckAvailability}
@@ -1323,8 +1560,8 @@ const Dashboard = () => {
                 </Button>
               </div>
             </div>
-          </SheetContent>
-        </Sheet>
+          </DrawerContent>
+        </Drawer>
 
         {/* Agents Available Sheet */}
         <Sheet open={agentsAvailableOpen} onOpenChange={setAgentsAvailableOpen}>
