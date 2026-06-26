@@ -73,6 +73,7 @@ import {
   Volume2,
   Megaphone,
   ShoppingCart,
+  UserX,
 } from 'lucide-react';
 import { formatDate, formatDateTime } from '../lib/utilities';
 import { sanitizeImageUrl, isValidUrl } from '../lib/security';
@@ -132,6 +133,10 @@ const EnquiryDetail = ({ enquiryId, onClose, onUpdate }) => {
   // Order Wizard state
   const [isOrderWizardOpen, setIsOrderWizardOpen] = useState(false);
   const [selectedCustomerForOrder, setSelectedCustomerForOrder] = useState(null);
+
+  // Exclude from enquiries (non-customer) dialog state
+  const [isExcludeDialogOpen, setIsExcludeDialogOpen] = useState(false);
+  const [excluding, setExcluding] = useState(false);
 
   // Comments state
   const [comments, setComments] = useState([]);
@@ -357,6 +362,29 @@ const EnquiryDetail = ({ enquiryId, onClose, onUpdate }) => {
       toast.error(error.response?.data?.error || 'Failed to update status');
     } finally {
       setUpdatingLostStatus(false);
+    }
+  };
+
+  // Handle adding phone number to exception/non-customers list
+  const handleAddToNonCustomers = async () => {
+    if (!enquiry || !enquiry.contact_phone) return;
+
+    setExcluding(true);
+    try {
+      // Reason as name if any, otherwise "not a user"
+      const reason = enquiry.customer?.name || enquiry.contact_name || 'not a user';
+
+      await enquiryService.addExceptionPhone(enquiry.contact_phone, reason);
+
+      toast.success('Added to non-customers list successfully');
+      setIsExcludeDialogOpen(false);
+
+      // Refresh enquiry data
+      await fetchEnquiryById(id);
+    } catch (error) {
+      toast.error(error.response?.data?.error || 'Failed to add to non-customers list');
+    } finally {
+      setExcluding(false);
     }
   };
 
@@ -925,6 +953,20 @@ const EnquiryDetail = ({ enquiryId, onClose, onUpdate }) => {
                 ))}
               </div>
             </div>
+
+            {/* Non-Customer Exclusion */}
+            <div className="space-y-2 pt-4 border-t mt-4">
+              <h3 className="text-sm font-medium text-muted-foreground">Exclusions</h3>
+              <Button
+                variant="link"
+                size="sm"
+                onClick={() => setIsExcludeDialogOpen(true)}
+                className="gap-1 md:gap-2 text-xs md:text-sm"
+              >
+                <UserX className="h-3.5 w-3.5" />
+                Add to Non-Customers List
+              </Button>
+            </div>
           </Card>
         )}
 
@@ -1378,6 +1420,29 @@ const EnquiryDetail = ({ enquiryId, onClose, onUpdate }) => {
               >
                 {updatingStatus && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                 Mark as Converted
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        {/* Exclude/Non-customer Confirmation */}
+        <AlertDialog open={isExcludeDialogOpen} onOpenChange={setIsExcludeDialogOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Add to Non-Customers List?</AlertDialogTitle>
+              <AlertDialogDescription>
+                New chats won't create new enquiries. Are you sure you want to add this number to the non-customers list?
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleAddToNonCustomers}
+                disabled={excluding}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                {excluding && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                Add to List
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>

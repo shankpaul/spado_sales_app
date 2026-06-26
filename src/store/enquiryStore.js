@@ -1,10 +1,9 @@
 import { create } from 'zustand';
 import enquiryService from '../services/enquiryService';
 
-/**
- * Enquiry Store using Zustand
- * Single source of truth for all enquiry/lead data across the application
- */
+const sortByUpdatedAt = (items) => {
+  return [...items].sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at));
+};
 
 const useEnquiryStore = create((set, get) => ({
   // State
@@ -97,7 +96,7 @@ const useEnquiryStore = create((set, get) => ({
       const calculatedTotalPages = Math.ceil(total / state.perPage) || 1;
 
       set({
-        enquiries: reset ? newEnquiries : [...state.enquiries, ...newEnquiries],
+        enquiries: reset ? sortByUpdatedAt(newEnquiries) : sortByUpdatedAt([...state.enquiries, ...newEnquiries]),
         totalCount: total,
         totalPages: calculatedTotalPages,
         hasMore: newEnquiries.length === state.perPage,
@@ -129,7 +128,7 @@ const useEnquiryStore = create((set, get) => ({
       if (index !== -1) {
         const updatedEnquiries = [...state.enquiries];
         updatedEnquiries[index] = enquiry;
-        set({ enquiries: updatedEnquiries });
+        set({ enquiries: sortByUpdatedAt(updatedEnquiries) });
       }
       
       return enquiry;
@@ -150,7 +149,7 @@ const useEnquiryStore = create((set, get) => ({
       
       // Add to beginning of list
       set(state => ({
-        enquiries: [newEnquiry, ...state.enquiries],
+        enquiries: sortByUpdatedAt([newEnquiry, ...state.enquiries]),
         totalCount: state.totalCount + 1,
         isLoading: false,
       }));
@@ -173,9 +172,9 @@ const useEnquiryStore = create((set, get) => ({
       
       // Update in list
       set(state => ({
-        enquiries: state.enquiries.map(e => 
+        enquiries: sortByUpdatedAt(state.enquiries.map(e => 
           e.id === id ? updatedEnquiry : e
-        ),
+        )),
         selectedEnquiry: state.selectedEnquiry?.id === id ? updatedEnquiry : state.selectedEnquiry,
         isLoading: false,
       }));
@@ -198,9 +197,9 @@ const useEnquiryStore = create((set, get) => ({
       
       // Update in list
       set(state => ({
-        enquiries: state.enquiries.map(e => 
+        enquiries: sortByUpdatedAt(state.enquiries.map(e => 
           e.id === id ? updatedEnquiry : e
-        ),
+        )),
         selectedEnquiry: state.selectedEnquiry?.id === id ? updatedEnquiry : state.selectedEnquiry,
         isLoading: false,
       }));
@@ -223,9 +222,9 @@ const useEnquiryStore = create((set, get) => ({
       
       // Update in list
       set(state => ({
-        enquiries: state.enquiries.map(e => 
+        enquiries: sortByUpdatedAt(state.enquiries.map(e => 
           e.id === id ? updatedEnquiry : e
-        ),
+        )),
         selectedEnquiry: state.selectedEnquiry?.id === id ? updatedEnquiry : state.selectedEnquiry,
         isLoading: false,
       }));
@@ -305,7 +304,7 @@ const useEnquiryStore = create((set, get) => ({
       const calculatedTotalPages = Math.ceil(total / state.perPage) || 1;
 
       set({
-        enquiries: newEnquiries,
+        enquiries: sortByUpdatedAt(newEnquiries),
         totalCount: total,
         totalPages: calculatedTotalPages,
         page: pageNumber,

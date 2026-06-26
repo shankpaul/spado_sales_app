@@ -174,6 +174,16 @@ const enquiryService = {
     const response = await apiClient.put(`/enquiries/followups/${followup_id}/mark_done`);
     return response.data;
   },
+
+  /**
+   * Add a phone number to exception list (non-customers)
+   * @param {string} phone - The phone number to add
+   * @param {string} reason - The reason / name
+   */
+  addExceptionPhone: async (phone, reason) => {
+    const response = await apiClient.post('/enquiries/exceptions/phone', { phone, reason });
+    return response.data;
+  },
 };
 
 export default enquiryService;
