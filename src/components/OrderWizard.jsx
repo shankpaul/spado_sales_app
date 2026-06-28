@@ -1200,9 +1200,9 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
     setLoading(true);
     try {
       // Convert time to ISO 8601 datetime format with timezone (RFC3339)
-      const bookingDateISO = bookingDate ? `${bookingDate}T00:00:00Z` : null;
-      const bookingTimeFromISO = bookingTimeFrom ? `${bookingDate}T${bookingTimeFrom}:00Z` : null;
-      const bookingTimeToISO = bookingTimeTo ? `${bookingDate}T${bookingTimeTo}:00Z` : null;
+      const bookingDateISO = bookingDate ? `${bookingDate}T00:00:00+05:30` : null;
+      const bookingTimeFromISO = bookingTimeFrom ? `${bookingDate}T${bookingTimeFrom}:00+05:30` : null;
+      const bookingTimeToISO = bookingTimeTo ? `${bookingDate}T${bookingTimeTo}:00+05:30` : null;
 
       const orderData = {
         customer_id: parseInt(selectedCustomer.id, 10),

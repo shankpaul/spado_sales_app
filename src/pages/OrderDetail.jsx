@@ -399,8 +399,8 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
     try {
       // Convert to ISO format for API
       const bookingDateISO = new Date(bookingDate).toISOString().split('T')[0];
-      const bookingTimeFromISO = new Date(`${bookingDateISO}T${bookingTimeFrom}:00`).toISOString();
-      const bookingTimeToISO = new Date(`${bookingDateISO}T${bookingTimeTo}:00`).toISOString();
+      const bookingTimeFromISO = bookingTimeFrom ? `${bookingDateISO}T${bookingTimeFrom}:00+05:30` : null;
+      const bookingTimeToISO = bookingTimeTo ? `${bookingDateISO}T${bookingTimeTo}:00+05:30` : null;
 
       await orderService.updateOrder(id, {
         booking_date: bookingDateISO,

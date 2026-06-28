@@ -8,7 +8,13 @@ import { format } from 'date-fns';
 export const formatDate = (dateString) => {
   if (!dateString) return 'N/A';
   try {
-    return format(new Date(dateString), 'MMM dd, yyyy');
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      timeZone: 'Asia/Kolkata'
+    });
   } catch {
     return 'Invalid date';
   }
@@ -22,7 +28,16 @@ export const formatDate = (dateString) => {
 export const formatDateTime = (dateString) => {
   if (!dateString) return 'N/A';
   try {
-    return format(new Date(dateString), 'MMM dd, yyyy hh:mm a');
+    const date = new Date(dateString);
+    return date.toLocaleString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+      timeZone: 'Asia/Kolkata'
+    });
   } catch {
     return 'Invalid date';
   }
@@ -36,7 +51,13 @@ export const formatDateTime = (dateString) => {
 export const formatTime = (dateTimeString) => {
   if (!dateTimeString) return 'N/A';
   try {
-    return format(new Date(dateTimeString), 'hh:mm a');
+    const date = new Date(dateTimeString);
+    return date.toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+      timeZone: 'Asia/Kolkata'
+    });
   } catch {
     return 'N/A';
   }
