@@ -48,6 +48,7 @@ import {
   Target,
   AlertCircle,
   TrendingDown,
+  ChartPie,
 } from 'lucide-react';
 import { format, parseISO, differenceInDays, eachDayOfInterval, eachWeekOfInterval, eachMonthOfInterval, startOfWeek, startOfMonth, endOfWeek, endOfMonth } from 'date-fns';
 import { getStatusLabel, getStatusColor, ORDER_STATUSES, PAYMENT_STATUSES } from '../lib/constants';
@@ -61,7 +62,7 @@ const Reports = () => {
   const [loading, setLoading] = useState(false);
   const [reportData, setReportData] = useState(null);
   const [agents, setAgents] = useState([]);
-  
+
   // Filter states
   const [filters, setFilters] = useState({
     date_from: '',
@@ -367,16 +368,16 @@ const Reports = () => {
     }));
 
     const workbook = XLSX.utils.book_new();
-    
+
     const summarySheet = XLSX.utils.json_to_sheet(summaryData);
     XLSX.utils.book_append_sheet(workbook, summarySheet, 'Summary');
-    
+
     const sourceSheet = XLSX.utils.json_to_sheet(sourceData);
     XLSX.utils.book_append_sheet(workbook, sourceSheet, 'Source Performance');
-    
+
     const agentSheet = XLSX.utils.json_to_sheet(agentData);
     XLSX.utils.book_append_sheet(workbook, agentSheet, 'Agent Performance');
-    
+
     const detailedSheet = XLSX.utils.json_to_sheet(detailedData);
     XLSX.utils.book_append_sheet(workbook, detailedSheet, 'Detailed Enquiries');
 
@@ -393,21 +394,24 @@ const Reports = () => {
   const renderReportSelection = () => (
     <>
       <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold">Reports</h1>
+        <h1 className="text-2xl font-bold tracking-tight text-gray-900 flex items-center gap-2">
+          <ChartPie className="h-8 w-8 text-primary" strokeWidth={1.5} />
+          Reports
+        </h1>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {/* Orders Report Card */}
-        <Card 
+        <Card
           className="cursor-pointer hover:shadow-lg transition-shadow"
           onClick={() => setSelectedReport('orders')}
         >
           <CardHeader>
             <div className="flex items-center justify-between">
-              <ClipboardList className="h-8 w-8 text-primary" />
+              <CardTitle className="mt-4">Orders Report</CardTitle>
               <BarChart3 className="h-6 w-6 text-muted-foreground" />
             </div>
-            <CardTitle className="mt-4">Orders Report</CardTitle>
+
           </CardHeader>
           <CardContent>
             <p className="text-muted-foreground">
@@ -417,16 +421,15 @@ const Reports = () => {
         </Card>
 
         {/* Enquiries Report Card */}
-        <Card 
+        <Card
           className="cursor-pointer hover:shadow-lg transition-shadow"
           onClick={() => setSelectedReport('enquiries')}
         >
           <CardHeader>
             <div className="flex items-center justify-between">
-              <MessageSquare className="h-8 w-8 text-primary" />
-              <BarChart3 className="h-6 w-6 text-muted-foreground" />
+              <CardTitle className="mt-4">Enquiries Report</CardTitle>
+              <MessageSquare className="h-6 w-6 text-muted-foreground" />
             </div>
-            <CardTitle className="mt-4">Enquiries Report</CardTitle>
           </CardHeader>
           <CardContent>
             <p className="text-muted-foreground">
@@ -443,8 +446,8 @@ const Reports = () => {
     <>
       <div className="flex justify-between items-center">
         <div className="flex items-center gap-4">
-          <Button 
-            variant="ghost" 
+          <Button
+            variant="ghost"
             size="icon"
             onClick={() => {
               setSelectedReport(null);
@@ -653,128 +656,128 @@ const Reports = () => {
           {/* Table Tab */}
           <TabsContent value="table">
             <Card>
-          <CardHeader>
-            <CardTitle>Orders List ({reportData.orders.length})</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b">
-                    <th className="text-left p-2">Order #</th>
-                    <th className="text-left p-2">Customer</th>
-                    <th className="text-left p-2">Booking Date</th>
-                    <th className="text-left p-2">Status</th>
-                    <th className="text-left p-2">Payment</th>
-                    <th className="text-right p-2">Subtotal</th>
-                    <th className="text-right p-2">Total</th>
-                    <th className="text-right p-2">GST</th>
-                    <th className="text-right p-2">Profit</th>
-                    <th className="text-center p-2">Rating</th>
-                    <th className="text-left p-2">Agent</th>
-                    <th className="text-right p-2">Agent Inc.</th>
-                    <th className="text-right p-2">5★ Inc.</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {reportData.orders.map((order) => (
-                    <tr key={order.id} className="border-b hover:bg-muted/50">
-                      <td className="p-2 font-medium">{order.order_number}</td>
-                      <td className="p-2">
-                        <div>
-                          <div className="font-medium">{order.customer?.name}</div>
-                          <div className="text-xs text-muted-foreground">
-                            {order.customer?.phone}
-                          </div>
-                        </div>
-                      </td>
-                      <td className="p-2">
-                        {format(parseISO(order.booking_date), 'MMM dd, yyyy')}
-                      </td>
-                      <td className="p-2">
-                        <Badge2 variant={getStatusColor(order.status)}>
-                          {getStatusLabel(order.status)}
-                        </Badge2>
-                      </td>
-                      <td className="p-2">
-                        <Badge2 variant={order.payment_status === 'paid' ? 'success' : 'warning'}>
-                          {order.payment_status}
-                        </Badge2>
-                      </td>
-                      <td className="text-right p-2">₹{order.subtotal_amount.toFixed(2)}</td>
-                      <td className="text-right p-2 font-medium">
-                        ₹{order.total_amount.toFixed(2)}
-                      </td>
-                      <td className="text-right p-2">₹{order.gst_amount.toFixed(2)}</td>
-                      <td className="text-right p-2 text-green-600 font-medium">
-                        ₹{order.profit.toFixed(2)}
-                      </td>
-                      <td className="text-center p-2">
-                        {order.rating ? (
-                          <div className="flex items-center justify-center gap-1">
-                            <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-                            <span>{order.rating}</span>
-                          </div>
-                        ) : (
-                          <span className="text-muted-foreground">-</span>
-                        )}
-                      </td>
-                      <td className="p-2">{order.assigned_to?.name || '-'}</td>
-                      <td className="text-right p-2">₹{order.agent_incentive.toFixed(2)}</td>
-                      <td className="text-right p-2 text-yellow-600">
-                        ₹{order.five_star_incentive.toFixed(2)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </CardContent>
-        </Card>
-      </TabsContent>
+              <CardHeader>
+                <CardTitle>Orders List ({reportData.orders.length})</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b">
+                        <th className="text-left p-2">Order #</th>
+                        <th className="text-left p-2">Customer</th>
+                        <th className="text-left p-2">Booking Date</th>
+                        <th className="text-left p-2">Status</th>
+                        <th className="text-left p-2">Payment</th>
+                        <th className="text-right p-2">Subtotal</th>
+                        <th className="text-right p-2">Total</th>
+                        <th className="text-right p-2">GST</th>
+                        <th className="text-right p-2">Profit</th>
+                        <th className="text-center p-2">Rating</th>
+                        <th className="text-left p-2">Agent</th>
+                        <th className="text-right p-2">Agent Inc.</th>
+                        <th className="text-right p-2">5★ Inc.</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {reportData.orders.map((order) => (
+                        <tr key={order.id} className="border-b hover:bg-muted/50">
+                          <td className="p-2 font-medium">{order.order_number}</td>
+                          <td className="p-2">
+                            <div>
+                              <div className="font-medium">{order.customer?.name}</div>
+                              <div className="text-xs text-muted-foreground">
+                                {order.customer?.phone}
+                              </div>
+                            </div>
+                          </td>
+                          <td className="p-2">
+                            {format(parseISO(order.booking_date), 'MMM dd, yyyy')}
+                          </td>
+                          <td className="p-2">
+                            <Badge2 variant={getStatusColor(order.status)}>
+                              {getStatusLabel(order.status)}
+                            </Badge2>
+                          </td>
+                          <td className="p-2">
+                            <Badge2 variant={order.payment_status === 'paid' ? 'success' : 'warning'}>
+                              {order.payment_status}
+                            </Badge2>
+                          </td>
+                          <td className="text-right p-2">₹{order.subtotal_amount.toFixed(2)}</td>
+                          <td className="text-right p-2 font-medium">
+                            ₹{order.total_amount.toFixed(2)}
+                          </td>
+                          <td className="text-right p-2">₹{order.gst_amount.toFixed(2)}</td>
+                          <td className="text-right p-2 text-green-600 font-medium">
+                            ₹{order.profit.toFixed(2)}
+                          </td>
+                          <td className="text-center p-2">
+                            {order.rating ? (
+                              <div className="flex items-center justify-center gap-1">
+                                <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
+                                <span>{order.rating}</span>
+                              </div>
+                            ) : (
+                              <span className="text-muted-foreground">-</span>
+                            )}
+                          </td>
+                          <td className="p-2">{order.assigned_to?.name || '-'}</td>
+                          <td className="text-right p-2">₹{order.agent_incentive.toFixed(2)}</td>
+                          <td className="text-right p-2 text-yellow-600">
+                            ₹{order.five_star_incentive.toFixed(2)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
 
-      {/* Chart Tab */}
-      <TabsContent value="chart">
-        <Card>
-          <CardHeader>
-            <div className="flex justify-between items-center">
-              <CardTitle>Orders Trend</CardTitle>
-              <div className="flex gap-2">
-                <Select
-                  value={chartGranularity}
-                  onValueChange={setChartGranularity}
-                >
-                  <SelectTrigger className="w-[150px]">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="auto">Auto</SelectItem>
-                    <SelectItem value="daily">Daily</SelectItem>
-                    <SelectItem value="weekly">Weekly</SelectItem>
-                    <SelectItem value="monthly">Monthly</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={400}>
-              <BarChart data={chartData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="label" />
-                <YAxis yAxisId="left" />
-                <YAxis yAxisId="right" orientation="right" />
-                <Tooltip />
-                <Legend />
-                <Bar yAxisId="left" dataKey="Total Amount" fill="#8884d8" />
-                <Bar yAxisId="left" dataKey="Profit" fill="#82ca9d" />
-                <Bar yAxisId="right" dataKey="Orders" fill="#ffc658" />
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-      </TabsContent>
-    </Tabs>
+          {/* Chart Tab */}
+          <TabsContent value="chart">
+            <Card>
+              <CardHeader>
+                <div className="flex justify-between items-center">
+                  <CardTitle>Orders Trend</CardTitle>
+                  <div className="flex gap-2">
+                    <Select
+                      value={chartGranularity}
+                      onValueChange={setChartGranularity}
+                    >
+                      <SelectTrigger className="w-[150px]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="auto">Auto</SelectItem>
+                        <SelectItem value="daily">Daily</SelectItem>
+                        <SelectItem value="weekly">Weekly</SelectItem>
+                        <SelectItem value="monthly">Monthly</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={400}>
+                  <BarChart data={chartData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="label" />
+                    <YAxis yAxisId="left" />
+                    <YAxis yAxisId="right" orientation="right" />
+                    <Tooltip />
+                    <Legend />
+                    <Bar yAxisId="left" dataKey="Total Amount" fill="#8884d8" />
+                    <Bar yAxisId="left" dataKey="Profit" fill="#82ca9d" />
+                    <Bar yAxisId="right" dataKey="Orders" fill="#ffc658" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
       )}
 
       {/* Loading State */}
@@ -963,7 +966,7 @@ const Reports = () => {
                 </p>
               </CardContent>
             </Card>
-            
+
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Conversion Rate</CardTitle>
@@ -976,7 +979,7 @@ const Reports = () => {
                 </p>
               </CardContent>
             </Card>
-            
+
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Avg Conversion Time</CardTitle>
@@ -984,18 +987,18 @@ const Reports = () => {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">
-                  {reportData.summary.avg_conversion_time_hours 
-                    ? (reportData.summary.avg_conversion_time_hours / 24).toFixed(1) 
+                  {reportData.summary.avg_conversion_time_hours
+                    ? (reportData.summary.avg_conversion_time_hours / 24).toFixed(1)
                     : '0'}d
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  {reportData.summary.avg_response_time_hours 
-                    ? reportData.summary.avg_response_time_hours.toFixed(1) 
+                  {reportData.summary.avg_response_time_hours
+                    ? reportData.summary.avg_response_time_hours.toFixed(1)
                     : '0'}h response
                 </p>
               </CardContent>
             </Card>
-            
+
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Needs Follow-up</CardTitle>
@@ -1008,7 +1011,7 @@ const Reports = () => {
                 </p>
               </CardContent>
             </Card>
-            
+
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
@@ -1023,7 +1026,7 @@ const Reports = () => {
                 </p>
               </CardContent>
             </Card>
-            
+
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Lost Rate</CardTitle>
@@ -1136,7 +1139,7 @@ const Reports = () => {
                             <td className="text-right p-2">{source.lost}</td>
                             <td className="text-right p-2">{source.conversion_rate.toFixed(1)}%</td>
                             <td className="text-right p-2">
-                              {source.avg_conversion_time_hours 
+                              {source.avg_conversion_time_hours
                                 ? (source.avg_conversion_time_hours / 24).toFixed(1) + 'd'
                                 : 'N/A'}
                             </td>
@@ -1182,12 +1185,12 @@ const Reports = () => {
                             <td className="text-right p-2">{agent.lost}</td>
                             <td className="text-right p-2">{agent.conversion_rate.toFixed(1)}%</td>
                             <td className="text-right p-2">
-                              {agent.avg_response_time_hours 
+                              {agent.avg_response_time_hours
                                 ? agent.avg_response_time_hours.toFixed(1) + 'h'
                                 : 'N/A'}
                             </td>
                             <td className="text-right p-2">
-                              {agent.avg_conversion_time_hours 
+                              {agent.avg_conversion_time_hours
                                 ? (agent.avg_conversion_time_hours / 24).toFixed(1) + 'd'
                                 : 'N/A'}
                             </td>

@@ -36,6 +36,8 @@ import {
   MapPin,
   Phone,
   MoreVertical,
+  User2,
+  UsersRound,
 } from 'lucide-react';
 import LetterAvatar from '../components/LetterAvatar';
 import {
@@ -217,7 +219,10 @@ const Users = () => {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Users</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-gray-900 flex items-center gap-2">
+            <UsersRound className="h-8 w-8 text-primary" strokeWidth={1.5} />
+            System Users
+          </h1>
           <p className="text-gray-600 mt-1">Manage system users and permissions</p>
         </div>
         <Button onClick={handleAdd} className="sm:w-auto">
@@ -227,16 +232,16 @@ const Users = () => {
       </div>
 
       {/* Search */}
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-          <Input
-            type="text"
-            placeholder="Search users by name, email, or role..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10 pr-10 bg-white border-gray-200 shadow-xs"
-          />
-        </div>
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+        <Input
+          type="text"
+          placeholder="Search users by name, email, or role..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="pl-10 pr-10 bg-white border-gray-200 shadow-xs"
+        />
+      </div>
 
       {/* Users List */}
       {loading ? (

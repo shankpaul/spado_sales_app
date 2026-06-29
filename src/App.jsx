@@ -24,6 +24,9 @@ const Employees = lazy(() => import('./pages/Employees'));
 const Profile = lazy(() => import('./pages/Profile'));
 const Reports = lazy(() => import('./pages/Reports'));
 const TodaysWork = lazy(() => import('./pages/TodaysWork'));
+const Packages = lazy(() => import('./pages/Packages'));
+const Addons = lazy(() => import('./pages/Addons'));
+const ChecklistItems = lazy(() => import('./pages/ChecklistItems'));
 
 // Loading fallback component
 const LoadingFallback = () => (
@@ -218,6 +221,39 @@ function App() {
               <ProtectedRoute allowedRoles={['admin']}>
                 <Layout>
                   <Users />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/packages"
+            element={
+              <ProtectedRoute allowedRoles={['admin']}>
+                <Layout>
+                  <Packages />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/addons"
+            element={
+              <ProtectedRoute allowedRoles={['admin']}>
+                <Layout>
+                  <Addons />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/checklist-items"
+            element={
+              <ProtectedRoute allowedRoles={['admin']}>
+                <Layout>
+                  <ChecklistItems />
                 </Layout>
               </ProtectedRoute>
             }

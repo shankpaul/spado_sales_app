@@ -56,6 +56,7 @@ import {
   User,
   BoltIcon,
   CogIcon,
+  IdCardLanyard,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -100,7 +101,7 @@ const Employees = () => {
       const filters = {};
       if (statusFilter !== 'all') filters.status = statusFilter;
       if (schemeFilter !== 'all') filters.scheme = schemeFilter;
-      
+
       const response = await employeeService.getAllEmployees(filters);
       setEmployees(response.employees || response || []);
     } catch (error) {
@@ -209,8 +210,8 @@ const Employees = () => {
 
   // Get scheme badge color
   const getSchemeBadgeColor = (scheme) => {
-    return scheme === 'salary' 
-      ? 'bg-blue-100 text-blue-800' 
+    return scheme === 'salary'
+      ? 'bg-blue-100 text-blue-800'
       : 'bg-green-100 text-green-800';
   };
 
@@ -234,7 +235,10 @@ const Employees = () => {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Employees</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-gray-900 flex items-center gap-2">
+            <IdCardLanyard className="h-8 w-8 text-primary" strokeWidth={1.5} />
+            Employees
+          </h1>
           <p className="text-gray-600 mt-1">Manage employee records and compensation</p>
         </div>
         <Button onClick={handleAdd} className="sm:w-auto">
@@ -343,7 +347,7 @@ const Employees = () => {
         <>
           {/* Desktop Table View */}
           <div className="hidden md:block">
-            <Card  className="border-0 shadow-none rounded-lg md:border-1 md:shadow-xs bg-white">
+            <Card className="border-0 shadow-none rounded-lg md:border-1 md:shadow-xs bg-white">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -437,8 +441,8 @@ const Employees = () => {
           {/* Mobile Card View (Minimal) */}
           <div className="md:hidden grid gap-3">
             {filteredEmployees.map((employee) => (
-              <Card 
-                key={employee.id} 
+              <Card
+                key={employee.id}
                 className="p-4 hover:shadow-md transition-shadow cursor-pointer"
                 onClick={() => handleViewDetails(employee)}
               >
@@ -463,9 +467,9 @@ const Employees = () => {
                       <p className="text-sm text-gray-600 mt-1">{employee.job_title}</p>
                     )}
                   </div>
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
+                  <Button
+                    variant="ghost"
+                    size="sm"
                     className="h-8 w-8 p-0"
                     onClick={(e) => {
                       e.stopPropagation();
@@ -514,7 +518,7 @@ const Employees = () => {
               Complete information for {selectedEmployee?.name || selectedEmployee?.employee_number}
             </DialogDescription>
           </DialogHeader>
-          
+
           {selectedEmployee && (
             <div className="space-y-6">
               {/* Basic Information */}
@@ -619,12 +623,12 @@ const Employees = () => {
                   <div>
                     <label className="text-xs text-gray-500">Joining Date</label>
                     <p className="text-sm font-medium">
-                      {selectedEmployee.joining_date 
-                        ? new Date(selectedEmployee.joining_date).toLocaleDateString('en-IN', { 
-                            day: 'numeric', 
-                            month: 'long', 
-                            year: 'numeric' 
-                          })
+                      {selectedEmployee.joining_date
+                        ? new Date(selectedEmployee.joining_date).toLocaleDateString('en-IN', {
+                          day: 'numeric',
+                          month: 'long',
+                          year: 'numeric'
+                        })
                         : '-'}
                     </p>
                   </div>
@@ -632,10 +636,10 @@ const Employees = () => {
                     <div>
                       <label className="text-xs text-gray-500">Resignation Date</label>
                       <p className="text-sm font-medium text-red-600">
-                        {new Date(selectedEmployee.resignation_date).toLocaleDateString('en-IN', { 
-                          day: 'numeric', 
-                          month: 'long', 
-                          year: 'numeric' 
+                        {new Date(selectedEmployee.resignation_date).toLocaleDateString('en-IN', {
+                          day: 'numeric',
+                          month: 'long',
+                          year: 'numeric'
                         })}
                       </p>
                     </div>
@@ -669,7 +673,7 @@ const Employees = () => {
 
               {/* Actions */}
               <div className="border-t pt-4 flex gap-2">
-                <Button 
+                <Button
                   onClick={() => {
                     setIsDetailsOpen(false);
                     handleEdit(selectedEmployee);
@@ -679,7 +683,7 @@ const Employees = () => {
                   <Edit2 className="h-4 w-4 mr-2" />
                   Edit Employee
                 </Button>
-                <Button 
+                <Button
                   variant="outline"
                   onClick={() => handleToggleStatus(selectedEmployee)}
                   className="flex-1"
@@ -696,7 +700,7 @@ const Employees = () => {
                     </>
                   )}
                 </Button>
-                <Button 
+                <Button
                   variant="destructive"
                   onClick={() => {
                     setIsDetailsOpen(false);

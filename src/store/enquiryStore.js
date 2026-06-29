@@ -21,6 +21,7 @@ const useEnquiryStore = create((set, get) => ({
     assignedToId: '',
     startDate: '',
     endDate: '',
+    due_followup_only: false,
   },
   
   // Pagination
@@ -59,6 +60,7 @@ const useEnquiryStore = create((set, get) => ({
       assignedToId: '',
       startDate: '',
       endDate: '',
+      due_followup_only: false,
     },
   }),
 

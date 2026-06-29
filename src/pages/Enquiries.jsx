@@ -12,6 +12,8 @@ import {
   SelectValue,
 } from '../components/ui/select';
 import { toast } from 'sonner';
+import { Popover, PopoverTrigger, PopoverContent } from '../components/ui/popover';
+import enquiryService from '../services/enquiryService';
 import ablyClient from '../services/ablyClient';
 import useEnquiryStore from '../store/enquiryStore';
 import {
@@ -40,6 +42,7 @@ import {
   X,
   MessageSquare,
   Bell,
+  BellRing,
   PackageOpen,
 } from 'lucide-react';
 import { format } from 'date-fns';
@@ -63,7 +66,7 @@ import { formatDateTime } from '@/lib/utilities';
  */
 const Enquiries = () => {
   const navigate = useNavigate();
-  
+
   // Use enquiry store
   const {
     enquiries,
@@ -79,7 +82,7 @@ const Enquiries = () => {
     fetchPage,
     resetPagination,
   } = useEnquiryStore();
-  
+
   // Load persisted state from localStorage
   const loadPersistedState = () => {
     try {
@@ -105,6 +108,8 @@ const Enquiries = () => {
   const [dateFrom, setDateFrom] = useState(persistedState?.dateFrom || '');
   const [dateTo, setDateTo] = useState(persistedState?.dateTo || '');
   const [assignedToId, setAssignedToId] = useState(persistedState?.assignedToId || 'all');
+  const [dueFollowupOnly, setDueFollowupOnly] = useState(persistedState?.dueFollowupOnly || false);
+  const [followupSummary, setFollowupSummary] = useState({ today: 0, due: 0 });
 
   // Temporary filter states (for sheet)
   const [tempStatus, setTempStatus] = useState(persistedState?.status || 'all');
@@ -139,7 +144,30 @@ const Enquiries = () => {
   // Handle closing enquiry detail
   const handleCloseEnquiryDetail = () => {
     setSearchParams({});
+    fetchSummary();
   };
+
+  const handleViewAllFollowups = () => {
+    setDueFollowupOnly(true);
+    setStatus('all');
+    setDateFrom('');
+    setDateTo('');
+  };
+
+  const fetchSummary = async () => {
+    try {
+      const summary = await enquiryService.getFollowUpSummary();
+      setFollowupSummary(summary || { today: 0, due: 0 });
+    } catch (err) {
+      console.error('Failed to load followup summary:', err);
+    }
+  };
+
+  useEffect(() => {
+    fetchSummary();
+    const interval = setInterval(fetchSummary, 60000);
+    return () => clearInterval(interval);
+  }, []);
 
   // Persist filter state to localStorage
   useEffect(() => {
@@ -151,10 +179,11 @@ const Enquiries = () => {
       dateFrom,
       dateTo,
       assignedToId,
+      dueFollowupOnly,
       page: storePage
     };
     localStorage.setItem('enquiriesFilters', JSON.stringify(filterState));
-  }, [searchQuery, status, source, sentiment, dateFrom, dateTo, assignedToId, storePage]);
+  }, [searchQuery, status, source, sentiment, dateFrom, dateTo, assignedToId, dueFollowupOnly, storePage]);
 
   // Detect mobile/desktop resize
   useEffect(() => {
@@ -181,8 +210,9 @@ const Enquiries = () => {
       date_from: dateFrom,
       date_to: dateTo,
       assigned_to_id: assignedToId !== 'all' ? assignedToId : '',
+      due_followup_only: dueFollowupOnly,
     });
-  }, [searchQuery, status, source, sentiment, dateFrom, dateTo, assignedToId, setFilters]);
+  }, [searchQuery, status, source, sentiment, dateFrom, dateTo, assignedToId, dueFollowupOnly, setFilters]);
 
   // Fetch enquiries with proper reset logic
   useEffect(() => {
@@ -198,7 +228,7 @@ const Enquiries = () => {
 
     // Reset and fetch when filters change
     fetchEnquiries(true);
-  }, [searchQuery, status, source, sentiment, dateFrom, dateTo, assignedToId, fetchEnquiries]);
+  }, [searchQuery, status, source, sentiment, dateFrom, dateTo, assignedToId, dueFollowupOnly, fetchEnquiries]);
 
   // Infinite scroll observer callback
   const handleObserver = useCallback((entries) => {
@@ -235,7 +265,7 @@ const Enquiries = () => {
     const setupSubscription = async () => {
       try {
         await ablyClient.initialize();
-        
+
         // Subscribe to enquiries channel
         unsubscribe = ablyClient.subscribeToEnquiries((eventName, eventData) => {
           // Handle different event types
@@ -245,16 +275,19 @@ const Enquiries = () => {
             });
             // Refresh the list to show new enquiry
             fetchEnquiries(true);
+            fetchSummary();
           } else if (eventName === 'enquiry.updated' || eventName === 'enquiry.status_changed') {
             // Refresh the list to show updates
             fetchEnquiries(true);
+            fetchSummary();
           } else if (eventName === 'enquiry.assigned') {
             toast.info('Enquiry Assigned', {
               description: `Enquiry from ${eventData.data.contact_name || 'Unknown'} has been assigned`,
             });
             fetchEnquiries(true);
+            fetchSummary();
           } else if (eventName === 'enquiry.comment_added') {
-            // Optionally update comment count in the list
+            fetchSummary();
           }
         });
       } catch (err) {
@@ -379,13 +412,13 @@ const Enquiries = () => {
   // Get Badge2 variant for status
   const getBadgeVariant = (statusValue) => {
     const color = ENQUIRY_STATUS_COLORS[statusValue] || 'gray';
-   return color|| 'secondary';
+    return color || 'secondary';
   };
 
   // Get Badge2 variant for sentiment
   const getSentimentBadgeVariant = (sentimentValue) => {
     const color = SENTIMENT_COLORS[sentimentValue] || 'secondary';
-    
+
     return color || 'secondary';
   };
 
@@ -394,6 +427,7 @@ const Enquiries = () => {
     setIsWizardOpen(false);
     // Refresh the list from the beginning
     fetchEnquiries(true);
+    fetchSummary();
   };
 
   // Check if follow-up is needed (follow-up date in the past or today)
@@ -416,18 +450,123 @@ const Enquiries = () => {
           </h1>
           <p className="text-muted-foreground">Track and manage customer enquiries</p>
         </div>
-        <Button onClick={() => setIsWizardOpen(true)} className="w-full sm:w-auto">
-          <Plus className="h-4 w-4 mr-2" />
-          New Enquiry
-        </Button>
+        <div className="flex items-center gap-3 w-full sm:w-auto">
+          {/* Bell Icon Popover */}
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant={followupSummary.today + followupSummary.due > 0 ? "default" : "outline"}
+                size="icon"
+                className={`relative rounded-full cursor-pointer shrink-0 transition-all ${followupSummary.today + followupSummary.due > 0
+                  ? 'bg-red-100 hover:bg-red-300 text-white border border-red-300 shadow-md active:scale-95'
+                  : 'hover:bg-gray-100 text-gray-600'
+                  }`}
+              >
+                <Bell className={`h-5 w-5 ${followupSummary.today + followupSummary.due > 0 ? 'text-red-500 fill-white/20 animate-bounce' : 'text-gray-600'}`} />
+                {followupSummary.today + followupSummary.due > 0 && (
+                  <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white shadow-xs">
+                    {followupSummary.today + followupSummary.due}
+                  </span>
+                )}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="z-[3000] w-80 bg-white p-4 shadow-md border border-gray-150 rounded-xl">
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 border-b border-gray-100 pb-2">
+                  <BellRing className="h-5 w-5 text-primary shrink-0" />
+                  <h4 className="font-bold text-sm text-gray-800">Follow-up Urgency</h4>
+                </div>
+                <div className="space-y-2 text-sm text-gray-600">
+                  <div className="flex justify-between items-center py-1">
+                    <span>Scheduled for today:</span>
+                    <span className="font-semibold text-gray-900 bg-amber-50 text-amber-700 px-2 py-0.5 rounded border border-amber-100 text-xs">
+                      {followupSummary.today} enquiry/s
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center py-1">
+                    <span>Already past due:</span>
+                    <span className="font-semibold text-gray-900 bg-red-50 text-red-700 px-2 py-0.5 rounded border border-red-100 text-xs">
+                      {followupSummary.due} enquiry/s
+                    </span>
+                  </div>
+                </div>
+                <Button
+                  onClick={handleViewAllFollowups}
+                  className="w-full text-xs font-semibold mt-2 cursor-pointer bg-red-600 hover:bg-red-700 text-white"
+                  size="sm"
+                >
+                  View All Urgent Follow-ups
+                </Button>
+              </div>
+            </PopoverContent>
+          </Popover>
+
+          <Button onClick={() => setIsWizardOpen(true)} className="w-full sm:w-auto">
+            <Plus className="h-4 w-4 mr-2" />
+            New Enquiry
+          </Button>
+        </div>
       </div>
 
       {/* Mobile Title - Visible only on mobile */}
       <div className="block md:hidden">
-        <h1 className="text-2xl font-bold flex items-center gap-2">
-          <PackageOpen className="h-6 w-6" strokeWidth={1.5} /> Enquiries
-        </h1>
-        <p className="text-muted-foreground text-sm">Track and manage customer enquiries</p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold flex items-center gap-2">
+              <PackageOpen className="h-6 w-6" strokeWidth={1.5} /> Enquiries
+            </h1>
+            <p className="text-muted-foreground text-sm">Track and manage customer enquiries</p>
+          </div>
+          {/* Bell Icon Popover for Mobile */}
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant={followupSummary.today + followupSummary.due > 0 ? "default" : "outline"}
+                size="icon"
+                className={`relative rounded-full cursor-pointer shrink-0 transition-all ${followupSummary.today + followupSummary.due > 0
+                  ? 'bg-red-100 hover:bg-red-600 text-white border border-red-500 shadow-md active:scale-95'
+                  : 'hover:bg-gray-100 text-gray-600'
+                  }`}
+              >
+                <Bell className={`h-5 w-5 ${followupSummary.today + followupSummary.due > 0 ? 'text-red-500 fill-white/20 animate-bounce' : 'text-gray-600'}`} />
+                {followupSummary.today + followupSummary.due > 0 && (
+                  <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white shadow-xs">
+                    {followupSummary.today + followupSummary.due}
+                  </span>
+                )}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="z-[3000] w-80 bg-white p-4 shadow-md border border-gray-150 rounded-xl">
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 border-b border-gray-100 pb-2">
+                  <BellRing className="h-5 w-5 text-primary shrink-0" />
+                  <h4 className="font-bold text-sm text-gray-800">Follow-up Urgency</h4>
+                </div>
+                <div className="space-y-2 text-sm text-gray-600">
+                  <div className="flex justify-between items-center py-1">
+                    <span>Scheduled for today:</span>
+                    <span className="font-semibold text-gray-900 bg-amber-50 text-amber-700 px-2 py-0.5 rounded border border-amber-100 text-xs">
+                      {followupSummary.today} enquiry/s
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center py-1">
+                    <span>Already past due:</span>
+                    <span className="font-semibold text-gray-900 bg-red-50 text-red-700 px-2 py-0.5 rounded border border-red-100 text-xs">
+                      {followupSummary.due} enquiry/s
+                    </span>
+                  </div>
+                </div>
+                <Button
+                  onClick={handleViewAllFollowups}
+                  className="w-full text-xs font-semibold mt-2 cursor-pointer bg-red-600 hover:bg-red-700 text-white"
+                  size="sm"
+                >
+                  View All Urgent Follow-ups
+                </Button>
+              </div>
+            </PopoverContent>
+          </Popover>
+        </div>
       </div>
 
       {/* Search and Filters - Sticky on Mobile */}
@@ -597,6 +736,26 @@ const Enquiries = () => {
         </div>
       )}
 
+      {/* Follow-up Urgency Filter Banner */}
+      {dueFollowupOnly && (
+        <div className="bg-primary/5 border border-primary/20 rounded-xl p-4 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-2">
+            <BellRing className="h-5 w-5 text-primary shrink-0" />
+            <p className="text-sm font-semibold text-primary">
+              Showing only enquiries requiring follow-up today or past due.
+            </p>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setDueFollowupOnly(false)}
+            className="text-xs h-8 cursor-pointer shrink-0"
+          >
+            Clear Filter
+          </Button>
+        </div>
+      )}
+
       {/* Enquiries List */}
       <Card className="border-0 shadow-none md:border-1 rounded-lg md:shadow-xs bg-white">
         {loading ? (
@@ -681,9 +840,9 @@ const Enquiries = () => {
                   className="bg-white shadow-sm border border-gray-100 rounded-xl p-4 active:scale-[0.98] active:bg-gray-50 transition-all duration-200"
                 >
                   <div className="flex items-center gap-4">
-                    <LetterAvatar 
-                      name={enquiry.customer?.name || enquiry.contact_name || 'Unknown'} 
-                      size="sm" 
+                    <LetterAvatar
+                      name={enquiry.customer?.name || enquiry.contact_name || 'Unknown'}
+                      size="sm"
                     />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between">
@@ -761,9 +920,9 @@ const Enquiries = () => {
                     >
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2">
-                          <LetterAvatar 
-                            name={enquiry.customer?.name || enquiry.contact_name || 'Unknown'} 
-                            size="xs" 
+                          <LetterAvatar
+                            name={enquiry.customer?.name || enquiry.contact_name || 'Unknown'}
+                            size="xs"
                           />
                           <div>
                             <div className="font-medium capitalize">

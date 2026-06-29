@@ -461,7 +461,7 @@ const Offers = () => {
             </div>
           </Card>
         ) : offers.length === 0 ? (
-          <Card className="p-12 text-center">
+          <Card className="p-12 text-center bg-white">
             <Tag className="h-12 w-12 text-gray-400 mx-auto mb-4" />
             <h3 className="text-lg font-semibold text-gray-700 mb-2">No offers found</h3>
             <p className="text-gray-500 mb-4">

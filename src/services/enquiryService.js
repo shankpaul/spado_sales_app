@@ -184,6 +184,15 @@ const enquiryService = {
     const response = await apiClient.post('/enquiries/exceptions/phone', { phone, reason });
     return response.data;
   },
+
+  /**
+   * Get followup summary counts for today and past due
+   * @returns {Promise<Object>} Summary data {today, due}
+   */
+  getFollowUpSummary: async () => {
+    const response = await apiClient.get('/enquiries/followup-summary');
+    return response.data;
+  },
 };
 
 export default enquiryService;

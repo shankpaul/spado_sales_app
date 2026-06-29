@@ -56,21 +56,21 @@ const TodaysWork = () => {
   // Calculate stats
   const totalUpcomingCount = upcomingOrders.length;
   const totalCompletedCount = completedOrders.length;
-  const totalUpcomingValue = upcomingOrders.reduce((sum, o) => sum + (o.total_amount || 0), 0);
-  const totalCompletedValue = completedOrders.reduce((sum, o) => sum + (o.total_amount || 0), 0);
+  const totalUpcomingValue = upcomingOrders.reduce((sum, o) => sum + (Number(o.total_amount) || 0), 0);
+  const totalCompletedValue = completedOrders.reduce((sum, o) => sum + (Number(o.total_amount) || 0), 0);
 
   // Today's pending payment stats
   const todaysPendingPaymentOrders = [...upcomingOrders, ...completedOrders].filter(
     order => ['pending', 'partial'].includes(order.payment_status) && order.status !== 'cancelled'
   );
   const pendingCount = todaysPendingPaymentOrders.length;
-  const pendingValue = todaysPendingPaymentOrders.reduce((sum, o) => sum + (o.total_amount || 0), 0);
+  const pendingValue = todaysPendingPaymentOrders.reduce((sum, o) => sum + (Number(o.total_amount) || 0), 0);
 
   return (
     <div className="p-4 md:p-6 space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-2">
+        <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
           <ClipboardList className="h-8 w-8 text-primary" strokeWidth={1.5} />
           Today's Work
         </h1>
