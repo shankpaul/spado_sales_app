@@ -91,8 +91,8 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { formatTime, checkServiceAvailability, getAgentsAvailableToday } from '@/lib/utilities';
-import { getBrands, getModelsByBrand, getVehicleType, getVehicleTypes } from '../lib/vehicleData';
-import VehicleIcon from '@/components/VehicleIcon';
+import { getVehicleTypes } from '../lib/vehicleData';
+import VehicleIdentifier from '../components/VehicleIdentifier';
 
 /**
  * Dashboard Page Component
@@ -133,10 +133,7 @@ const Dashboard = () => {
   const [agentsAvailableOpen, setAgentsAvailableOpen] = useState(false);
   const [quickToolsMenuOpen, setQuickToolsMenuOpen] = useState(false);
 
-  // Vehicle Identifier States
-  const [selectedBrand, setSelectedBrand] = useState('');
-  const [selectedModel, setSelectedModel] = useState('');
-  const [identifiedType, setIdentifiedType] = useState('');
+
 
   // Service Availability States
   const [serviceMapLink, setServiceMapLink] = useState('');
@@ -205,26 +202,7 @@ const Dashboard = () => {
     return () => clearInterval(refreshInterval);
   }, []);
 
-  // Handle vehicle identification
-  const handleIdentifyVehicle = () => {
-    if (selectedBrand && selectedModel) {
-      const type = getVehicleType(selectedBrand, selectedModel);
-      if (type) {
-        setIdentifiedType(type);
-      } else {
-        toast.error('Could not identify vehicle type');
-      }
-    } else {
-      toast.error('Please select both brand and model');
-    }
-  };
 
-  // Reset vehicle identifier
-  const resetVehicleIdentifier = () => {
-    setSelectedBrand('');
-    setSelectedModel('');
-    setIdentifiedType('');
-  };
 
   // Fetch packages when vehicle type changes
   useEffect(() => {
@@ -402,19 +380,19 @@ const Dashboard = () => {
         {/* Charts Section */}
         {statsLoading ? (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <Card className="bg-white border-none shadow-sm md:border md:shadow-none p-6">
+            <Card className="bg-white  shadow-sm md:border md:shadow-none p-6">
               <Skeleton className="h-6 w-48 mb-4" />
               <Skeleton className="h-72 w-full rounded-2xl" />
             </Card>
-            <Card className="bg-white border-none shadow-sm md:border md:shadow-none p-6">
+            <Card className="bg-white  shadow-sm md:border md:shadow-none p-6">
               <Skeleton className="h-6 w-48 mb-4" />
               <Skeleton className="h-72 w-full rounded-2xl" />
             </Card>
-            <Card className="bg-white border-none shadow-sm md:border md:shadow-none p-6">
+            <Card className="bg-white  shadow-sm md:border md:shadow-none p-6">
               <Skeleton className="h-6 w-48 mb-4" />
               <Skeleton className="h-72 w-full rounded-2xl" />
             </Card>
-            <Card className="bg-white border-none shadow-sm md:border md:shadow-none p-6">
+            <Card className="bg-white  shadow-sm md:border md:shadow-none p-6">
               <Skeleton className="h-6 w-48 mb-4" />
               <Skeleton className="h-72 w-full rounded-2xl" />
             </Card>
@@ -422,11 +400,11 @@ const Dashboard = () => {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Chart 1: Monthly Revenue Trend */}
-            <Card className="bg-white border-none shadow-sm md:border md:shadow-none">
+            <Card className="bg-white  shadow-sm md:border md:shadow-none">
               <CardHeader className="pb-2">
                 <CardTitle className="text-base font-semibold text-gray-900 flex items-center gap-2">
                   <TrendingUp className="h-5 w-5 text-indigo-500" />
-                  Revenue Trend (30 Days)
+                  Revenue Trend (14 Days)
                 </CardTitle>
               </CardHeader>
               <CardContent className="pt-4">
@@ -476,11 +454,11 @@ const Dashboard = () => {
             </Card>
 
             {/* Chart 2: Bookings Trend */}
-            <Card className="bg-white border-none shadow-sm md:border md:shadow-none">
+            <Card className="bg-white  shadow-sm md:border md:shadow-none">
               <CardHeader className="pb-2">
                 <CardTitle className="text-base font-semibold text-gray-900 flex items-center gap-2">
                   <Calendar className="h-5 w-5 text-emerald-500" />
-                  Bookings Trend (30 Days)
+                  Bookings Trend (14 Days)
                 </CardTitle>
               </CardHeader>
               <CardContent className="pt-4">
@@ -529,11 +507,11 @@ const Dashboard = () => {
             </Card>
 
             {/* Chart 3: Enquiries Trend */}
-            <Card className="bg-white border-none shadow-sm md:border md:shadow-none">
+            <Card className="bg-white  shadow-sm md:border md:shadow-none">
               <CardHeader className="pb-2">
                 <CardTitle className="text-base font-semibold text-gray-900 flex items-center gap-2">
                   <Car className="h-5 w-5 text-orange-500" />
-                  Enquiries Trend (30 Days)
+                  Enquiries Trend (14 Days)
                 </CardTitle>
               </CardHeader>
               <CardContent className="pt-4">
@@ -582,11 +560,11 @@ const Dashboard = () => {
             </Card>
 
             {/* Chart 4: New Customers */}
-            <Card className="bg-white border-none shadow-sm md:border md:shadow-none">
+            <Card className="bg-white  shadow-sm md:border md:shadow-none">
               <CardHeader className="pb-2">
                 <CardTitle className="text-base font-semibold text-gray-900 flex items-center gap-2">
                   <Users className="h-5 w-5 text-cyan-500" />
-                  New Customers (30 Days)
+                  New Customers (14 Days)
                 </CardTitle>
               </CardHeader>
               <CardContent className="pt-4">
@@ -733,7 +711,7 @@ const Dashboard = () => {
         <div className="grid gap-4 md:grid-cols-3">
           {/* Orders Column - Takes 2 columns on desktop */}
           <div className="md:col-span-2 space-y-4">
-            <div className="border-none flex flex-col gap-4">
+            <div className=" flex flex-col gap-4">
               <div className="text-lg flex items-center justify-between">
                 <span className="font-semibold text-xl text-gray-900 flex items-center gap-2">
                   Today's Upcoming Works
@@ -766,7 +744,7 @@ const Dashboard = () => {
             </div>
 
             {(loadingOrders || completedOrders.length > 0) && (
-              <div className="border-none flex flex-col gap-4">
+              <div className=" flex flex-col gap-4">
                 <div className="text-lg flex items-center justify-between">
                   <span className="font-semibold text-xl text-gray-900 flex items-center gap-2">
                     Completed Today
@@ -1041,153 +1019,11 @@ const Dashboard = () => {
           </DialogContent>
         </Dialog>
 
-        {/* Vehicle Identifier Dialog - Desktop */}
-        <Dialog open={vehicleIdentifierOpen && !isMobile} onOpenChange={setVehicleIdentifierOpen}>
-          <DialogContent className="sm:max-w-md">
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
-                <Car className="h-5 w-5 text-primary" />
-                Identify Vehicle Type
-              </DialogTitle>
-              <DialogDescription>
-                Select the vehicle brand and model to identify its type category.
-              </DialogDescription>
-            </DialogHeader>
-
-            <div className="space-y-4 py-4">
-              <div className="space-y-2">
-                <Label htmlFor="brand">Brand</Label>
-                <Select value={selectedBrand} onValueChange={(value) => {
-                  setSelectedBrand(value);
-                  setSelectedModel('');
-                  setIdentifiedType('');
-                }}>
-                  <SelectTrigger id="brand">
-                    <SelectValue placeholder="Select brand" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {getBrands().map((brand) => (
-                      <SelectItem key={brand} value={brand}>{brand}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {selectedBrand && (
-                <div className="space-y-2">
-                  <Label htmlFor="model">Model</Label>
-                  <Select value={selectedModel} onValueChange={setSelectedModel}>
-                    <SelectTrigger id="model">
-                      <SelectValue placeholder="Select model" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {getModelsByBrand(selectedBrand).map((model) => (
-                        <SelectItem key={model.name} value={model.name}>{model.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
-
-              {identifiedType && (
-                <div className="p-4 rounded-lg bg-blue-50 border border-primary/20">
-                  <div className="flex items-center justify-between gap-4">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="text-sm font-semibold text-primary">Identified Type</span>
-                      </div>
-                      <p className="text-2xl font-bold text-primary uppercase">{identifiedType}</p>
-                    </div>
-                    <VehicleIcon vehicleType={identifiedType} size={82} />
-                  </div>
-                </div>
-              )}
-
-              <div className="flex gap-2 pt-2">
-                <Button onClick={handleIdentifyVehicle} className="flex-1">
-                  Identify
-                </Button>
-                <Button variant="outline" onClick={resetVehicleIdentifier}>
-                  Reset
-                </Button>
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
-
-        {/* Vehicle Identifier Drawer - Mobile */}
-        <Drawer open={vehicleIdentifierOpen && isMobile} onOpenChange={setVehicleIdentifierOpen}>
-          <DrawerContent className="max-h-[90vh]">
-            <DrawerHeader className="px-4 text-left">
-              <DrawerTitle className="flex items-center gap-2">
-                <Car className="h-5 w-5 text-primary" />
-                Identify Vehicle Type
-              </DrawerTitle>
-              <DrawerDescription>
-                Select the vehicle brand and model to identify its type category.
-              </DrawerDescription>
-            </DrawerHeader>
-
-            <div className="px-4 pb-4 space-y-4 overflow-y-auto">
-              <div className="space-y-2">
-                <Label htmlFor="mobile-brand">Brand</Label>
-                <Select value={selectedBrand} onValueChange={(value) => {
-                  setSelectedBrand(value);
-                  setSelectedModel('');
-                  setIdentifiedType('');
-                }}>
-                  <SelectTrigger id="mobile-brand">
-                    <SelectValue placeholder="Select brand" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {getBrands().map((brand) => (
-                      <SelectItem key={brand} value={brand}>{brand}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {selectedBrand && (
-                <div className="space-y-2">
-                  <Label htmlFor="mobile-model">Model</Label>
-                  <Select value={selectedModel} onValueChange={setSelectedModel}>
-                    <SelectTrigger id="mobile-model">
-                      <SelectValue placeholder="Select model" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {getModelsByBrand(selectedBrand).map((model) => (
-                        <SelectItem key={model.name} value={model.name}>{model.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
-
-              {identifiedType && (
-                <div className="p-4 rounded-lg bg-blue-50 border border-primary/20">
-                  <div className="flex items-center justify-between gap-4">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="text-sm font-semibold text-primary">Identified Type</span>
-                      </div>
-                      <p className="text-2xl font-bold text-primary uppercase">{identifiedType}</p>
-                    </div>
-                    <VehicleIcon vehicleType={identifiedType} size={82} />
-                  </div>
-                </div>
-              )}
-
-              <div className="flex gap-2 pt-2">
-                <Button onClick={handleIdentifyVehicle} className="flex-1">
-                  Identify
-                </Button>
-                <Button variant="outline" onClick={resetVehicleIdentifier}>
-                  Reset
-                </Button>
-              </div>
-            </div>
-          </DrawerContent>
-        </Drawer>
+        {/* Vehicle Identifier Dialog/Drawer */}
+        <VehicleIdentifier
+          open={vehicleIdentifierOpen}
+          onOpenChange={setVehicleIdentifierOpen}
+        />
 
         {/* Service Availability Dialog - Desktop */}
         <Dialog open={serviceCheckerOpen && !isMobile} onOpenChange={(open) => {
@@ -1638,7 +1474,7 @@ const Dashboard = () => {
 const StatCard = ({ title, value, change, icon, isLoading, vsLabel = "vs last month", onClick }) => (
   <Card
     className={cn(
-      "overflow-hidden border-none shadow-sm md:border md:shadow-none transition-all duration-200",
+      "overflow-hidden shadow-sm md:border md:shadow-none transition-all duration-200",
       onClick && "cursor-pointer hover:shadow-md hover:border-primary-100 hover:bg-gray-50/50 active:scale-[0.98]"
     )}
     onClick={onClick}
@@ -1898,8 +1734,8 @@ const ResponseMeterCard = ({ title, stats, isLoading, onClick }) => {
   return (
     <Card
       className={cn(
-        "overflow-hidden border-none shadow-sm md:border md:shadow-none transition-all duration-200 bg-white",
-        onClick && "cursor-pointer hover:shadow-md hover:border-primary-100 hover:bg-gray-50/50 active:scale-[0.98]"
+        "overflow-hidden  shadow-sm md:border md:shadow-none transition-all duration-200 bg-white",
+        onClick && "cursor-pointer hover:shadow-md hover:border-primary-100  active:scale-[0.98]"
       )}
       onClick={onClick}
     >
@@ -1986,7 +1822,7 @@ const TargetAchievementCard = ({ stats, isLoading }) => {
   const offset = circumference - (Math.min(percentage, 100) / 100) * circumference;
 
   return (
-    <Card className="overflow-hidden border-none shadow-sm md:border md:shadow-none bg-white flex flex-col h-full">
+    <Card className="overflow-hidden hover:shadow-md shadow-sm md:border md:shadow-none bg-white flex flex-col h-full">
       <CardHeader className="flex flex-row items-center justify-between pb-2 bg-white">
         <CardTitle className="text-sm font-bold text-gray-900 flex items-center gap-2">
           <TrendingUp className="h-4 w-4 text-emerald-500" />
@@ -2100,7 +1936,7 @@ const PendingPaymentsCard = ({ stats, isLoading, onOrderClick }) => {
     <>
       <Card
         className={cn(
-          "overflow-hidden border-none shadow-sm md:border md:shadow-none transition-all duration-200 bg-white flex flex-col h-full",
+          "overflow-hidden  shadow-sm md:border md:shadow-none transition-all duration-200 bg-white flex flex-col h-full",
           count > 0 && "cursor-pointer hover:shadow-md hover:border-primary-100 hover:bg-gray-50/50 active:scale-[0.98]"
         )}
         onClick={() => count > 0 && setIsOpen(true)}

@@ -260,7 +260,7 @@ const Employees = () => {
           />
         </div>
         <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-full sm:w-40">
+          <SelectTrigger className="w-full sm:w-40 bg-white border-gray-200">
             <SelectValue placeholder="Status" />
           </SelectTrigger>
           <SelectContent>
@@ -270,7 +270,7 @@ const Employees = () => {
           </SelectContent>
         </Select>
         <Select value={schemeFilter} onValueChange={setSchemeFilter}>
-          <SelectTrigger className="w-full sm:w-40">
+          <SelectTrigger className="w-full sm:w-40 bg-white border-gray-200">
             <SelectValue placeholder="Scheme" />
           </SelectTrigger>
           <SelectContent>
@@ -313,174 +313,247 @@ const Employees = () => {
               </Table>
             </Card>
           </div>
+
           {/* Mobile Loading */}
-          <div className="md:hidden grid gap-3">
-            {[...Array(5)].map((_, i) => (
-              <Card key={i} className="p-4">
-                <div className="space-y-2">
-                  <Skeleton className="h-5 w-32" />
+          <div className="grid grid-cols-1 gap-4 md:hidden">
+            {[...Array(3)].map((_, i) => (
+              <Card key={i} className="p-4 space-y-3 bg-white">
+                <div className="flex justify-between">
+                  <Skeleton className="h-5 w-24" />
+                  <Skeleton className="h-5 w-16" />
+                </div>
+                <Skeleton className="h-4 w-32" />
+                <div className="flex gap-2">
+                  <Skeleton className="h-4 w-20" />
                   <Skeleton className="h-4 w-24" />
                 </div>
               </Card>
             ))}
           </div>
         </>
-      ) : filteredEmployees.length === 0 ? (
-        <Card className="p-12 text-center">
-          <Briefcase className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">
-            {searchTerm ? 'No employees found' : 'No employees yet'}
-          </h3>
-          <p className="text-gray-600 mb-4">
-            {searchTerm
-              ? 'Try adjusting your search or filters'
-              : 'Get started by adding your first employee'}
-          </p>
-          {!searchTerm && (
-            <Button onClick={handleAdd}>
-              <Plus className="h-4 w-4 mr-2" />
-              Add Employee
-            </Button>
-          )}
-        </Card>
       ) : (
         <>
-          {/* Desktop Table View */}
+          {/* Desktop View - Table */}
           <div className="hidden md:block">
-            <Card className="border-0 shadow-none rounded-lg md:border-1 md:shadow-xs bg-white">
+            <Card className="bg-white border border-gray-200 shadow-sm overflow-hidden rounded-xl">
               <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead>Employee</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Scheme</TableHead>
+                    <TableHead>Compensation</TableHead>
+                    <TableHead>Contact</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredEmployees.map((employee) => (
-                    <TableRow key={employee.id} className="cursor-pointer hover:bg-gray-50" onClick={() => handleViewDetails(employee)}>
-                      <TableCell>
-                        <div>
-                          <div className="font-medium text-gray-900">
-                            {employee.name || 'Unnamed Employee'}
-                          </div>
-                          <div className="text-sm text-gray-500">
-                            {employee.employee_number}
-                            {employee.job_title && ` • ${employee.job_title}`}
-                          </div>
-                          {employee.user && (
-                            <div className="text-xs text-gray-400 flex gap-1 items-center">
-                              <CogIcon strokeWidth={1.2} size={12} /> {employee.user.name} ({employee.user.role})
-                            </div>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge
-                          className={
-                            employee.status === 'active'
-                              ? 'bg-green-100 text-green-800'
-                              : 'bg-gray-100 text-gray-800'
-                          }
-                        >
-                          {employee.status}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Badge className={getSchemeBadgeColor(employee.scheme)}>
-                          {getSchemeLabel(employee.scheme)}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                              <MoreVertical className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => handleViewDetails(employee)}>
-                              <Eye className="h-4 w-4 mr-2" />
-                              View Details
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleEdit(employee)}>
-                              <Edit2 className="h-4 w-4 mr-2" />
-                              Edit
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleToggleStatus(employee)}>
-                              {employee.status === 'active' ? (
-                                <>
-                                  <UserX className="h-4 w-4 mr-2" />
-                                  Deactivate
-                                </>
-                              ) : (
-                                <>
-                                  <UserCheck className="h-4 w-4 mr-2" />
-                                  Activate
-                                </>
-                              )}
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={() => handleDeleteClick(employee)}
-                              className="text-red-600"
-                            >
-                              <Trash2 className="h-4 w-4 mr-2" />
-                              Delete
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+                  {filteredEmployees.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={6} className="text-center py-8 text-gray-500 bg-white">
+                        No employees found matching the filters.
                       </TableCell>
                     </TableRow>
-                  ))}
+                  ) : (
+                    filteredEmployees.map((employee) => (
+                      <TableRow
+                        key={employee.id}
+                        className="cursor-pointer hover:bg-gray-50 transition-colors"
+                        onClick={() => handleViewDetails(employee)}
+                      >
+                        <TableCell>
+                          <div className="flex items-center gap-3">
+                            <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">
+                              {employee.name ? employee.name[0].toUpperCase() : 'E'}
+                            </div>
+                            <div>
+                              <div className="font-semibold text-gray-900">{employee.name}</div>
+                              <div className="text-sm text-gray-500 flex items-center gap-1">
+                                <Briefcase className="h-3 w-3" />
+                                {employee.job_title || 'No Title'}
+                              </div>
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge
+                            className={
+                              employee.status === 'active'
+                                ? 'bg-green-50 text-green-700 hover:bg-green-50 border-green-200'
+                                : 'bg-red-50 text-red-700 hover:bg-red-50 border-red-200'
+                            }
+                          >
+                            {employee.status === 'active' ? 'Active' : 'Resigned'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <span className="capitalize font-medium text-gray-700">
+                            {employee.scheme === 'salary' ? 'Fixed Salary' : 'Commission Only'}
+                          </span>
+                        </TableCell>
+                        <TableCell>
+                          <div className="space-y-1">
+                            {employee.scheme === 'salary' && (
+                              <div className="font-medium text-gray-900">
+                                {formatCurrency(employee.fixed_salary)}/mo
+                              </div>
+                            )}
+                            {employee.scheme === 'commission' && (
+                              <div className="text-sm font-medium text-gray-900">
+                                {employee.commission_percentage}% Comm.
+                              </div>
+                            )}
+                            <div className="text-xs text-gray-500">
+                              Work: {employee.work_incentive_percentage}% | 5★: {employee.five_star_incentive_percentage}%
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="space-y-1 text-sm text-gray-600">
+                            {employee.contact_number && (
+                              <div className="flex items-center gap-1">
+                                <Phone className="h-3 w-3" />
+                                {employee.contact_number}
+                              </div>
+                            )}
+                            {employee.user && (
+                              <div className="flex items-center gap-1 text-xs text-gray-500">
+                                <Mail className="h-3 w-3" />
+                                {employee.user.email}
+                              </div>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" className="h-8 w-8 p-0">
+                                <span className="sr-only">Open menu</span>
+                                <MoreVertical className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="bg-white border border-gray-150 rounded-xl shadow-md">
+                              <DropdownMenuItem
+                                onClick={() => handleViewDetails(employee)}
+                                className="cursor-pointer hover:bg-gray-50"
+                              >
+                                <Eye className="mr-2 h-4 w-4" />
+                                View Details
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() => handleEdit(employee)}
+                                className="cursor-pointer hover:bg-gray-50"
+                              >
+                                <Edit2 className="mr-2 h-4 w-4" />
+                                Edit Employee
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() => handleToggleStatus(employee)}
+                                className="cursor-pointer hover:bg-gray-50"
+                              >
+                                {employee.status === 'active' ? (
+                                  <>
+                                    <UserX className="mr-2 h-4 w-4 text-red-600" />
+                                    <span className="text-red-600">Deactivate</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <UserCheck className="mr-2 h-4 w-4 text-green-600" />
+                                    <span className="text-green-600">Activate</span>
+                                  </>
+                                )}
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() => handleDeleteClick(employee)}
+                                className="text-red-600 focus:text-red-600 cursor-pointer hover:bg-red-50"
+                              >
+                                <Trash2 className="mr-2 h-4 w-4" />
+                                Delete
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
                 </TableBody>
               </Table>
             </Card>
           </div>
 
-          {/* Mobile Card View (Minimal) */}
-          <div className="md:hidden grid gap-3">
-            {filteredEmployees.map((employee) => (
-              <Card
-                key={employee.id}
-                className="p-4 hover:shadow-md transition-shadow cursor-pointer"
-                onClick={() => handleViewDetails(employee)}
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <h3 className="font-semibold text-gray-900 truncate">
-                        {employee.name || 'Unnamed Employee'}
-                      </h3>
-                      <Badge
-                        className={
-                          employee.status === 'active'
-                            ? 'bg-green-100 text-green-800'
-                            : 'bg-gray-100 text-gray-800'
-                        }
-                      >
-                        {employee.status}
-                      </Badge>
-                    </div>
-                    <p className="text-sm text-gray-500">{employee.employee_number}</p>
-                    {employee.job_title && (
-                      <p className="text-sm text-gray-600 mt-1">{employee.job_title}</p>
-                    )}
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-8 w-8 p-0"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleViewDetails(employee);
-                    }}
-                  >
-                    <Eye className="h-4 w-4" />
-                  </Button>
-                </div>
+          {/* Mobile View - Cards */}
+          <div className="grid grid-cols-1 gap-4 md:hidden">
+            {filteredEmployees.length === 0 ? (
+              <Card className="p-8 text-center text-gray-500 bg-white">
+                No employees found matching the filters.
               </Card>
-            ))}
+            ) : (
+              filteredEmployees.map((employee) => (
+                <Card
+                  key={employee.id}
+                  className="p-4 space-y-4 cursor-pointer hover:shadow-md transition-shadow bg-white border border-gray-200"
+                  onClick={() => handleViewDetails(employee)}
+                >
+                  <div className="flex justify-between items-start">
+                    <div className="flex items-center gap-3">
+                      <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">
+                        {employee.name ? employee.name[0].toUpperCase() : 'E'}
+                      </div>
+                      <div>
+                        <div className="font-semibold text-gray-900">{employee.name}</div>
+                        <div className="text-sm text-gray-500 flex items-center gap-1">
+                          <Briefcase className="h-3 w-3" />
+                          {employee.job_title || 'No Title'}
+                        </div>
+                      </div>
+                    </div>
+                    <Badge
+                      className={
+                        employee.status === 'active'
+                          ? 'bg-green-50 text-green-700 hover:bg-green-50 border-green-200'
+                          : 'bg-red-50 text-red-700 hover:bg-red-50 border-red-200'
+                      }
+                    >
+                      {employee.status === 'active' ? 'Active' : 'Resigned'}
+                    </Badge>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 pt-2 border-t border-gray-100 text-sm">
+                    <div>
+                      <span className="text-gray-500 block text-xs">Scheme</span>
+                      <span className="capitalize font-medium text-gray-800">
+                        {employee.scheme === 'salary' ? 'Fixed Salary' : 'Commission Only'}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-gray-500 block text-xs">Compensation</span>
+                      <span className="font-medium text-gray-800">
+                        {employee.scheme === 'salary'
+                          ? `${formatCurrency(employee.fixed_salary)}/mo`
+                          : `${employee.commission_percentage}% Comm.`}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between pt-2 border-t border-gray-100">
+                    <div className="text-xs text-gray-500">
+                      Work: {employee.work_incentive_percentage}% | 5★: {employee.five_star_incentive_percentage}%
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 w-8 p-0"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleViewDetails(employee);
+                      }}
+                    >
+                      <Eye className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </Card>
+              ))
+            )}
           </div>
         </>
       )}

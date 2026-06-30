@@ -12,6 +12,14 @@ import {
 } from '../components/ui/select';
 import { Skeleton } from '../components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from '../components/ui/dialog';
+import MapPreview from '../components/MapPreview';
 import { toast } from 'sonner';
 import {
   LineChart,
@@ -27,6 +35,7 @@ import {
 } from 'recharts';
 import * as XLSX from 'xlsx';
 import { saveAs } from 'file-saver';
+import employeeService from '../services/employeeService';
 import { ENQUIRY_STATUS_LABELS } from '../constants/enquiryConstants';
 import {
   Download,
@@ -36,6 +45,7 @@ import {
   FileText,
   Award,
   Loader2,
+  Eye,
   IndianRupee,
   Star,
   ArrowLeft,
@@ -62,6 +72,112 @@ const Reports = () => {
   const [loading, setLoading] = useState(false);
   const [reportData, setReportData] = useState(null);
   const [agents, setAgents] = useState([]);
+
+  // EOD Reports States
+  const [employees, setEmployees] = useState([]);
+  const [eodReports, setEodReports] = useState([]);
+  const [eodLoading, setEodLoading] = useState(false);
+  const [eodEmployeeFilter, setEodEmployeeFilter] = useState('all');
+  const [eodStartDate, setEodStartDate] = useState('');
+  const [eodEndDate, setEodEndDate] = useState('');
+  const [selectedEodReport, setSelectedEodReport] = useState(null);
+  const [isEodDetailsOpen, setIsEodDetailsOpen] = useState(false);
+
+  const handleViewEodDetails = (report) => {
+    setSelectedEodReport(report);
+    setIsEodDetailsOpen(true);
+  };
+
+  // Fetch employees list for dropdown
+  const fetchEmployees = async () => {
+    try {
+      const response = await employeeService.getAllEmployees({ status: 'active', per_page: 1000 });
+      setEmployees(response.employees || response || []);
+    } catch (_) {}
+  };
+
+  // Fetch EOD Reports
+  const fetchEodReports = async () => {
+    setEodLoading(true);
+    try {
+      const filters = {};
+      if (eodEmployeeFilter !== 'all') filters.employee_id = eodEmployeeFilter;
+      if (eodStartDate) filters.start_date = eodStartDate;
+      if (eodEndDate) filters.end_date = eodEndDate;
+
+      const response = await employeeService.getEodReports(filters);
+      setEodReports(response || []);
+    } catch (error) {
+      toast.error('Failed to load EOD reports');
+      setEodReports([]);
+    } finally {
+      setEodLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchEmployees();
+  }, []);
+
+  useEffect(() => {
+    fetchEodReports();
+  }, [eodEmployeeFilter, eodStartDate, eodEndDate]);
+
+  const formatReportDate = (dateString) => {
+    if (!dateString) return 'N/A';
+    try {
+      return new Date(dateString).toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+      });
+    } catch {
+      return dateString;
+    }
+  };
+
+  const formatReportTime = (timeString) => {
+    if (!timeString) return 'N/A';
+    try {
+      return new Date(timeString).toLocaleTimeString('en-US', {
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true,
+      });
+    } catch {
+      return timeString;
+    }
+  };
+
+  const formatCurrency = (amount) => {
+    if (!amount) return '-';
+    return new Intl.NumberFormat('en-IN', {
+      style: 'currency',
+      currency: 'INR',
+      minimumFractionDigits: 0,
+    }).format(amount);
+  };
+
+  const formatHoursWorked = (hours) => {
+    if (!hours || isNaN(hours) || hours <= 0) return '-';
+    const hrs = Math.floor(hours);
+    const mins = Math.round((hours - hrs) * 60);
+    return mins > 0 ? `${hrs}h ${mins}m` : `${hrs}h`;
+  };
+
+  const formatLocationLink = (lat, lng) => {
+    if (!lat || !lng) return '-';
+    return (
+      <a
+        href={`https://www.google.com/maps/search/?api=1&query=${lat},${lng}`}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-primary hover:underline font-medium text-xs"
+      >
+        {lat.toFixed(4)}, {lng.toFixed(4)}
+      </a>
+    );
+  };
 
   // Filter states
   const [filters, setFilters] = useState({
@@ -434,6 +550,24 @@ const Reports = () => {
           <CardContent>
             <p className="text-muted-foreground">
               Analyze enquiry trends, conversion rates, source performance, and agent response times. Track lead pipeline health and follow-up effectiveness.
+            </p>
+          </CardContent>
+        </Card>
+
+        {/* EOD Reports Card */}
+        <Card
+          className="cursor-pointer hover:shadow-lg transition-shadow"
+          onClick={() => setSelectedReport('eod')}
+        >
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <CardTitle className="mt-4">EOD Reports</CardTitle>
+              <ClipboardList className="h-6 w-6 text-muted-foreground" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <p className="text-muted-foreground">
+              Review daily end-of-day checkout logs for agents, track distance traveled, cash collected, and checkout notes.
             </p>
           </CardContent>
         </Card>
@@ -1254,11 +1388,310 @@ const Reports = () => {
     );
   };
 
+  const renderEodReport = () => {
+    // Calculate summary statistics
+    let totalDistance = 0;
+    let totalCash = 0;
+    eodReports.forEach(report => {
+      totalDistance += report.total_distance || 0;
+      totalCash += report.total_cash_in_hand || 0;
+    });
+    const totalTA = totalDistance * 3;
+
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center gap-4">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => {
+              setSelectedReport(null);
+            }}
+          >
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <h1 className="text-3xl font-bold">End of Day Reports</h1>
+        </div>
+
+        {/* EOD Summary Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Distance Travelled</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-gray-900">{totalDistance.toFixed(1)} km</div>
+              <p className="text-xs text-muted-foreground">Across all filtered logs</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Cash Collected</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-green-700">{formatCurrency(totalCash)}</div>
+              <p className="text-xs text-muted-foreground">In hand cash submissions</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Travel Allowance (TA)</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-blue-700">{formatCurrency(totalTA)}</div>
+              <p className="text-xs text-muted-foreground">Calculated at ₹3 per km</p>
+            </CardContent>
+          </Card>
+        </div>
+
+        <Card>
+          <CardHeader className="flex flex-col sm:flex-row items-center justify-between gap-4 pb-2 border-b border-gray-100 bg-white">
+            <CardTitle>EOD Submissions</CardTitle>
+            <div className="flex flex-wrap gap-3 items-center w-full sm:w-auto">
+              <Select value={eodEmployeeFilter} onValueChange={setEodEmployeeFilter}>
+                <SelectTrigger className="w-full sm:w-48 bg-white border-gray-200 shadow-xs">
+                  <SelectValue placeholder="All Employees" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Employees</SelectItem>
+                  {employees.map(emp => (
+                    <SelectItem key={emp.id} value={emp.id.toString()}>
+                      {emp.name} ({emp.employee_number})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs text-gray-500">From</span>
+                <Input
+                  type="date"
+                  value={eodStartDate}
+                  onChange={(e) => setEodStartDate(e.target.value)}
+                  className="w-full sm:w-36 bg-white border-gray-200 h-9"
+                />
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs text-gray-500">To</span>
+                <Input
+                  type="date"
+                  value={eodEndDate}
+                  onChange={(e) => setEodEndDate(e.target.value)}
+                  className="w-full sm:w-36 bg-white border-gray-200 h-9"
+                />
+              </div>
+              {(eodEmployeeFilter !== 'all' || eodStartDate || eodEndDate) && (
+                <Button 
+                  variant="ghost" 
+                  onClick={() => {
+                    setEodEmployeeFilter('all');
+                    setEodStartDate('');
+                    setEodEndDate('');
+                  }}
+                  className="text-gray-500 hover:text-gray-800 text-xs px-2 h-9"
+                >
+                  Clear
+                </Button>
+              )}
+            </div>
+          </CardHeader>
+          <CardContent className="pt-6">
+            {eodLoading ? (
+              <div className="flex items-center justify-center p-12">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              </div>
+            ) : eodReports.length === 0 ? (
+              <div className="text-center py-8 text-gray-500">
+                No End of Day reports found matching the filters.
+              </div>
+            ) : (
+              <>
+                <div className="overflow-x-auto">
+                  <table className="w-full border-collapse text-sm">
+                    <thead>
+                      <tr className="border-b border-gray-200 text-gray-600 font-semibold text-left">
+                        <th className="p-2">Date</th>
+                        <th className="p-2">Employee</th>
+                        <th className="p-2">Check-in Time</th>
+                        <th className="p-2">Hours Worked</th>
+                        <th className="p-2">Distance Travelled</th>
+                        <th className="p-2">Travel Allowance (TA)</th>
+                        <th className="p-2">Cash Collected</th>
+                        <th className="p-2">Checkout Time</th>
+                        <th className="p-2 text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {eodReports.map((report, idx) => (
+                        <tr key={idx} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
+                          <td className="p-2 font-medium text-gray-900">
+                            {formatReportDate(report.date)}
+                          </td>
+                          <td className="p-2">
+                            <div>
+                              <div className="font-semibold text-gray-800">{report.employee_name}</div>
+                              <div className="text-xs text-gray-500">{report.employee_number}</div>
+                            </div>
+                          </td>
+                          <td className="p-2 text-gray-700">
+                            <div className="flex items-center gap-1.5">
+                              <span>{report.check_in_time && !new Date(report.check_in_time).getTime() ? '-' : formatReportTime(report.check_in_time)}</span>
+                              {report.is_late ? (
+                                <span className="px-1.5 py-0.5 text-xs font-semibold bg-red-100 text-red-800 rounded-full">Late</span>
+                              ) : report.check_in_time && new Date(report.check_in_time).getTime() ? (
+                                <span className="px-1.5 py-0.5 text-xs font-semibold bg-green-100 text-green-800 rounded-full">On Time</span>
+                              ) : null}
+                            </div>
+                          </td>
+                          <td className="p-2 font-medium text-gray-900">
+                            {formatHoursWorked(report.hours_worked)}
+                          </td>
+                          <td className="p-2 text-gray-700">
+                            {report.total_distance.toFixed(1)} km
+                          </td>
+                          <td className="p-2 font-semibold text-blue-700">
+                            {formatCurrency(report.total_distance * 3)}
+                          </td>
+                          <td className="p-2 font-semibold text-green-700">
+                            {formatCurrency(report.total_cash_in_hand)}
+                          </td>
+                          <td className="p-2 text-gray-600">
+                            {report.check_out_time && !new Date(report.check_out_time).getTime() ? '-' : formatReportTime(report.check_out_time)}
+                          </td>
+                          <td className="p-2 text-right">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleViewEodDetails(report)}
+                              className="h-8 px-2 flex items-center gap-1 text-primary hover:text-primary-dark ml-auto"
+                            >
+                              <Eye className="h-4 w-4" />
+                              <span>Details</span>
+                            </Button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* EOD Details Dialog */}
+                <Dialog open={isEodDetailsOpen} onOpenChange={setIsEodDetailsOpen}>
+                  <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto bg-white border border-gray-150 rounded-xl shadow-lg">
+                    <DialogHeader>
+                      <DialogTitle className="text-xl font-bold">EndOfDay Submission Details</DialogTitle>
+                      <DialogDescription>
+                        For {selectedEodReport && formatReportDate(selectedEodReport.date)}
+                      </DialogDescription>
+                    </DialogHeader>
+
+                    {selectedEodReport && (
+                      <div className="space-y-6 pt-4">
+                        {/* Employee Summary Card */}
+                        <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border border-gray-100">
+                          <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">
+                            {selectedEodReport.employee_name ? selectedEodReport.employee_name[0].toUpperCase() : 'E'}
+                          </div>
+                          <div>
+                            <div className="font-bold text-gray-900">{selectedEodReport.employee_name}</div>
+                            <div className="text-sm text-gray-500">Number: {selectedEodReport.employee_number}</div>
+                          </div>
+                        </div>
+
+                        {/* Stats Grid */}
+                        <div className="grid grid-cols-3 gap-4 text-center">
+                          <div className="p-3 bg-gray-50 rounded-lg border border-gray-100">
+                            <div className="text-xs text-gray-500">Distance Travelled</div>
+                            <div className="text-lg font-bold text-gray-900">{selectedEodReport.total_distance.toFixed(1)} km</div>
+                          </div>
+                          <div className="p-3 bg-gray-50 rounded-lg border border-gray-100">
+                            <div className="text-xs text-gray-500">Travel Allowance (TA)</div>
+                            <div className="text-lg font-bold text-blue-700">{formatCurrency(selectedEodReport.total_distance * 3)}</div>
+                          </div>
+                          <div className="p-3 bg-gray-50 rounded-lg border border-gray-100">
+                            <div className="text-xs text-gray-500">Cash Collected</div>
+                            <div className="text-lg font-bold text-green-700">{formatCurrency(selectedEodReport.total_cash_in_hand)}</div>
+                          </div>
+                        </div>
+
+                        {/* Checkin / Checkout Split */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          {/* Checkin Details */}
+                          <div className="space-y-3">
+                            <div className="font-semibold text-gray-900 border-b pb-1">Check-in Details</div>
+                            <div className="text-sm space-y-1">
+                              <div className="flex justify-between">
+                                <span className="text-gray-500">Time:</span>
+                                <span className="font-medium">
+                                  {selectedEodReport.check_in_time && new Date(selectedEodReport.check_in_time).getTime()
+                                    ? formatReportTime(selectedEodReport.check_in_time)
+                                    : '-'}
+                                  {selectedEodReport.is_late && (
+                                    <span className="ml-1.5 px-1.5 py-0.5 text-xs font-semibold bg-red-100 text-red-800 rounded-full">Late</span>
+                                  )}
+                                </span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span className="text-gray-500">Location:</span>
+                                <span>{formatLocationLink(selectedEodReport.check_in_latitude, selectedEodReport.check_in_longitude)}</span>
+                              </div>
+                            </div>
+                            {selectedEodReport.check_in_latitude && selectedEodReport.check_in_longitude ? (
+                              <div className="mt-2">
+                                <MapPreview lat={selectedEodReport.check_in_latitude} lng={selectedEodReport.check_in_longitude} />
+                              </div>
+                            ) : null}
+                          </div>
+
+                          {/* Checkout Details */}
+                          <div className="space-y-3">
+                            <div className="font-semibold text-gray-900 border-b pb-1">Check-out Details</div>
+                            <div className="text-sm space-y-1">
+                              <div className="flex justify-between">
+                                <span className="text-gray-500">Time:</span>
+                                <span className="font-medium">
+                                  {selectedEodReport.check_out_time && new Date(selectedEodReport.check_out_time).getTime()
+                                    ? formatReportTime(selectedEodReport.check_out_time)
+                                    : '-'}
+                                </span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span className="text-gray-500">Location:</span>
+                                <span>{formatLocationLink(selectedEodReport.check_out_latitude, selectedEodReport.check_out_longitude)}</span>
+                              </div>
+                            </div>
+                            {selectedEodReport.check_out_latitude && selectedEodReport.check_out_longitude ? (
+                              <div className="mt-2">
+                                <MapPreview lat={selectedEodReport.check_out_latitude} lng={selectedEodReport.check_out_longitude} />
+                              </div>
+                            ) : null}
+                          </div>
+                        </div>
+
+                        {/* Notes */}
+                        <div className="space-y-2 border-t pt-4">
+                          <div className="font-semibold text-gray-900">Checkout Notes</div>
+                          <div className="text-sm text-gray-600 bg-gray-50 p-3 rounded-lg border border-gray-100 min-h-[60px] whitespace-pre-wrap">
+                            {selectedEodReport.notes || 'No checkout notes provided.'}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </DialogContent>
+                </Dialog>
+              </>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    );
+  };
+
   return (
     <div className="container mx-auto p-6 space-y-6">
       {!selectedReport && renderReportSelection()}
       {selectedReport === 'orders' && renderOrdersReport()}
       {selectedReport === 'enquiries' && renderEnquiriesReport()}
+      {selectedReport === 'eod' && renderEodReport()}
     </div>
   );
 };

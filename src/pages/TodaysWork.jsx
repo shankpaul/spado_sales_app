@@ -81,7 +81,7 @@ const TodaysWork = () => {
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="bg-white border-none shadow-sm md:border md:shadow-none">
+        <Card className="bg-white  shadow-sm md:border md:shadow-none">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
               Upcoming Tasks
@@ -102,7 +102,7 @@ const TodaysWork = () => {
           </CardContent>
         </Card>
 
-        <Card className="bg-white border-none shadow-sm md:border md:shadow-none">
+        <Card className="bg-white  shadow-sm md:border md:shadow-none">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
               Completed Today
@@ -123,7 +123,7 @@ const TodaysWork = () => {
           </CardContent>
         </Card>
 
-        <Card className="bg-white border-none shadow-sm md:border md:shadow-none">
+        <Card className="bg-white  shadow-sm md:border md:shadow-none">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
               Today's Volume
@@ -147,7 +147,7 @@ const TodaysWork = () => {
         </Card>
 
         <Card className={cn(
-          "bg-white border-none shadow-sm md:border md:shadow-none transition-all",
+          "bg-white  shadow-sm md:border md:shadow-none transition-all",
           pendingCount > 0 && "border-red-100 bg-red-50/10"
         )}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">

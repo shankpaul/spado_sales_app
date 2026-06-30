@@ -44,7 +44,7 @@ import {
 import { toast } from 'sonner';
 import subscriptionService from '../services/subscriptionService';
 import customerService from '../services/customerService';
-import { getBrands, getModelsByBrand, getVehicleType } from '../lib/vehicleData';
+import VehicleIdentifier from './VehicleIdentifier';
 import {
   STORAGE_KEYS,
   DRAFT_EXPIRY_HOURS,
@@ -91,8 +91,6 @@ const SubscriptionWizard = ({ open, onOpenChange, onSuccess, customerId = null, 
   const [showCustomerSuggestions, setShowCustomerSuggestions] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
   const [identifyDialog, setIdentifyDialog] = useState({ open: false });
-  const [identifyBrand, setIdentifyBrand] = useState('');
-  const [identifyModel, setIdentifyModel] = useState('');
   const customerSearchRef = useRef(null);
   const prevMonthsDurationRef = useRef(1);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
@@ -999,35 +997,80 @@ const SubscriptionWizard = ({ open, onOpenChange, onSuccess, customerId = null, 
                         className="pl-10"
                       />
                       {showCustomerSuggestions && (
-                        <Card className="absolute bg-white z-10 w-full mt-1 max-h-60 overflow-y-auto">
+                        <Card className="absolute bg-white z-10 w-full mt-1 max-h-60 overflow-y-auto shadow-lg border border-gray-100">
                           {customerSearchLoading ? (
                             <div className="p-4 text-center">
                               <Loader2 className="h-6 w-6 animate-spin mx-auto" />
                             </div>
                           ) : customers.length > 0 ? (
-                            <div className="divide-y">
-                              {customers.map((customer) => (
-                                <button
-                                  key={customer.id}
-                                  type="button"
-                                  onClick={() => handleSelectCustomer(customer)}
-                                  className="w-full p-4 text-left hover:bg-muted active:bg-secondary/80 active:scale-[0.98] transition-all duration-200 border-b last:border-0"
-                                >
-                                  <div className="flex justify-between items-center">
+                            <div className="divide-y divide-gray-50">
+                              {(() => {
+                                const getCustomerScore = (customer, term) => {
+                                  if (!term) return 0;
+                                  const cleanTerm = term.toLowerCase().trim();
+                                  const name = (customer.name || '').toLowerCase();
+                                  const phone = (customer.phone || '').toLowerCase();
+                                  
+                                  if (name === cleanTerm || phone === cleanTerm) return 100;
+                                  if (name.startsWith(cleanTerm) || phone.startsWith(cleanTerm)) return 80;
+                                  if (name.includes(cleanTerm) || phone.includes(cleanTerm)) return 50;
+                                  return 10;
+                                };
+
+                                const scoredCustomers = customers.map(c => ({
+                                  ...c,
+                                  score: getCustomerScore(c, customerSearchTerm)
+                                }));
+                                
+                                const bestMatches = scoredCustomers.filter(c => c.score >= 80);
+                                const otherMatches = scoredCustomers.filter(c => c.score < 80);
+
+                                const renderCustomerRow = (customer) => (
+                                  <button
+                                    key={customer.id}
+                                    type="button"
+                                    onClick={() => handleSelectCustomer(customer)}
+                                    className="w-full px-4 py-2.5 text-left hover:bg-secondary active:bg-secondary/80 active:scale-[0.98] transition-all flex items-center justify-between border-b last:border-b-0 border-gray-50"
+                                  >
                                     <div>
-                                      <p className="font-semibold text-base">{customer.name}</p>
-                                      <p className="text-sm text-muted-foreground">{customer.phone}</p>
+                                      <p className="font-semibold text-gray-900 text-sm">{customer.name}</p>
+                                      <p className="text-xs text-muted-foreground flex items-center gap-1.5 mt-0.5">{customer.phone}</p>
                                       {customer.area && (
-                                        <p className="text-xs text-muted-foreground capitalize mt-1 flex items-center gap-1">
-                                          <MapPin className="h-3 w-3" />
+                                        <p className="text-[11px] text-muted-foreground capitalize mt-0.5 flex items-center gap-1">
+                                          <MapPin className="h-3 w-3 text-gray-400" />
                                           {customer.area}
                                         </p>
                                       )}
                                     </div>
-                                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                                  </div>
-                                </button>
-                              ))}
+                                    <ChevronRight className="h-4 w-4 text-gray-400" />
+                                  </button>
+                                );
+
+                                return (
+                                  <>
+                                    {bestMatches.length > 0 && (
+                                      <div>
+                                        <div className="px-3 py-1 text-[10px] font-bold text-emerald-700 bg-emerald-50/70 uppercase tracking-wider">
+                                          Best Matches
+                                        </div>
+                                        <div className="divide-y divide-gray-50">
+                                          {bestMatches.map(renderCustomerRow)}
+                                        </div>
+                                      </div>
+                                    )}
+                                    {otherMatches.length > 0 && (
+                                      <div>
+                                        <div className="px-3 py-1 text-[10px] font-bold text-gray-500 bg-gray-50 uppercase tracking-wider border-t border-gray-100">
+                                          Other Matches
+                                        </div>
+                                        <div className="divide-y divide-gray-50">
+                                          {otherMatches.map(renderCustomerRow)}
+                                        </div>
+                                      </div>
+                                    )}
+                                  </>
+                                );
+                              })()}
                             </div>
                           ) : hasSearched ? (
                             <div className="p-6 text-center">
@@ -2068,177 +2111,14 @@ const SubscriptionWizard = ({ open, onOpenChange, onSuccess, customerId = null, 
             </SheetContent>
           </Sheet>
 
-          {/* Identify Vehicle Type Dialog - Desktop */}
-          <Dialog open={identifyDialog.open && !isMobile} onOpenChange={(open) => setIdentifyDialog({ open })}>
-            <DialogContent className="sm:max-w-md">
-              <DialogHeader>
-                <DialogTitle>Identify Vehicle Type</DialogTitle>
-                <DialogDescription>
-                  Select your vehicle brand and model to auto-detect the vehicle type
-                </DialogDescription>
-              </DialogHeader>
-
-              <div className="space-y-4">
-                <div>
-                  <Label>Brand</Label>
-                  <Select value={identifyBrand} onValueChange={setIdentifyBrand}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select brand" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {getBrands().map((brand) => (
-                        <SelectItem key={brand} value={brand}>{brand}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div>
-                  <Label>Model</Label>
-                  <Select value={identifyModel} onValueChange={setIdentifyModel} disabled={!identifyBrand}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select model" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {identifyBrand && getModelsByBrand(identifyBrand).map((model) => (
-                        <SelectItem key={model.name} value={model.name}>{model.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {identifyBrand && identifyModel && (
-                  <Card className="p-3 bg-secondary/50">
-                    <div className="flex items-center gap-2">
-                      <Car className="h-5 w-5 text-primary" />
-                      <div>
-                        <p className="text-sm font-medium">
-                          Detected: {getVehicleType(identifyBrand, identifyModel) || 'Unknown'}
-                        </p>
-                        <p className="text-xs text-muted-foreground">{identifyBrand} {identifyModel}</p>
-                      </div>
-                    </div>
-                  </Card>
-                )}
-              </div>
-
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  className="flex-1"
-                  onClick={() => {
-                    setIdentifyDialog({ open: false });
-                    setIdentifyBrand('');
-                    setIdentifyModel('');
-                  }}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  className="flex-1"
-                  disabled={!identifyBrand || !identifyModel}
-                  onClick={() => {
-                    const detectedType = getVehicleType(identifyBrand, identifyModel);
-                    if (detectedType) {
-                      setVehicleType(detectedType.toString().toLowerCase());
-                      toast.success(`Vehicle identified as ${detectedType}`);
-                    }
-                    setIdentifyDialog({ open: false });
-                    setIdentifyBrand('');
-                    setIdentifyModel('');
-                  }}
-                >
-                  Apply
-                </Button>
-              </div>
-            </DialogContent>
-          </Dialog>
-
-          {/* Identify Vehicle Type Drawer - Mobile */}
-          <Drawer open={identifyDialog.open && isMobile} onOpenChange={(open) => setIdentifyDialog({ open })}>
-            <DrawerContent className="max-h-[90vh]">
-              <DrawerHeader className="px-4 text-left">
-                <DrawerTitle>Identify Vehicle Type</DrawerTitle>
-                <DrawerDescription>
-                  Select your vehicle brand and model to auto-detect the vehicle type
-                </DrawerDescription>
-              </DrawerHeader>
-
-              <div className="px-4 pb-4 space-y-4 overflow-y-auto">
-                <div>
-                  <Label>Brand</Label>
-                  <Select value={identifyBrand} onValueChange={setIdentifyBrand}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select brand" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {getBrands().map((brand) => (
-                        <SelectItem key={brand} value={brand}>{brand}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div>
-                  <Label>Model</Label>
-                  <Select value={identifyModel} onValueChange={setIdentifyModel} disabled={!identifyBrand}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select model" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {identifyBrand && getModelsByBrand(identifyBrand).map((model) => (
-                        <SelectItem key={model.name} value={model.name}>{model.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {identifyBrand && identifyModel && (
-                  <Card className="p-3 bg-secondary/50">
-                    <div className="flex items-center gap-2">
-                      <Car className="h-5 w-5 text-primary" />
-                      <div>
-                        <p className="text-sm font-medium">
-                          Detected: {getVehicleType(identifyBrand, identifyModel) || 'Unknown'}
-                        </p>
-                        <p className="text-xs text-muted-foreground">{identifyBrand} {identifyModel}</p>
-                      </div>
-                    </div>
-                  </Card>
-                )}
-
-                <div className="flex gap-2 pt-2">
-                  <Button
-                    variant="outline"
-                    className="flex-1"
-                    onClick={() => {
-                      setIdentifyDialog({ open: false });
-                      setIdentifyBrand('');
-                      setIdentifyModel('');
-                    }}
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    className="flex-1"
-                    disabled={!identifyBrand || !identifyModel}
-                    onClick={() => {
-                      const detectedType = getVehicleType(identifyBrand, identifyModel);
-                      if (detectedType) {
-                        setVehicleType(detectedType.toString().toLowerCase());
-                        toast.success(`Vehicle identified as ${detectedType}`);
-                      }
-                      setIdentifyDialog({ open: false });
-                      setIdentifyBrand('');
-                      setIdentifyModel('');
-                    }}
-                  >
-                    Apply
-                  </Button>
-                </div>
-              </div>
-            </DrawerContent>
-          </Drawer>
+          {/* Vehicle Identifier Dialog/Drawer */}
+          <VehicleIdentifier
+            open={identifyDialog.open}
+            onOpenChange={(open) => setIdentifyDialog({ open })}
+            onApply={(type) => {
+              setVehicleType(type);
+            }}
+          />
 
           {/* Clear Draft Confirmation Dialog */}
           <ConfirmDialog

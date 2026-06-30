@@ -48,7 +48,8 @@ import offerService from '../services/offerService';
 import loyaltyService from '../services/loyaltyService';
 import enquiryService from '../services/enquiryService';
 import useOrderStore from '../store/orderStore';
-import { getBrands, getModelsByBrand, getVehicleType, getVehicleTypes } from '../lib/vehicleData';
+import VehicleIdentifier from './VehicleIdentifier';
+import { getVehicleType } from '../lib/vehicleData';
 import {
   STORAGE_KEYS,
   DRAFT_EXPIRY_HOURS,
@@ -98,8 +99,6 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
   const [loading, setLoading] = useState(false);
   const [showDraftDialog, setShowDraftDialog] = useState(false);
   const [identifyDialog, setIdentifyDialog] = useState({ open: false, index: null });
-  const [identifyBrand, setIdentifyBrand] = useState('');
-  const [identifyModel, setIdentifyModel] = useState('');
   const [deletePackageDialog, setDeletePackageDialog] = useState({ open: false, index: null });
   const [showCustomerForm, setShowCustomerForm] = useState(false);
   const [newCustomerInitialData, setNewCustomerInitialData] = useState(null);
@@ -1334,7 +1333,7 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
 
           {/* Suggestions Dropdown */}
           {showCustomerSuggestions && customerSearchTerm.length >= 2 && (
-            <Card className="absolute bg-white z-50 w-full mt-1 max-h-64 overflow-y-auto shadow-lg">
+            <Card className="absolute bg-white z-50 w-full mt-1 max-h-64 overflow-y-auto shadow-lg border border-gray-100">
               {customerSearchLoading ? (
                 <div className="p-4 text-center text-sm text-muted-foreground">
                   <Loader2 className="h-4 w-4 animate-spin mx-auto mb-2" />
@@ -1342,40 +1341,87 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
                 </div>
               ) : customers.length > 0 ? (
                 <div className="py-1">
-                  {customers.map((customer) => (
-                    <button
-                      key={customer.id}
-                      type="button"
-                      className="w-full px-4 py-3 text-left hover:bg-secondary active:bg-secondary/80 active:scale-[0.99] transition-all border-b last:border-b-0"
-                      onClick={() => {
-                        setSelectedCustomer(customer);
-                        setCustomerPhone(customer.phone || ''); // Initialize order-specific phone
-                        setCustomerSearchTerm('');
-                        setShowCustomerSuggestions(false);
-                        setAddress({
-                          area: customer.area || '',
-                          city: customer.city || '',
-                          district: customer.district || '',
-                          state: customer.state || '',
-                          map_link: customer.map_link || '',
-                        });
-                        saveDraft();
-                      }}
-                    >
-                      <div className="font-medium">{customer.name}</div>
-                      <div className="text-sm text-muted-foreground flex items-center gap-2">
-                        <Phone className="h-3 w-3" />
-                        {customer.phone}
-                        {customer.area && (
-                          <>
-                            <span>•</span>
-                            <MapPin className="h-3 w-3" />
-                            {customer.area}
-                          </>
+                  {(() => {
+                    const getCustomerScore = (customer, term) => {
+                      if (!term) return 0;
+                      const cleanTerm = term.toLowerCase().trim();
+                      const name = (customer.name || '').toLowerCase();
+                      const phone = (customer.phone || '').toLowerCase();
+                      
+                      if (name === cleanTerm || phone === cleanTerm) return 100;
+                      if (name.startsWith(cleanTerm) || phone.startsWith(cleanTerm)) return 80;
+                      if (name.includes(cleanTerm) || phone.includes(cleanTerm)) return 50;
+                      return 10;
+                    };
+
+                    const scoredCustomers = customers.map(c => ({
+                      ...c,
+                      score: getCustomerScore(c, customerSearchTerm)
+                    }));
+                    
+                    const bestMatches = scoredCustomers.filter(c => c.score >= 80);
+                    const otherMatches = scoredCustomers.filter(c => c.score < 80);
+                    
+                    const renderCustomerRow = (customer) => (
+                      <button
+                        key={customer.id}
+                        type="button"
+                        className="w-full px-4 py-2.5 text-left hover:bg-secondary active:bg-secondary/80 active:scale-[0.99] transition-all flex flex-col border-b last:border-b-0 border-gray-50"
+                        onClick={() => {
+                          setSelectedCustomer(customer);
+                          setCustomerPhone(customer.phone || ''); // Initialize order-specific phone
+                          setCustomerSearchTerm('');
+                          setShowCustomerSuggestions(false);
+                          setAddress({
+                            area: customer.area || '',
+                            city: customer.city || '',
+                            district: customer.district || '',
+                            state: customer.state || '',
+                            map_link: customer.map_link || '',
+                          });
+                          saveDraft();
+                        }}
+                      >
+                        <div className="font-medium text-gray-900 text-sm">{customer.name}</div>
+                        <div className="text-xs text-muted-foreground flex items-center gap-1.5 mt-0.5">
+                          <Phone className="h-3 w-3 text-gray-400" />
+                          {customer.phone}
+                          {customer.area && (
+                            <>
+                              <span>•</span>
+                              <MapPin className="h-3 w-3 text-gray-400" />
+                              {customer.area}
+                            </>
+                          )}
+                        </div>
+                      </button>
+                    );
+
+                    return (
+                      <>
+                        {bestMatches.length > 0 && (
+                          <div>
+                            <div className="px-3 py-1 text-[10px] font-bold text-emerald-700 bg-emerald-50/70 uppercase tracking-wider">
+                              Best Matches
+                            </div>
+                            <div className="divide-y divide-gray-50">
+                              {bestMatches.map(renderCustomerRow)}
+                            </div>
+                          </div>
                         )}
-                      </div>
-                    </button>
-                  ))}
+                        {otherMatches.length > 0 && (
+                          <div>
+                            <div className="px-3 py-1 text-[10px] font-bold text-gray-500 bg-gray-50 uppercase tracking-wider border-t border-gray-100">
+                              Other Matches
+                            </div>
+                            <div className="divide-y divide-gray-50">
+                              {otherMatches.map(renderCustomerRow)}
+                            </div>
+                          </div>
+                        )}
+                      </>
+                    );
+                  })()}
                 </div>
               ) : (
                 <div className="p-6 text-center">
@@ -2839,181 +2885,18 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
             variant="destructive"
           />
 
-          {/* Vehicle Identification Dialog - Desktop */}
-          <Dialog open={identifyDialog.open && !isMobile} onOpenChange={(open) => setIdentifyDialog({ open, index: null })}>
-            <DialogContent className="sm:max-w-md">
-              <div className="space-y-4">
-                <div>
-                  <h3 className="text-lg font-semibold">Identify Vehicle Type</h3>
-                  <p className="text-sm text-muted-foreground">Enter brand and model to auto-detect vehicle type</p>
-                </div>
-
-                <div className="space-y-3">
-                  <div>
-                    <Label>Brand</Label>
-                    <Select value={identifyBrand} onValueChange={setIdentifyBrand}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select brand" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {getBrands().map((brand) => (
-                          <SelectItem key={brand} value={brand}>{brand}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div>
-                    <Label>Model</Label>
-                    <Select value={identifyModel} onValueChange={setIdentifyModel} disabled={!identifyBrand}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select model" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {identifyBrand && getModelsByBrand(identifyBrand).map((model) => (
-                          <SelectItem key={model.name} value={model.name}>{model.name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  {identifyBrand && identifyModel && (
-                    <Card className="p-3 bg-secondary/50">
-                      <div className="flex items-center gap-2">
-                        <Car className="h-5 w-5 text-primary" />
-                        <div>
-                          <p className="text-sm font-medium">
-                            Detected: {getVehicleType(identifyBrand, identifyModel) || 'Unknown'}
-                          </p>
-                          <p className="text-xs text-muted-foreground">{identifyBrand} {identifyModel}</p>
-                        </div>
-                      </div>
-                    </Card>
-                  )}
-                </div>
-
-                <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    className="flex-1"
-                    onClick={() => {
-                      setIdentifyDialog({ open: false, index: null });
-                      setIdentifyBrand('');
-                      setIdentifyModel('');
-                    }}
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    className="flex-1"
-                    disabled={!identifyBrand || !identifyModel}
-                    onClick={() => {
-                      const vehicleType = getVehicleType(identifyBrand, identifyModel);
-                      if (vehicleType && identifyDialog.index !== null) {
-                        updatePackageItem(identifyDialog.index, 'brand', identifyBrand);
-                        updatePackageItem(identifyDialog.index, 'model', identifyModel);
-                        updatePackageItem(identifyDialog.index, 'vehicle_type', vehicleType.toString().toLowerCase());
-                        toast.success(`Vehicle identified as ${vehicleType}`);
-                      }
-                      setIdentifyDialog({ open: false, index: null });
-                      setIdentifyBrand('');
-                      setIdentifyModel('');
-                    }}
-                  >
-                    Apply
-                  </Button>
-                </div>
-              </div>
-            </DialogContent>
-          </Dialog>
-
-          {/* Vehicle Identification Drawer - Mobile */}
-          <Drawer open={identifyDialog.open && isMobile} onOpenChange={(open) => setIdentifyDialog({ open, index: null })}>
-            <DrawerContent className="max-h-[90vh]">
-              <DrawerHeader className="px-4 text-left">
-                <DrawerTitle>Identify Vehicle Type</DrawerTitle>
-                <DrawerDescription>
-                  Enter brand and model to auto-detect vehicle type
-                </DrawerDescription>
-              </DrawerHeader>
-
-              <div className="px-4 pb-4 space-y-4 overflow-y-auto">
-                <div>
-                  <Label>Brand</Label>
-                  <Select value={identifyBrand} onValueChange={setIdentifyBrand}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select brand" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {getBrands().map((brand) => (
-                        <SelectItem key={brand} value={brand}>{brand}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div>
-                  <Label>Model</Label>
-                  <Select value={identifyModel} onValueChange={setIdentifyModel} disabled={!identifyBrand}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select model" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {identifyBrand && getModelsByBrand(identifyBrand).map((model) => (
-                        <SelectItem key={model.name} value={model.name}>{model.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {identifyBrand && identifyModel && (
-                  <Card className="p-3 bg-secondary/50">
-                    <div className="flex items-center gap-2">
-                      <Car className="h-5 w-5 text-primary" />
-                      <div>
-                        <p className="text-sm font-medium">
-                          Detected: {getVehicleType(identifyBrand, identifyModel) || 'Unknown'}
-                        </p>
-                        <p className="text-xs text-muted-foreground">{identifyBrand} {identifyModel}</p>
-                      </div>
-                    </div>
-                  </Card>
-                )}
-
-                <div className="flex gap-2 pt-2">
-                  <Button
-                    variant="outline"
-                    className="flex-1"
-                    onClick={() => {
-                      setIdentifyDialog({ open: false, index: null });
-                      setIdentifyBrand('');
-                      setIdentifyModel('');
-                    }}
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    className="flex-1"
-                    disabled={!identifyBrand || !identifyModel}
-                    onClick={() => {
-                      const vehicleType = getVehicleType(identifyBrand, identifyModel);
-                      if (vehicleType && identifyDialog.index !== null) {
-                        updatePackageItem(identifyDialog.index, 'brand', identifyBrand);
-                        updatePackageItem(identifyDialog.index, 'model', identifyModel);
-                        updatePackageItem(identifyDialog.index, 'vehicle_type', vehicleType.toString().toLowerCase());
-                        toast.success(`Vehicle identified as ${vehicleType}`);
-                      }
-                      setIdentifyDialog({ open: false, index: null });
-                      setIdentifyBrand('');
-                      setIdentifyModel('');
-                    }}
-                  >
-                    Apply
-                  </Button>
-                </div>
-              </div>
-            </DrawerContent>
-          </Drawer>
+          {/* Vehicle Identifier Dialog/Drawer */}
+          <VehicleIdentifier
+            open={identifyDialog.open}
+            onOpenChange={(open) => setIdentifyDialog({ open, index: open ? identifyDialog.index : null })}
+            onApply={(type, brand, model) => {
+              if (identifyDialog.index !== null) {
+                updatePackageItem(identifyDialog.index, 'brand', brand);
+                updatePackageItem(identifyDialog.index, 'model', model);
+                updatePackageItem(identifyDialog.index, 'vehicle_type', type);
+              }
+            }}
+          />
 
           {/* Offer Details Dialog */}
           <Dialog open={offerDetailsDialog.open} onOpenChange={(open) => setOfferDetailsDialog({ open, offer: null })}>

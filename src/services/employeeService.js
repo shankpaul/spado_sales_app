@@ -14,8 +14,11 @@ const employeeService = {
   async getAllEmployees(filters = {}) {
     try {
       const params = new URLSearchParams();
-      if (filters.status) params.append('status', filters.status);
-      if (filters.scheme) params.append('scheme', filters.scheme);
+      Object.keys(filters).forEach(key => {
+        if (filters[key] !== undefined && filters[key] !== null) {
+          params.append(key, filters[key]);
+        }
+      });
       
       const queryString = params.toString();
       const url = queryString ? `/employees?${queryString}` : '/employees';
@@ -106,6 +109,28 @@ const employeeService = {
   async deactivateEmployee(id) {
     try {
       const response = await apiClient.post(`/employees/${id}/deactivate`);
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  },
+
+  /**
+   * Get employee EOD reports
+   * @param {Object} filters - Optional filters (employee_id, start_date, end_date)
+   * @returns {Promise} API response with EOD reports list
+   */
+  async getEodReports(filters = {}) {
+    try {
+      const params = new URLSearchParams();
+      if (filters.employee_id) params.append('employee_id', filters.employee_id);
+      if (filters.start_date) params.append('start_date', filters.start_date);
+      if (filters.end_date) params.append('end_date', filters.end_date);
+      
+      const queryString = params.toString();
+      const url = queryString ? `/employees/eod-reports?${queryString}` : '/employees/eod-reports';
+      
+      const response = await apiClient.get(url);
       return response.data;
     } catch (error) {
       throw error;
