@@ -240,14 +240,21 @@ const Packages = () => {
     }
   };
 
-  // Filter packages by search query locally
-  const filteredPackages = packages.filter(pkg =>
-    pkg.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (pkg.description && pkg.description.toLowerCase().includes(searchQuery.toLowerCase()))
-  );
+  // Filter packages by search query locally and sort by price ascending
+  const filteredPackages = packages
+    .filter(pkg =>
+      pkg.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (pkg.description && pkg.description.toLowerCase().includes(searchQuery.toLowerCase()))
+    )
+    .sort((a, b) => (a.unit_price || 0) - (b.unit_price || 0));
 
-  const preChecklists = checklistItems.filter(item => item.when === 'pre');
-  const postChecklists = checklistItems.filter(item => item.when === 'post');
+  const preChecklists = checklistItems
+    .filter(item => item.when === 'pre')
+    .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+    
+  const postChecklists = checklistItems
+    .filter(item => item.when === 'post')
+    .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
 
   return (
     <div className="container mx-auto p-6 max-w-7xl">
@@ -371,22 +378,9 @@ const Packages = () => {
                   </div>
                 </div>
 
-                {/* Features list */}
-                {pkg.features && pkg.features.length > 0 && (
-                  <div className="mb-4">
-                    <span className="text-[10px] uppercase font-bold text-gray-400 tracking-wider block mb-1">Included Features</span>
-                    <div className="flex flex-wrap gap-1">
-                      {pkg.features.map((feature, idx) => (
-                        <span key={idx} className="inline-flex items-center text-[11px] bg-gray-100 text-gray-700 px-2 py-0.5 rounded">
-                          {feature}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
                 {/* Checklist Summary */}
                 <div className="border-t border-gray-100 pt-3 flex justify-between text-xs text-gray-500 mt-auto">
+
                   <div className="flex items-center gap-1">
                     <Layers className="h-3.5 w-3.5 text-gray-400" />
                     <span>Checklists:</span>
