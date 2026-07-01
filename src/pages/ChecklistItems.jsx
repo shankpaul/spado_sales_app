@@ -113,6 +113,14 @@ const ChecklistItems = () => {
       position: idx,
     }));
 
+    // Find which items actually changed position
+    const changedItems = reorderedItems.filter(item => {
+      const originalItem = checklistItems.find(ci => ci.id === item.id);
+      return originalItem && originalItem.position !== item.position;
+    });
+
+    if (changedItems.length === 0) return;
+
     // Update main checklistItems state optimistically
     const updatedChecklistItems = checklistItems.map(item => {
       const reordered = reorderedItems.find(ri => ri.id === item.id);
@@ -131,17 +139,16 @@ const ChecklistItems = () => {
 
     const toastId = toast.loading('Saving new order positions...');
     try {
-      // Send updates to backend for items that changed
-      const updatePromises = reorderedItems.map(item =>
-        packageService.updateChecklistItem(item.id, {
+      // Send updates to backend sequentially to avoid concurrent DB transactions/locks
+      for (const item of changedItems) {
+        await packageService.updateChecklistItem(item.id, {
           name: item.name,
           when: item.when,
           position: item.position,
           active: item.active
-        })
-      );
+        });
+      }
 
-      await Promise.all(updatePromises);
       toast.success('Positions saved successfully', { id: toastId });
       fetchChecklistItems();
       fetchPackages(); // Sync package lists
