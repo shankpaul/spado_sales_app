@@ -311,14 +311,22 @@ const Dashboard = () => {
 
     return (
       <div className="space-y-6">
-        <div className="grid grid-cols-2 gap-3 md:gap-4 lg:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 md:gap-5 lg:grid-cols-5">
           <StatCard
-            title="This Month Revenue"
+            title="Monthly Revenue"
             value={dashboardStats ? formatCurrency(dashboardStats.revenue.current) : '--'}
             change={dashboardStats ? formatPercentage(dashboardStats.revenue.change_percentage) : '--'}
             icon={<IndianRupee className="h-4 w-4 text-primary-600" />}
             isLoading={statsLoading}
             onClick={() => navigate('/reports')}
+          />
+          <StatCard
+            title="Avg. Order Value"
+            value={dashboardStats?.average_order_value ? formatCurrency(dashboardStats.average_order_value.current) : '--'}
+            change={dashboardStats?.average_order_value ? formatPercentage(dashboardStats.average_order_value.change_percentage) : '--'}
+            icon={<IndianRupee className="h-4 w-4 text-primary-600" />}
+            isLoading={statsLoading}
+            onClick={() => navigate('/orders')}
           />
           <StatCard
             title="Total Customers"
@@ -629,9 +637,9 @@ const Dashboard = () => {
       <div className="space-y-6">
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
           <StatCard
-            title="My Sales This Month"
-            value={dashboardStats ? formatCurrency(dashboardStats.revenue.current) : '--'}
-            change={dashboardStats ? formatPercentage(dashboardStats.revenue.change_percentage) : '--'}
+            title="Average Order Value"
+            value={dashboardStats?.average_order_value ? formatCurrency(dashboardStats.average_order_value.current) : '--'}
+            change={dashboardStats?.average_order_value ? formatPercentage(dashboardStats.average_order_value.change_percentage) : '--'}
             icon={<IndianRupee className="h-4 w-4 text-primary-600" />}
             isLoading={statsLoading}
             onClick={() => navigate('/orders')}
@@ -859,9 +867,9 @@ const Dashboard = () => {
             onClick={() => navigate('/transactions')}
           />
           <StatCard
-            title="Monthly Revenue"
-            value={dashboardStats ? formatCurrency(dashboardStats.revenue.current) : '--'}
-            change={dashboardStats ? formatPercentage(dashboardStats.revenue.change_percentage) : '--'}
+            title="Average Order Value"
+            value={dashboardStats?.average_order_value ? formatCurrency(dashboardStats.average_order_value.current) : '--'}
+            change={dashboardStats?.average_order_value ? formatPercentage(dashboardStats.average_order_value.change_percentage) : '--'}
             icon={<DollarSign className="h-4 w-4 text-primary-600" />}
             isLoading={statsLoading}
             onClick={() => navigate('/reports')}
@@ -1783,7 +1791,7 @@ const ResponseMeterCard = ({ title, stats, isLoading, onClick }) => {
                 <span className="text-lg font-bold text-indigo-600">{contacted}</span>
               </div>
               <div className="space-y-1">
-                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">Converted</span>
+                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">Booked</span>
                 <span className="text-lg font-bold text-emerald-600">{converted}</span>
               </div>
             </div>
