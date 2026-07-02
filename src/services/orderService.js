@@ -80,6 +80,20 @@ const orderService = {
   },
 
   /**
+   * Update payment status for an order
+   * @param {string} id - Order ID
+   * @param {string} paymentMethod - Payment method (cash, upi, card)
+   * @param {boolean} amountVerified - Confirm amount has been verified
+   */
+  updatePaymentStatus: async (id, paymentMethod, amountVerified) => {
+    const response = await apiClient.post(`/orders/${id}/update_payment`, {
+      payment_method: paymentMethod,
+      amount_verified: amountVerified,
+    });
+    return response.data;
+  },
+
+  /**
    * Get all packages with optional vehicle type filter
    * @param {string} vehicleType - Optional vehicle type filter (Hatchback/Sedan/SUV)
    * @param {boolean} subscription_enabled - Filter by subscription enabled status

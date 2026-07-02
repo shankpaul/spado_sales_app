@@ -189,6 +189,12 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
   const [paymentReceived, setPaymentReceived] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState('');
 
+  // Record payment dialog state
+  const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
+  const [recordPaymentMethod, setRecordPaymentMethod] = useState('');
+  const [recordPaymentVerified, setRecordPaymentVerified] = useState(false);
+  const [recordingPayment, setRecordingPayment] = useState(false);
+
   // Quick booking edit dialog state
   const [isBookingEditOpen, setIsBookingEditOpen] = useState(false);
   const [bookingDate, setBookingDate] = useState('');
@@ -540,6 +546,33 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
       toast.error('Failed to submit feedback');
     } finally {
       setSubmittingFeedback(false);
+    }
+  };
+
+  // Handle record payment
+  const handleRecordPayment = async () => {
+    if (!recordPaymentMethod) {
+      toast.error('Please select a payment method');
+      return;
+    }
+    if (!recordPaymentVerified) {
+      toast.error('Please confirm the amount has been verified');
+      return;
+    }
+
+    setRecordingPayment(true);
+    try {
+      await orderService.updatePaymentStatus(id, recordPaymentMethod, recordPaymentVerified);
+      toast.success('Payment recorded successfully');
+      setIsPaymentDialogOpen(false);
+      setRecordPaymentMethod('');
+      setRecordPaymentVerified(false);
+      await fetchOrderDetails(true);
+      setTimeout(() => fetchTimeline(), 0);
+    } catch (error) {
+      toast.error(error.response?.data?.errors?.join('\n') || 'Failed to record payment');
+    } finally {
+      setRecordingPayment(false);
     }
   };
 
@@ -1086,7 +1119,7 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
                     <div>
                       <div className="flex items-center justify-between mb-2">
                         <h3 className="font-semibold text-lg">Add-on Services</h3>
-                        <Badge2 variant="outline" className="text-xs">{order.addons.length} items</Badge2>
+                        <Badge2 variant="secondary" className="text-xs">{order.addons.length} items</Badge2>
                       </div>
                       <div className="space-y-4">
 
@@ -1306,6 +1339,21 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
                     <Badge2 variant={getBadgeVariant(order.payment_status, 'payment')}>
                       {getStatusLabel(order.payment_status, PAYMENT_STATUSES)}
                     </Badge2>
+                    {order.payment_status !== 'paid' && (
+                      <Button
+                        size="sm"
+                        className="h-7 px-2 text-xs bg-blue-600 hover:bg-blue-700 text-white"
+                        onClick={() => {
+                          setRecordPaymentMethod('');
+                          setRecordPaymentVerified(false);
+                          setIsPaymentDialogOpen(true);
+                        }}
+                      >
+                        <span className="font-semibold">₹</span>
+                        Add Payment
+                      </Button>
+                    )}
+
                   </div>
                 </div>
 
@@ -1691,6 +1739,196 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
           setTimeout(() => fetchTimeline(), 0);
         }}
       />
+
+      {/* Record Payment Dialog - Desktop */}
+      <Dialog open={isPaymentDialogOpen && !isMobile} onOpenChange={(open) => {
+        setIsPaymentDialogOpen(open);
+        if (!open) {
+          setRecordPaymentMethod('');
+          setRecordPaymentVerified(false);
+        }
+      }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Record Payment</DialogTitle>
+            <DialogDescription>
+              Select the payment method and confirm the amount received from the customer.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            {/* Amount Summary */}
+            <div className="rounded-lg bg-orange-50 border border-orange-200 p-4">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium text-orange-900">Amount Due:</span>
+                <span className="text-xl font-bold text-orange-900">{formatCurrency(order?.total_amount || 0)}</span>
+              </div>
+            </div>
+
+            {/* Payment Method Selection */}
+            <div className="p-4 border rounded-lg bg-white space-y-3">
+              <Label className="text-sm font-semibold text-gray-900 block">
+                Payment Method *
+              </Label>
+              <RadioGroup
+                value={recordPaymentMethod}
+                onValueChange={setRecordPaymentMethod}
+                className="flex gap-4 flex-wrap"
+                disabled={recordingPayment}
+              >
+                <div className="flex items-center gap-2">
+                  <RadioGroupItem value="cash" id="record-payment-cash" />
+                  <Label htmlFor="record-payment-cash" className="text-sm font-medium cursor-pointer select-none">
+                    Cash
+                  </Label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <RadioGroupItem value="upi" id="record-payment-upi" />
+                  <Label htmlFor="record-payment-upi" className="text-sm font-medium cursor-pointer select-none">
+                    UPI
+                  </Label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <RadioGroupItem value="card" id="record-payment-card" />
+                  <Label htmlFor="record-payment-card" className="text-sm font-medium cursor-pointer select-none">
+                    Card
+                  </Label>
+                </div>
+              </RadioGroup>
+            </div>
+
+            {/* Amount Verification Checkbox */}
+            <div className="flex items-start gap-3 p-4 border rounded-lg bg-white">
+              <Checkbox
+                id="record-amount-verified"
+                checked={recordPaymentVerified}
+                onCheckedChange={setRecordPaymentVerified}
+                disabled={recordingPayment}
+              />
+              <label
+                htmlFor="record-amount-verified"
+                className="text-sm font-medium leading-none cursor-pointer select-none"
+              >
+                I confirm that the payment of {formatCurrency(order?.total_amount || 0)} has been received for this order
+              </label>
+            </div>
+          </div>
+
+          <div className="flex gap-2 pt-2">
+            <Button
+              variant="outline"
+              onClick={() => setIsPaymentDialogOpen(false)}
+              disabled={recordingPayment}
+              className="flex-1"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleRecordPayment}
+              disabled={recordingPayment || !recordPaymentMethod || !recordPaymentVerified}
+              className="flex-1 bg-green-600 hover:bg-green-700 text-white font-medium"
+            >
+              {recordingPayment && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Confirm Payment
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Record Payment Drawer - Mobile */}
+      <Drawer open={isPaymentDialogOpen && isMobile} onOpenChange={(open) => {
+        setIsPaymentDialogOpen(open);
+        if (!open) {
+          setRecordPaymentMethod('');
+          setRecordPaymentVerified(false);
+        }
+      }}>
+        <DrawerContent className="max-h-[90vh]">
+          <DrawerHeader className="px-4 text-left">
+            <DrawerTitle>Record Payment</DrawerTitle>
+            <DrawerDescription>
+              Select the payment method and confirm the amount received from the customer.
+            </DrawerDescription>
+          </DrawerHeader>
+
+          <div className="px-4 pb-4 space-y-4 overflow-y-auto">
+            {/* Amount Summary */}
+            <div className="rounded-lg bg-orange-50 border border-orange-200 p-4">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium text-orange-900">Amount Due:</span>
+                <span className="text-xl font-bold text-orange-900">{formatCurrency(order?.total_amount || 0)}</span>
+              </div>
+            </div>
+
+            {/* Payment Method Selection */}
+            <div className="p-4 border rounded-lg bg-white space-y-3">
+              <Label className="text-sm font-semibold text-gray-900 block">
+                Payment Method *
+              </Label>
+              <RadioGroup
+                value={recordPaymentMethod}
+                onValueChange={setRecordPaymentMethod}
+                className="flex gap-4 flex-wrap"
+                disabled={recordingPayment}
+              >
+                <div className="flex items-center gap-2">
+                  <RadioGroupItem value="cash" id="mobile-record-payment-cash" />
+                  <Label htmlFor="mobile-record-payment-cash" className="text-sm font-medium cursor-pointer select-none">
+                    Cash
+                  </Label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <RadioGroupItem value="upi" id="mobile-record-payment-upi" />
+                  <Label htmlFor="mobile-record-payment-upi" className="text-sm font-medium cursor-pointer select-none">
+                    UPI
+                  </Label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <RadioGroupItem value="card" id="mobile-record-payment-card" />
+                  <Label htmlFor="mobile-record-payment-card" className="text-sm font-medium cursor-pointer select-none">
+                    Card
+                  </Label>
+                </div>
+              </RadioGroup>
+            </div>
+
+            {/* Amount Verification Checkbox */}
+            <div className="flex items-start gap-3 p-4 border rounded-lg bg-white">
+              <Checkbox
+                id="mobile-record-amount-verified"
+                checked={recordPaymentVerified}
+                onCheckedChange={setRecordPaymentVerified}
+                disabled={recordingPayment}
+              />
+              <label
+                htmlFor="mobile-record-amount-verified"
+                className="text-sm font-medium leading-none cursor-pointer select-none"
+              >
+                I confirm that the payment of {formatCurrency(order?.total_amount || 0)} has been received for this order
+              </label>
+            </div>
+
+            <div className="flex gap-2 pt-2">
+              <Button
+                variant="outline"
+                onClick={() => setIsPaymentDialogOpen(false)}
+                disabled={recordingPayment}
+                className="flex-1"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleRecordPayment}
+                disabled={recordingPayment || !recordPaymentMethod || !recordPaymentVerified}
+                className="flex-1 bg-green-600 hover:bg-green-700 text-white font-medium"
+              >
+                {recordingPayment && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                Confirm Payment
+              </Button>
+            </div>
+          </div>
+        </DrawerContent>
+      </Drawer>
 
       {/* Agent Reassignment Confirmation Dialog */}
       <AlertDialog open={isReassignDialogOpen} onOpenChange={setIsReassignDialogOpen}>

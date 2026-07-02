@@ -251,7 +251,7 @@ const Packages = () => {
   const preChecklists = checklistItems
     .filter(item => item.when === 'pre')
     .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
-    
+
   const postChecklists = checklistItems
     .filter(item => item.when === 'post')
     .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
