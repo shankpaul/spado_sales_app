@@ -935,6 +935,19 @@ const Dashboard = () => {
   return (
     <div className="min-h-screen bg-gray-50/50">
       <div className="p-4 md:p-6 space-y-6">
+        {/* Mobile Header - Visible only on mobile */}
+        <div className="block md:hidden">
+          <div className="flex items-center justify-between mb-1">
+            <h1 className="text-2xl font-bold flex items-center gap-2">
+              <BarChart3 className="h-6 w-6" strokeWidth={1.5} />
+              Dashboard
+            </h1>
+          </div>
+          <p className="text-muted-foreground text-sm">
+            Welcome back, {user?.name || user?.email}!
+          </p>
+        </div>
+
         {/* Desktop Header - Hidden on Mobile */}
         <div className="hidden md:block">
           <div className="flex items-center justify-between">
