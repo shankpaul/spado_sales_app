@@ -83,11 +83,11 @@ const OfferForm = () => {
       try {
         const packagesResp = await orderService.getPackages();
         const addonsResp = await orderService.getAddons();
-        
+
         const loadedPackages = packagesResp.packages || packagesResp || [];
         loadedPackages.sort((a, b) => a.name.localeCompare(b.name));
         setPackages(loadedPackages);
-        
+
         setAddons(addonsResp.addons || addonsResp || []);
       } catch (error) {
         toast.error('Failed to load packages and addons');
@@ -448,7 +448,7 @@ const OfferForm = () => {
                 <Package className="inline h-5 w-5 mr-2" />
                 Package & Addon Configuration
               </h2>
-              
+
               {/* Vehicle Type Tabs */}
               <div className="mb-6">
                 <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
@@ -582,31 +582,31 @@ const OfferForm = () => {
 
 
           {/* Settings */
-          <Card className="p-6 mb-6 bg-white shadow-xs">
-            <h2 className="text-lg font-semibold mb-4">Settings</h2>
-            <div className="space-y-4">
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="is_stackable"
-                  checked={formData.is_stackable}
-                  onCheckedChange={(checked) => handleChange('is_stackable', checked)}
-                />
-                <label htmlFor="is_stackable" className="text-sm font-medium">
-                  Stackable (Can be combined with other offers)
-                </label>
+            <Card className="p-6 mb-6 bg-white shadow-xs">
+              <h2 className="text-lg font-semibold mb-4">Settings</h2>
+              <div className="space-y-4">
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="is_stackable"
+                    checked={formData.is_stackable}
+                    onCheckedChange={(checked) => handleChange('is_stackable', checked)}
+                  />
+                  <label htmlFor="is_stackable" className="text-sm font-medium">
+                    Stackable (Can be combined with other offers)
+                  </label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="is_active"
+                    checked={formData.is_active}
+                    onCheckedChange={(checked) => handleChange('is_active', checked)}
+                  />
+                  <label htmlFor="is_active" className="text-sm font-medium">
+                    Active
+                  </label>
+                </div>
               </div>
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="is_active"
-                  checked={formData.is_active}
-                  onCheckedChange={(checked) => handleChange('is_active', checked)}
-                />
-                <label htmlFor="is_active" className="text-sm font-medium">
-                  Active
-                </label>
-              </div>
-            </div>
-          </Card>}
+            </Card>}
 
           {/* Action Buttons */}
           <div className="flex justify-end gap-4">

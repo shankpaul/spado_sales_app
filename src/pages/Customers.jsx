@@ -14,6 +14,13 @@ import {
   SheetTrigger,
 } from '../components/ui/sheet';
 import {
+  Drawer,
+  DrawerContent,
+  DrawerHeader,
+  DrawerTitle,
+  DrawerDescription,
+} from '../components/ui/drawer';
+import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -205,6 +212,80 @@ const Customers = () => {
     setIsFilterOpen(open);
   };
 
+  const renderFilterContent = () => (
+    <>
+      <div className="grid gap-4 py-4">
+        {/* Booking Date Filter */}
+        <div className="space-y-2">
+          <label className="text-sm font-medium">Last Booked</label>
+          <Select value={tempDateFilter} onValueChange={setTempDateFilter}>
+            <SelectTrigger>
+              <SelectValue placeholder="All Time" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Time</SelectItem>
+              <SelectItem value="7d">Last 7 days</SelectItem>
+              <SelectItem value="14d">Last 2 weeks</SelectItem>
+              <SelectItem value="1m">Last month</SelectItem>
+              <SelectItem value="3m">Last 3 months</SelectItem>
+              <SelectItem value="custom">Custom Range</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Custom Range Input */}
+        {tempDateFilter === 'custom' && (
+          <div className="space-y-3 p-4 bg-muted/30 rounded-lg">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Select Unit</label>
+              <Select value={tempCustomUnit} onValueChange={setTempCustomUnit}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select unit" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="days">Days</SelectItem>
+                  <SelectItem value="months">Months</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
+            {tempCustomUnit === 'days' ? (
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Number of Days</label>
+                <Input
+                  type="number"
+                  placeholder="Enter number of days"
+                  value={tempCustomDays}
+                  onChange={(e) => setTempCustomDays(e.target.value)}
+                  min="1"
+                />
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Number of Months</label>
+                <Input
+                  type="number"
+                  placeholder="Enter number of months"
+                  value={tempCustomMonths}
+                  onChange={(e) => setTempCustomMonths(e.target.value)}
+                  min="1"
+                />
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+      <div className="flex flex-col gap-2 pt-4 border-t">
+        <Button onClick={applyFilters} className="w-full">
+          Apply Filters
+        </Button>
+        <Button variant="outline" onClick={clearFilters} className="w-full">
+          Clear All
+        </Button>
+      </div>
+    </>
+  );
+
   // Get filter summary for display
   const getFilterSummary = () => {
     const filters = [];
@@ -361,8 +442,8 @@ const Customers = () => {
       </div>
 
       {/* Search and Filters - Sheet-based Implementation */}
-      <div className="sticky top-0 z-10">
-        <div className="flex flex-col sm:flex-row gap-4 w-full">
+      <div className="sticky top-0 z-30 bg-background/95 backdrop-blur-xs py-2 -mx-4 px-4 border-b md:relative md:top-0 md:z-0 md:bg-transparent md:backdrop-blur-none md:p-0 md:border-0 md:mb-6">
+        <div className="flex flex-row items-center gap-2 w-full">
           {/* Search Field */}
           <div className="relative flex-1 flex gap-2">
             <div className="relative flex-1">
@@ -391,102 +472,48 @@ const Customers = () => {
           </div>
 
           {/* Filter Button with Sheet */}
-          <Sheet open={isFilterOpen} onOpenChange={handleFilterOpen}>
-            <SheetTrigger asChild>
-              <Button
-                variant={hasActiveFilters() ? "default" : "outline"}
-                className="w-full sm:w-auto relative"
+          <Button
+            variant={hasActiveFilters() ? "default" : "outline"}
+            className="w-auto relative shrink-0"
+            onClick={() => handleFilterOpen(true)}
+          >
+            <Filter className="h-4 w-4 mr-0 sm:mr-2" />
+            <span className="hidden sm:inline">Filters</span>
+            {hasActiveFilters() && (
+              <Badge2
+                variant="secondary"
+                className="ml-2 bg-white text-primary px-1.5 py-0 text-xs h-5 min-w-[20px]"
               >
-                <Filter className="h-4 w-4 mr-2" />
-                Filters
-                {hasActiveFilters() && (
-                  <Badge2
-                    variant="secondary"
-                    className="ml-2 bg-white text-primary px-1.5 py-0 text-xs h-5 min-w-[20px]"
-                  >
-                    {getActiveFilterCount()}
-                  </Badge2>
-                )}
-              </Button>
-            </SheetTrigger>
-            <SheetContent side={isMobile ? "bottom" : "right"}>
-              <SheetHeader>
-                <SheetTitle>Filter Customers</SheetTitle>
-                <SheetDescription>
-                  Filter customers by their last booking date
-                </SheetDescription>
-              </SheetHeader>
-              <div className="grid gap-4 py-4">
-                {/* Booking Date Filter */}
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Last Booked</label>
-                  <Select value={tempDateFilter} onValueChange={setTempDateFilter}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="All Time" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Time</SelectItem>
-                      <SelectItem value="7d">Last 7 days</SelectItem>
-                      <SelectItem value="14d">Last 2 weeks</SelectItem>
-                      <SelectItem value="1m">Last month</SelectItem>
-                      <SelectItem value="3m">Last 3 months</SelectItem>
-                      <SelectItem value="custom">Custom Range</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+                {getActiveFilterCount()}
+              </Badge2>
+            )}
+          </Button>
 
-                {/* Custom Range Input */}
-                {tempDateFilter === 'custom' && (
-                  <div className="space-y-3 p-4 bg-muted/30 rounded-lg">
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium">Select Unit</label>
-                      <Select value={tempCustomUnit} onValueChange={setTempCustomUnit}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select unit" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="days">Days</SelectItem>
-                          <SelectItem value="months">Months</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    
-                    {tempCustomUnit === 'days' ? (
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium">Number of Days</label>
-                        <Input
-                          type="number"
-                          placeholder="Enter number of days"
-                          value={tempCustomDays}
-                          onChange={(e) => setTempCustomDays(e.target.value)}
-                          min="1"
-                        />
-                      </div>
-                    ) : (
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium">Number of Months</label>
-                        <Input
-                          type="number"
-                          placeholder="Enter number of months"
-                          value={tempCustomMonths}
-                          onChange={(e) => setTempCustomMonths(e.target.value)}
-                          min="1"
-                        />
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-              <div className="flex flex-col gap-2 pt-4 border-t">
-                <Button onClick={applyFilters} className="w-full">
-                  Apply Filters
-                </Button>
-                <Button variant="outline" onClick={clearFilters} className="w-full">
-                  Clear All
-                </Button>
-              </div>
-            </SheetContent>
-          </Sheet>
+          {isMobile ? (
+            <Drawer open={isFilterOpen} onOpenChange={handleFilterOpen}>
+              <DrawerContent className="max-h-[85vh] px-4 pb-6 overflow-y-auto">
+                <DrawerHeader className="text-left px-0">
+                  <DrawerTitle>Filter Customers</DrawerTitle>
+                  <DrawerDescription>
+                    Filter customers by their last booking date
+                  </DrawerDescription>
+                </DrawerHeader>
+                {renderFilterContent()}
+              </DrawerContent>
+            </Drawer>
+          ) : (
+            <Sheet open={isFilterOpen} onOpenChange={handleFilterOpen}>
+              <SheetContent side="right">
+                <SheetHeader>
+                  <SheetTitle>Filter Customers</SheetTitle>
+                  <SheetDescription>
+                    Filter customers by their last booking date
+                  </SheetDescription>
+                </SheetHeader>
+                {renderFilterContent()}
+              </SheetContent>
+            </Sheet>
+          )}
         </div>
       </div>
 
@@ -867,7 +894,7 @@ const Customers = () => {
       {isMobile && (
         <Button
           onClick={() => handleOpenForm()}
-          className="fixed bottom-20 right-6 h-14 w-14 rounded-full shadow-lg z-40 bg-primary text-white p-0 flex items-center justify-center animate-in fade-in slide-in-from-bottom-4 duration-300"
+          className="fixed bottom-20 right-6 h-14 w-14 rounded-full shadow-lg shadow-blue-500/30 z-40 bg-blue-600 hover:bg-blue-700 text-white p-0 flex items-center justify-center animate-in fade-in slide-in-from-bottom-4 duration-300"
         >
           <Plus className="h-6 w-6" />
         </Button>

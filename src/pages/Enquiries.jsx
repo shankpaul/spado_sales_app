@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, Fragment } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -13,6 +13,13 @@ import {
 } from '../components/ui/select';
 import { toast } from 'sonner';
 import { Popover, PopoverTrigger, PopoverContent } from '../components/ui/popover';
+import {
+  Drawer,
+  DrawerContent,
+  DrawerHeader,
+  DrawerTitle,
+  DrawerDescription,
+} from '../components/ui/drawer';
 import enquiryService from '../services/enquiryService';
 import ablyClient from '../services/ablyClient';
 import useEnquiryStore from '../store/enquiryStore';
@@ -83,6 +90,64 @@ const Enquiries = () => {
     resetPagination,
   } = useEnquiryStore();
 
+  const getGroupedEnquiries = () => {
+    const groups = {};
+    enquiries.forEach((enquiry) => {
+      let dateKey = 'Unknown Date';
+      if (enquiry.updated_at) {
+        try {
+          const dateObj = new Date(enquiry.updated_at);
+          dateKey = format(dateObj, 'yyyy-MM-dd');
+        } catch (e) {
+          console.error(e);
+        }
+      }
+      if (!groups[dateKey]) {
+        groups[dateKey] = [];
+      }
+      groups[dateKey].push(enquiry);
+    });
+
+    return Object.keys(groups)
+      .sort((a, b) => b.localeCompare(a))
+      .map(dateKey => {
+        let displayTitle = dateKey;
+        try {
+          const dateObj = new Date(dateKey);
+          const today = format(new Date(), 'yyyy-MM-dd');
+          const yesterday = format(new Date(Date.now() - 86400000), 'yyyy-MM-dd');
+          if (dateKey === today) {
+            displayTitle = 'Today';
+          } else if (dateKey === yesterday) {
+            displayTitle = 'Yesterday';
+          } else {
+            displayTitle = format(dateObj, 'MMMM d, yyyy');
+          }
+        } catch (e) { }
+
+        return {
+          dateKey,
+          displayTitle,
+          items: groups[dateKey]
+        };
+      });
+  };
+
+  const formatPhoneNumber = (phone) => {
+    if (!phone) return 'N/A';
+    const cleanPhone = phone.trim().replace(/[^0-9+]/g, '');
+    if (cleanPhone.length === 10 && /^\d+$/.test(cleanPhone)) {
+      return `+91 ${cleanPhone.slice(0, 5)} ${cleanPhone.slice(5)}`;
+    }
+    if (cleanPhone.startsWith('+91') && cleanPhone.length === 13) {
+      return `+91 ${cleanPhone.slice(3, 8)} ${cleanPhone.slice(8)}`;
+    }
+    if (cleanPhone.startsWith('91') && cleanPhone.length === 12) {
+      return `+91 ${cleanPhone.slice(2, 7)} ${cleanPhone.slice(7)}`;
+    }
+    return phone;
+  };
+
   // Load persisted state from localStorage
   const loadPersistedState = () => {
     try {
@@ -127,6 +192,8 @@ const Enquiries = () => {
   // Wizard and filter sheet states
   const [isWizardOpen, setIsWizardOpen] = useState(false);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const [isDesktopPopoverOpen, setIsDesktopPopoverOpen] = useState(false);
+  const [isMobilePopoverOpen, setIsMobilePopoverOpen] = useState(false);
 
   // Track if this is the first mount to prevent resetting page from localStorage
   const isFirstMount = useRef(true);
@@ -152,6 +219,8 @@ const Enquiries = () => {
     setStatus('all');
     setDateFrom('');
     setDateTo('');
+    setIsDesktopPopoverOpen(false);
+    setIsMobilePopoverOpen(false);
   };
 
   const fetchSummary = async () => {
@@ -366,6 +435,94 @@ const Enquiries = () => {
     setIsFilterOpen(open);
   };
 
+  const renderFilterContent = () => (
+    <>
+      <div className="grid gap-4 py-4">
+        {/* Status Filter */}
+        <div className="space-y-2">
+          <label className="text-sm font-medium">Status</label>
+          <Select value={tempStatus} onValueChange={setTempStatus}>
+            <SelectTrigger>
+              <SelectValue placeholder="All Statuses" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Statuses</SelectItem>
+              {ENQUIRY_STATUS_OPTIONS.map((s) => (
+                <SelectItem key={s.value} value={s.value}>
+                  {s.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Source Filter */}
+        <div className="space-y-2">
+          <label className="text-sm font-medium">Source</label>
+          <Select value={tempSource} onValueChange={setTempSource}>
+            <SelectTrigger>
+              <SelectValue placeholder="All Sources" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Sources</SelectItem>
+              {ENQUIRY_SOURCE_OPTIONS.map((s) => (
+                <SelectItem key={s.value} value={s.value}>
+                  {s.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Sentiment Filter */}
+        <div className="space-y-2">
+          <label className="text-sm font-medium">Sentiment</label>
+          <Select value={tempSentiment} onValueChange={setTempSentiment}>
+            <SelectTrigger>
+              <SelectValue placeholder="All Sentiments" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Sentiments</SelectItem>
+              {SENTIMENT_OPTIONS.map((s) => (
+                <SelectItem key={s.value} value={s.value}>
+                  {SENTIMENT_EMOJIS[s.value]} {s.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Date Range */}
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Date From</label>
+            <Input
+              type="date"
+              value={tempDateFrom}
+              onChange={(e) => setTempDateFrom(e.target.value)}
+            />
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Date To</label>
+            <Input
+              type="date"
+              value={tempDateTo}
+              onChange={(e) => setTempDateTo(e.target.value)}
+            />
+          </div>
+        </div>
+      </div>
+      <div className="flex flex-col gap-2 pt-4 border-t">
+        <Button onClick={applyFilters} className="w-full">
+          Apply Filters
+        </Button>
+        <Button variant="outline" onClick={clearFilters} className="w-full">
+          Clear All
+        </Button>
+      </div>
+    </>
+  );
+
   // Handle search button click or Enter key
   const handleSearch = () => {
     setSearchQuery(searchInput);
@@ -451,8 +608,7 @@ const Enquiries = () => {
           <p className="text-muted-foreground">Track and manage customer enquiries</p>
         </div>
         <div className="flex items-center gap-3 w-full sm:w-auto">
-          {/* Bell Icon Popover */}
-          <Popover>
+          <Popover open={isDesktopPopoverOpen} onOpenChange={setIsDesktopPopoverOpen}>
             <PopoverTrigger asChild>
               <Button
                 variant={followupSummary.today + followupSummary.due > 0 ? "default" : "outline"}
@@ -509,69 +665,16 @@ const Enquiries = () => {
       </div>
 
       {/* Mobile Title - Visible only on mobile */}
-      <div className="block md:hidden">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold flex items-center gap-2">
-              <PackageOpen className="h-6 w-6" strokeWidth={1.5} /> Enquiries
-            </h1>
-            <p className="text-muted-foreground text-sm">Track and manage customer enquiries</p>
-          </div>
-          {/* Bell Icon Popover for Mobile */}
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button
-                variant={followupSummary.today + followupSummary.due > 0 ? "default" : "outline"}
-                size="icon"
-                className={`relative rounded-full cursor-pointer shrink-0 transition-all ${followupSummary.today + followupSummary.due > 0
-                  ? 'bg-red-100 hover:bg-red-600 text-white border border-red-500 shadow-md active:scale-95'
-                  : 'hover:bg-gray-100 text-gray-600'
-                  }`}
-              >
-                <Bell className={`h-5 w-5 ${followupSummary.today + followupSummary.due > 0 ? 'text-red-500 fill-white/20 animate-bounce' : 'text-gray-600'}`} />
-                {followupSummary.today + followupSummary.due > 0 && (
-                  <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white shadow-xs">
-                    {followupSummary.today + followupSummary.due}
-                  </span>
-                )}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="z-[3000] w-80 bg-white p-4 shadow-md border border-gray-150 rounded-xl">
-              <div className="space-y-3">
-                <div className="flex items-center gap-2 border-b border-gray-100 pb-2">
-                  <BellRing className="h-5 w-5 text-primary shrink-0" />
-                  <h4 className="font-bold text-sm text-gray-800">Follow-up Urgency</h4>
-                </div>
-                <div className="space-y-2 text-sm text-gray-600">
-                  <div className="flex justify-between items-center py-1">
-                    <span>Scheduled for today:</span>
-                    <span className="font-semibold text-gray-900 bg-amber-50 text-amber-700 px-2 py-0.5 rounded border border-amber-100 text-xs">
-                      {followupSummary.today} enquiry/s
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center py-1">
-                    <span>Already past due:</span>
-                    <span className="font-semibold text-gray-900 bg-red-50 text-red-700 px-2 py-0.5 rounded border border-red-100 text-xs">
-                      {followupSummary.due} enquiry/s
-                    </span>
-                  </div>
-                </div>
-                <Button
-                  onClick={handleViewAllFollowups}
-                  className="w-full text-xs font-semibold mt-2 cursor-pointer bg-red-600 hover:bg-red-700 text-white"
-                  size="sm"
-                >
-                  View All Urgent Follow-ups
-                </Button>
-              </div>
-            </PopoverContent>
-          </Popover>
-        </div>
+      <div className="block md:hidden mb-2">
+        <h1 className="text-2xl font-bold flex items-center gap-2">
+          <PackageOpen className="h-6 w-6" strokeWidth={1.5} /> Enquiries
+        </h1>
+        <p className="text-muted-foreground text-sm">Track and manage customer enquiries</p>
       </div>
 
       {/* Search and Filters - Sticky on Mobile */}
-      <div className="sticky top-0 z-10 ">
-        <div className="flex flex-col sm:flex-row gap-4 w-full">
+      <div className="sticky top-0 z-30 bg-background/95 backdrop-blur-xs py-2 -mx-4 px-4 border-b md:relative md:top-0 md:z-0 md:bg-transparent md:backdrop-blur-none md:p-0 md:border-0 md:mb-6">
+        <div className="flex flex-row items-center gap-2 w-full">
           {/* Single Search Field */}
           <div className="relative flex-1 flex gap-2">
             <div className="relative flex-1">
@@ -600,118 +703,48 @@ const Enquiries = () => {
           </div>
 
           {/* Filter Button */}
-          <Sheet open={isFilterOpen} onOpenChange={handleFilterOpen}>
-            <SheetTrigger asChild>
-              <Button
-                variant={hasActiveFilters() ? "default" : "outline"}
-                className="w-full sm:w-auto relative"
+          <Button
+            variant={hasActiveFilters() ? "default" : "outline"}
+            className="w-auto relative shrink-0"
+            onClick={() => handleFilterOpen(true)}
+          >
+            <Filter className="h-4 w-4 mr-0 sm:mr-2" />
+            <span className="hidden sm:inline">Filters</span>
+            {hasActiveFilters() && (
+              <Badge2
+                variant="secondary"
+                className="ml-2 bg-white text-primary px-1.5 py-0 text-xs h-5 min-w-[20px]"
               >
-                <Filter className="h-4 w-4 mr-2" />
-                Filters
-                {hasActiveFilters() && (
-                  <Badge2
-                    variant="secondary"
-                    className="ml-2 bg-white text-primary px-1.5 py-0 text-xs h-5 min-w-[20px]"
-                  >
-                    {getActiveFilterCount()}
-                  </Badge2>
-                )}
-              </Button>
-            </SheetTrigger>
-            <SheetContent side={isMobile ? "bottom" : "right"}>
-              <SheetHeader>
-                <SheetTitle>Filter Enquiries</SheetTitle>
-                <SheetDescription>
-                  Apply filters to narrow down your enquiry list
-                </SheetDescription>
-              </SheetHeader>
-              <div className="grid gap-4 py-4">
-                {/* Status Filter */}
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Status</label>
-                  <Select value={tempStatus} onValueChange={setTempStatus}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="All Statuses" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Statuses</SelectItem>
-                      {ENQUIRY_STATUS_OPTIONS.map((s) => (
-                        <SelectItem key={s.value} value={s.value}>
-                          {s.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+                {getActiveFilterCount()}
+              </Badge2>
+            )}
+          </Button>
 
-                {/* Source Filter */}
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Source</label>
-                  <Select value={tempSource} onValueChange={setTempSource}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="All Sources" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Sources</SelectItem>
-                      {ENQUIRY_SOURCE_OPTIONS.map((s) => (
-                        <SelectItem key={s.value} value={s.value}>
-                          {s.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {/* Sentiment Filter */}
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Sentiment</label>
-                  <Select value={tempSentiment} onValueChange={setTempSentiment}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="All Sentiments" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Sentiments</SelectItem>
-                      {SENTIMENT_OPTIONS.map((s) => (
-                        <SelectItem key={s.value} value={s.value}>
-                          {SENTIMENT_EMOJIS[s.value]} {s.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {/* Date Range */}
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Date From</label>
-                    <Input
-                      type="date"
-                      value={tempDateFrom}
-                      onChange={(e) => setTempDateFrom(e.target.value)}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Date To</label>
-                    <Input
-                      type="date"
-                      value={tempDateTo}
-                      onChange={(e) => setTempDateTo(e.target.value)}
-                    />
-                  </div>
-                </div>
-
-                {/* TODO: Assigned To Filter - need users list */}
-              </div>
-              <div className="flex flex-col gap-2 pt-4 border-t">
-                <Button onClick={applyFilters} className="w-full">
-                  Apply Filters
-                </Button>
-                <Button variant="outline" onClick={clearFilters} className="w-full">
-                  Clear All
-                </Button>
-              </div>
-            </SheetContent>
-          </Sheet>
+          {isMobile ? (
+            <Drawer open={isFilterOpen} onOpenChange={handleFilterOpen}>
+              <DrawerContent className="max-h-[85vh] px-4 pb-6 overflow-y-auto">
+                <DrawerHeader className="text-left px-0">
+                  <DrawerTitle>Filter Enquiries</DrawerTitle>
+                  <DrawerDescription>
+                    Apply filters to narrow down your enquiry list
+                  </DrawerDescription>
+                </DrawerHeader>
+                {renderFilterContent()}
+              </DrawerContent>
+            </Drawer>
+          ) : (
+            <Sheet open={isFilterOpen} onOpenChange={handleFilterOpen}>
+              <SheetContent side="right">
+                <SheetHeader>
+                  <SheetTitle>Filter Enquiries</SheetTitle>
+                  <SheetDescription>
+                    Apply filters to narrow down your enquiry list
+                  </SheetDescription>
+                </SheetHeader>
+                {renderFilterContent()}
+              </SheetContent>
+            </Sheet>
+          )}
         </div>
       </div>
 
@@ -738,10 +771,10 @@ const Enquiries = () => {
 
       {/* Follow-up Urgency Filter Banner */}
       {dueFollowupOnly && (
-        <div className="bg-primary/5 border border-primary/20 rounded-xl p-4 flex items-center justify-between gap-4">
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-center justify-between gap-4">
           <div className="flex items-center gap-2">
-            <BellRing className="h-5 w-5 text-primary shrink-0" />
-            <p className="text-sm font-semibold text-primary">
+            <BellRing className="h-5 w-5 text-amber-600 shrink-0" />
+            <p className="text-sm font-semibold text-amber-800">
               Showing only enquiries requiring follow-up today or past due.
             </p>
           </div>
@@ -749,7 +782,7 @@ const Enquiries = () => {
             variant="outline"
             size="sm"
             onClick={() => setDueFollowupOnly(false)}
-            className="text-xs h-8 cursor-pointer shrink-0"
+            className="text-xs h-8 cursor-pointer shrink-0 border-amber-200 hover:bg-amber-100/50 text-amber-800 hover:text-amber-900"
           >
             Clear Filter
           </Button>
@@ -832,53 +865,77 @@ const Enquiries = () => {
         ) : (
           <>
             {/* Mobile View - Cards with Infinite Scroll */}
-            <div className="block md:hidden space-y-3">
-              {enquiries.map((enquiry) => (
-                <div
-                  key={enquiry.id}
-                  onClick={() => handleOpenEnquiryDetail(enquiry.id)}
-                  className="bg-white shadow-sm border border-gray-100 rounded-xl p-4 active:scale-[0.98] active:bg-gray-50 transition-all duration-200"
-                >
-                  <div className="flex items-center gap-4">
-                    <LetterAvatar
-                      name={enquiry.customer?.name || enquiry.contact_name || 'Unknown'}
-                      size="sm"
-                    />
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between">
-                        <div className="font-bold text-base truncate capitalize">
-                          {enquiry.customer?.name || enquiry.contact_name || 'Unknown'}
-                        </div>
-                      </div>
-                      <div className="flex items-center justify-between mt-1">
-                        <div className="text-xs text-muted-foreground flex items-center gap-2">
-                          <Phone className="h-3 w-3" />
-                          <span>{enquiry.contact_phone}</span>
-                        </div>
-                        <div className="text-xs text-muted-foreground">
-                          {ENQUIRY_SOURCE_LABELS[enquiry.source]}
-                        </div>
-                      </div>
-                    </div>
+            <div className="block md:hidden space-y-4">
+              {getGroupedEnquiries().map((group) => (
+                <div key={group.dateKey} className="space-y-2">
+                  <div className="text-[11px] font-bold text-blue-500 uppercase tracking-wider pl-1 pt-2 sticky top-0 bg-gray-50/90 backdrop-blur-xs py-1 z-10">
+                    {group.displayTitle}
                   </div>
+                  {group.items.map((enquiry) => (
+                    <div
+                      key={enquiry.id}
+                      onClick={() => handleOpenEnquiryDetail(enquiry.id)}
+                      className="bg-white shadow-sm border border-gray-100 rounded-xl p-4 active:scale-[0.98] active:bg-gray-50 transition-all duration-200"
+                    >
+                      <div className="flex items-start gap-4">
+                        <LetterAvatar
+                          name={enquiry.customer?.name || enquiry.contact_name || 'Unknown'}
+                          size="sm"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between">
+                            <div className="font-bold text-base truncate capitalize">
+                              {enquiry.customer?.name || enquiry.contact_name || 'Unknown'}
+                            </div>
+                          </div>
+                          <div className="flex items-center justify-between mt-1">
+                            <div className="text-xs text-muted-foreground flex flex-col gap-1">
+                              <div className="flex items-center gap-2">
+                                <Phone className="h-3 w-3" />
+                                <span>{formatPhoneNumber(enquiry.contact_phone)}</span>
+                              </div>
+                              {enquiry.status === 'needs_followup' && (
+                                <div className="mt-1">
+                                  <Badge2 variant={getBadgeVariant(enquiry.status)} className="px-2 text-[10px] py-0.5">
+                                    {ENQUIRY_STATUS_LABELS[enquiry.status]}
+                                  </Badge2>
+                                </div>
+                              )}
+                            </div>
+                            <div className="text-xs text-muted-foreground self-start">
+                              {ENQUIRY_SOURCE_LABELS[enquiry.source]}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
 
-                  <div className="flex items-center justify-between mt-4 pt-3 border-t border-gray-50">
-                    <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                      <div className="flex items-center gap-1">
-                        <Calendar className="h-3 w-3" />
-                        {formatDateTime(enquiry.updated_at)}
-                      </div>
-                      {enquiry.followup_date && (
-                        <div className="flex items-center gap-1">
-                          <Bell className={`h-3 w-3 ${isFollowUpNeeded(enquiry.followup_date) ? 'text-red-500' : ''}`} />
-                          {formatDate(enquiry.followup_date)}
+                      <div className="flex flex-col gap-1.5 mt-4 pt-3 border-t border-gray-50">
+                        <div className="flex items-center justify-between text-xs text-muted-foreground">
+                          <div className="flex items-center gap-1">
+                            <Calendar className="h-3 w-3" />
+                            <span>Updated {formatDateTime(enquiry.updated_at)}</span>
+                          </div>
+                          {enquiry.status !== 'needs_followup' && (
+                            <Badge2 variant={getBadgeVariant(enquiry.status)} className="px-2">
+                              {ENQUIRY_STATUS_LABELS[enquiry.status]}
+                            </Badge2>
+                          )}
                         </div>
-                      )}
+                        {enquiry.status === 'needs_followup' && enquiry.followup_date && (
+                          <div className="flex items-center gap-1.5 text-xs font-medium text-destructive bg-red-50/50 p-1.5 rounded-lg border border-red-100/50 mt-1 w-full">
+                            <Bell className="h-3.5 w-3.5 animate-pulse text-red-500" />
+                            <span>Follow-up: <span className="font-semibold">{formatDate(enquiry.followup_date)}</span></span>
+                          </div>
+                        )}
+                        {enquiry.status !== 'needs_followup' && enquiry.followup_date && (
+                          <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
+                            <Bell className={`h-3 w-3 ${isFollowUpNeeded(enquiry.followup_date) ? 'text-red-500' : ''}`} />
+                            <span>Follow-up: {formatDate(enquiry.followup_date)}</span>
+                          </div>
+                        )}
+                      </div>
                     </div>
-                    <Badge2 variant={getBadgeVariant(enquiry.status)} className="px-2">
-                      {ENQUIRY_STATUS_LABELS[enquiry.status]}
-                    </Badge2>
-                  </div>
+                  ))}
                 </div>
               ))}
 
@@ -912,61 +969,70 @@ const Enquiries = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {enquiries.map((enquiry) => (
-                    <tr
-                      key={enquiry.id}
-                      className="border-b last:border-0 hover:bg-muted/50 cursor-pointer"
-                      onClick={() => handleOpenEnquiryDetail(enquiry.id)}
-                    >
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-2">
-                          <LetterAvatar
-                            name={enquiry.customer?.name || enquiry.contact_name || 'Unknown'}
-                            size="xs"
-                          />
-                          <div>
-                            <div className="font-medium capitalize">
-                              {enquiry.customer?.name || enquiry.contact_name || 'Unknown'}
-                            </div>
-                            {enquiry.contact_email && (
-                              <div className="text-xs text-muted-foreground">
-                                {enquiry.contact_email}
+                  {getGroupedEnquiries().map((group) => (
+                    <Fragment key={group.dateKey}>
+                      <tr className="bg-gray-50 border-b border-gray-200/60">
+                        <td colSpan={7} className="px-4 py-2 font-bold text-xs text-blue-500 uppercase tracking-wider">
+                          {group.displayTitle}
+                        </td>
+                      </tr>
+                      {group.items.map((enquiry) => (
+                        <tr
+                          key={enquiry.id}
+                          className="border-b last:border-0 hover:bg-muted/50 cursor-pointer"
+                          onClick={() => handleOpenEnquiryDetail(enquiry.id)}
+                        >
+                          <td className="px-4 py-3">
+                            <div className="flex items-center gap-2">
+                              <LetterAvatar
+                                name={enquiry.customer?.name || enquiry.contact_name || 'Unknown'}
+                                size="xs"
+                              />
+                              <div>
+                                <div className="font-medium capitalize">
+                                  {enquiry.customer?.name || enquiry.contact_name || 'Unknown'}
+                                </div>
+                                {enquiry.contact_email && (
+                                  <div className="text-xs text-muted-foreground">
+                                    {enquiry.contact_email}
+                                  </div>
+                                )}
                               </div>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="flex items-center gap-1">
+                              <Phone className="h-3 w-3 text-muted-foreground" />
+                              <span className="font-medium">{formatPhoneNumber(enquiry.contact_phone)}</span>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="font-medium capitalize">
+                              {ENQUIRY_SOURCE_LABELS[enquiry.source]}
+                            </div>
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="font-medium capitalize">{enquiry.area || 'N/A'}</div>
+                          </td>
+                          <td className="px-4 py-3">
+                            <Badge2 variant={getBadgeVariant(enquiry.status)}>
+                              {ENQUIRY_STATUS_LABELS[enquiry.status]}
+                            </Badge2>
+                          </td>
+                          <td className="px-4 py-3">
+                            {enquiry.followup_date ? (
+                              <div className={`flex items-center gap-1 ${isFollowUpNeeded(enquiry.followup_date) ? 'text-red-500 font-medium' : ''}`}>
+                                <Bell className="h-3 w-3" />
+                                {formatDate(enquiry.followup_date)}
+                              </div>
+                            ) : (
+                              <span className="text-muted-foreground">N/A</span>
                             )}
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-1">
-                          <Phone className="h-3 w-3 text-muted-foreground" />
-                          <span className="font-medium">{enquiry.contact_phone}</span>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="font-medium capitalize">
-                          {ENQUIRY_SOURCE_LABELS[enquiry.source]}
-                        </div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="font-medium capitalize">{enquiry.area || 'N/A'}</div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <Badge2 variant={getBadgeVariant(enquiry.status)}>
-                          {ENQUIRY_STATUS_LABELS[enquiry.status]}
-                        </Badge2>
-                      </td>
-                      <td className="px-4 py-3">
-                        {enquiry.followup_date ? (
-                          <div className={`flex items-center gap-1 ${isFollowUpNeeded(enquiry.followup_date) ? 'text-red-500 font-medium' : ''}`}>
-                            <Bell className="h-3 w-3" />
-                            {formatDate(enquiry.followup_date)}
-                          </div>
-                        ) : (
-                          <span className="text-muted-foreground">N/A</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3">{formatDateTime(enquiry.updated_at)}</td>
-                    </tr>
+                          </td>
+                          <td className="px-4 py-3">{formatDateTime(enquiry.updated_at)}</td>
+                        </tr>
+                      ))}
+                    </Fragment>
                   ))}
                 </tbody>
               </table>
@@ -1054,11 +1120,61 @@ const Enquiries = () => {
       )}
 
       {/* Floating Action Button (FAB) for Mobile */}
-      <div className="md:hidden fixed bottom-20 right-6 z-40">
+      <div className="md:hidden fixed bottom-20 right-6 z-40 flex flex-col gap-3">
+        <Popover open={isMobilePopoverOpen} onOpenChange={setIsMobilePopoverOpen}>
+          <PopoverTrigger asChild>
+            <Button
+              variant={followupSummary.today + followupSummary.due > 0 ? "default" : "outline"}
+              size="icon"
+              className={`h-14 w-14 rounded-full shadow-lg relative cursor-pointer transition-all duration-200 active:scale-90 ${followupSummary.today + followupSummary.due > 0
+                ? 'bg-red-200 hover:bg-red-400 text-red-500'
+                : 'bg-white hover:bg-gray-50 text-gray-700 shadow-gray-500/10 border border-gray-150'
+                }`}
+            >
+              <Bell className={`h-6 w-6 ${followupSummary.today + followupSummary.due > 0 ? 'text-red-500 fill-white/20 animate-bounce' : 'text-gray-600'}`} />
+              {followupSummary.today + followupSummary.due > 0 && (
+                <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white shadow-xs">
+                  {followupSummary.today + followupSummary.due}
+                </span>
+              )}
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="z-[3000] w-80 bg-white p-4 shadow-xl border border-gray-150 rounded-xl" align="end" side="top">
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 border-b border-gray-100 pb-2">
+                <BellRing className="h-5 w-5 text-primary shrink-0" />
+                <h4 className="font-bold text-sm text-gray-800">Follow-up Urgency</h4>
+              </div>
+              <div className="space-y-2 text-sm text-gray-600">
+                <div className="flex justify-between items-center py-1">
+                  <span>Scheduled for today:</span>
+                  <span className="font-semibold text-gray-900 bg-amber-50 text-amber-700 px-2 py-0.5 rounded border border-amber-100 text-xs">
+                    {followupSummary.today} enquiry/s
+                  </span>
+                </div>
+                <div className="flex justify-between items-center py-1">
+                  <span>Already past due:</span>
+                  <span className="font-semibold text-gray-900 bg-red-50 text-red-700 px-2 py-0.5 rounded border border-red-100 text-xs">
+                    {followupSummary.due} enquiry/s
+                  </span>
+                </div>
+              </div>
+              <Button
+                onClick={handleViewAllFollowups}
+                className="w-full text-xs font-semibold mt-2 cursor-pointer bg-red-600 hover:bg-red-700 text-white"
+                size="sm"
+              >
+                View All Urgent Follow-ups
+              </Button>
+            </div>
+          </PopoverContent>
+        </Popover>
+
+        {/* Create Enquiry Wizard Trigger */}
         <Button
           onClick={() => setIsWizardOpen(true)}
           size="icon"
-          className="h-14 w-14 rounded-full shadow-lg bg-primary hover:bg-primary/90 active:scale-90 transition-all duration-200"
+          className="h-14 w-14 rounded-full shadow-lg shadow-blue-500/30 bg-blue-600 hover:bg-blue-700 text-white active:scale-90 transition-all duration-200"
         >
           <Plus className="h-7 w-7" />
         </Button>
@@ -1066,7 +1182,7 @@ const Enquiries = () => {
 
       {/* Enquiry Detail Sheet */}
       <Sheet open={!!selectedEnquiryId} onOpenChange={(open) => !open && handleCloseEnquiryDetail()}>
-        <SheetContent side="right" className="w-full sm:max-w-3/4 p-0 overflow-y-auto">
+        <SheetContent side="right" className="w-full sm:max-w-3/4 p-0 overflow-y-auto [&>button]:hidden">
           {selectedEnquiryId && (
             <EnquiryDetail
               enquiryId={selectedEnquiryId}

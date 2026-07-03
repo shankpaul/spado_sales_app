@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, Fragment } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -47,6 +47,13 @@ import {
   SheetTitle,
   SheetTrigger,
 } from '../components/ui/sheet';
+import {
+  Drawer,
+  DrawerContent,
+  DrawerHeader,
+  DrawerTitle,
+  DrawerDescription,
+} from '../components/ui/drawer';
 import { Badge2 } from '@/components/ui/badge2';
 import { Skeleton } from '../components/ui/skeleton';
 import AssigneeResponseTick from '../components/AssigneeResponseTick';
@@ -58,7 +65,7 @@ import AssigneeResponseTick from '../components/AssigneeResponseTick';
  */
 const Orders = () => {
   const navigate = useNavigate();
-  
+
   // Use order store
   const {
     orders,
@@ -77,7 +84,50 @@ const Orders = () => {
     resetPagination,
     fetchAgents,
   } = useOrderStore();
-  
+
+  const getGroupedOrders = () => {
+    const groups = {};
+    orders.forEach((order) => {
+      let dateKey = 'Unknown Date';
+      if (order.booking_date) {
+        try {
+          const dateObj = new Date(order.booking_date);
+          dateKey = format(dateObj, 'yyyy-MM-dd');
+        } catch (e) {
+          console.error(e);
+        }
+      }
+      if (!groups[dateKey]) {
+        groups[dateKey] = [];
+      }
+      groups[dateKey].push(order);
+    });
+
+    return Object.keys(groups)
+      .sort((a, b) => b.localeCompare(a))
+      .map(dateKey => {
+        let displayTitle = dateKey;
+        try {
+          const dateObj = new Date(dateKey);
+          const today = format(new Date(), 'yyyy-MM-dd');
+          const yesterday = format(new Date(Date.now() - 86400000), 'yyyy-MM-dd');
+          if (dateKey === today) {
+            displayTitle = 'Today';
+          } else if (dateKey === yesterday) {
+            displayTitle = 'Yesterday';
+          } else {
+            displayTitle = format(dateObj, 'MMMM d, yyyy');
+          }
+        } catch (e) { }
+
+        return {
+          dateKey,
+          displayTitle,
+          items: groups[dateKey]
+        };
+      });
+  };
+
   // Load persisted state from localStorage
   const loadPersistedState = () => {
     try {
@@ -285,6 +335,94 @@ const Orders = () => {
     setIsFilterOpen(open);
   };
 
+  const renderFilterContent = () => (
+    <>
+      <div className="grid gap-4 py-4">
+        {/* Status Filter */}
+        <div className="space-y-2">
+          <label className="text-sm font-medium">Order Status</label>
+          <Select value={tempStatus} onValueChange={setTempStatus}>
+            <SelectTrigger>
+              <SelectValue placeholder="All Statuses" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Statuses</SelectItem>
+              {ORDER_STATUSES.map((s) => (
+                <SelectItem key={s.value} value={s.value}>
+                  {s.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Payment Status Filter */}
+        <div className="space-y-2">
+          <label className="text-sm font-medium">Payment Status</label>
+          <Select value={tempPaymentStatus} onValueChange={setTempPaymentStatus}>
+            <SelectTrigger>
+              <SelectValue placeholder="All Statuses" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Statuses</SelectItem>
+              {PAYMENT_STATUSES.map((s) => (
+                <SelectItem key={s.value} value={s.value}>
+                  {s.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Assigned Agent Filter */}
+        <div className="space-y-2">
+          <label className="text-sm font-medium">Assigned Agent</label>
+          <Select value={tempAgentId} onValueChange={setTempAgentId}>
+            <SelectTrigger>
+              <SelectValue placeholder="All Agents" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Agents</SelectItem>
+              {agents.map((agent) => (
+                <SelectItem key={agent.id} value={String(agent.id)}>
+                  {agent.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Date Range */}
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Date From</label>
+            <Input
+              type="date"
+              value={tempDateFrom}
+              onChange={(e) => setTempDateFrom(e.target.value)}
+            />
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Date To</label>
+            <Input
+              type="date"
+              value={tempDateTo}
+              onChange={(e) => setTempDateTo(e.target.value)}
+            />
+          </div>
+        </div>
+      </div>
+      <div className="flex flex-col gap-2 pt-4 border-t">
+        <Button onClick={applyFilters} className="w-full">
+          Apply Filters
+        </Button>
+        <Button variant="outline" onClick={clearFilters} className="w-full">
+          Clear All
+        </Button>
+      </div>
+    </>
+  );
+
   // Handle search button click or Enter key
   const handleSearch = () => {
     setSearchQuery(searchInput);
@@ -383,13 +521,13 @@ const Orders = () => {
       <div className="block md:hidden">
         <div className="flex items-center justify-between mb-2">
           <h1 className="text-2xl font-bold flex items-center gap-2 items-center"><Blocks className="h-6 w-6" strokeWidth={1.5} /> Orders</h1>
-         </div>
+        </div>
         <p className="text-muted-foreground text-sm">Manage customer orders and bookings</p>
       </div>
 
       {/* Search and Filters - Sticky on Mobile */}
-      <div className="sticky top-0 z-10">
-        <div className="flex flex-col sm:flex-row gap-4 w-full">
+      <div className="sticky top-0 z-30 bg-background/95 backdrop-blur-xs py-2 -mx-4 px-4 border-b md:relative md:top-0 md:z-0 md:bg-transparent md:backdrop-blur-none md:p-0 md:border-0 md:mb-6">
+        <div className="flex flex-row items-center gap-2 w-full">
           {/* Single Search Field */}
           <div className="relative flex-1 flex gap-2">
             <div className="relative flex-1">
@@ -418,116 +556,48 @@ const Orders = () => {
           </div>
 
           {/* Filter Button */}
-          <Sheet open={isFilterOpen} onOpenChange={handleFilterOpen}>
-            <SheetTrigger asChild>
-              <Button
-                variant={hasActiveFilters() ? "default" : "outline"}
-                className="w-full sm:w-auto relative"
+          <Button
+            variant={hasActiveFilters() ? "default" : "outline"}
+            className="w-auto relative shrink-0"
+            onClick={() => handleFilterOpen(true)}
+          >
+            <Filter className="h-4 w-4 mr-0 sm:mr-2" />
+            <span className="hidden sm:inline">Filters</span>
+            {hasActiveFilters() && (
+              <Badge2
+                variant="secondary"
+                className="ml-2 bg-white text-primary px-1.5 py-0 text-xs h-5 min-w-[20px]"
               >
-                <Filter className="h-4 w-4 mr-2" />
-                Filters
-                {hasActiveFilters() && (
-                  <Badge2
-                    variant="secondary"
-                    className="ml-2 bg-white text-primary px-1.5 py-0 text-xs h-5 min-w-[20px]"
-                  >
-                    {getActiveFilterCount()}
-                  </Badge2>
-                )}
-              </Button>
-            </SheetTrigger>
-            <SheetContent side={isMobile ? "bottom" : "right"}>
-              <SheetHeader>
-                <SheetTitle>Filter Orders</SheetTitle>
-                <SheetDescription>
-                  Apply filters to narrow down your order list
-                </SheetDescription>
-              </SheetHeader>
-              <div className="grid gap-4 py-4">
-                {/* Status Filter */}
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Order Status</label>
-                  <Select value={tempStatus} onValueChange={setTempStatus}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="All Statuses" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Statuses</SelectItem>
-                      {ORDER_STATUSES.map((s) => (
-                        <SelectItem key={s.value} value={s.value}>
-                          {s.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+                {getActiveFilterCount()}
+              </Badge2>
+            )}
+          </Button>
 
-                {/* Payment Status Filter */}
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Payment Status</label>
-                  <Select value={tempPaymentStatus} onValueChange={setTempPaymentStatus}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="All Payment Status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Payment Status</SelectItem>
-                      {PAYMENT_STATUSES.map((s) => (
-                        <SelectItem key={s.value} value={s.value}>
-                          {s.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {/* Date Range */}
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Date From</label>
-                    <Input
-                      type="date"
-                      value={tempDateFrom}
-                      onChange={(e) => setTempDateFrom(e.target.value)}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Date To</label>
-                    <Input
-                      type="date"
-                      value={tempDateTo}
-                      onChange={(e) => setTempDateTo(e.target.value)}
-                    />
-                  </div>
-                </div>
-
-                {/* Agent Filter */}
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Assigned Agent</label>
-                  <Select value={tempAgentId} onValueChange={setTempAgentId}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="All Agents" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Agents</SelectItem>
-                      {agents && agents.filter(agent => !agent.locked).map((agent) => (
-                        <SelectItem key={agent.id} value={String(agent.id)}>
-                          {agent.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <div className="flex flex-col gap-2 pt-4 border-t">
-                <Button onClick={applyFilters} className="w-full">
-                  Apply Filters
-                </Button>
-                <Button variant="outline" onClick={clearFilters} className="w-full">
-                  Clear All
-                </Button>
-              </div>
-            </SheetContent>
-          </Sheet>
+          {isMobile ? (
+            <Drawer open={isFilterOpen} onOpenChange={handleFilterOpen}>
+              <DrawerContent className="max-h-[85vh] px-4 pb-6 overflow-y-auto">
+                <DrawerHeader className="text-left px-0">
+                  <DrawerTitle>Filter Orders</DrawerTitle>
+                  <DrawerDescription>
+                    Apply filters to narrow down your order list
+                  </DrawerDescription>
+                </DrawerHeader>
+                {renderFilterContent()}
+              </DrawerContent>
+            </Drawer>
+          ) : (
+            <Sheet open={isFilterOpen} onOpenChange={handleFilterOpen}>
+              <SheetContent side="right">
+                <SheetHeader>
+                  <SheetTitle>Filter Orders</SheetTitle>
+                  <SheetDescription>
+                    Apply filters to narrow down your order list
+                  </SheetDescription>
+                </SheetHeader>
+                {renderFilterContent()}
+              </SheetContent>
+            </Sheet>
+          )}
         </div>
       </div>
 
@@ -628,65 +698,72 @@ const Orders = () => {
         ) : (
           <>
             {/* Mobile View - Cards with Infinite Scroll */}
-            <div className="block md:hidden space-y-3">
-              {orders.map((order) => (
-                <div
-                  key={order.id}
-                  onClick={() => handleOpenOrderDetail(order.id)}
-                  className="bg-white shadow-sm border border-gray-100 rounded-xl p-4 active:scale-[0.98] active:bg-gray-50 transition-all duration-200"
-                >
-                  <div className="flex items-center gap-4">
-                    <LetterAvatar name={order.customer?.name} size="sm" />
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between">
-                        <div className="font-bold text-base truncate capitalize">
-                          {order.customer?.name}
-                        </div>
-                        <div className="font-bold text-primary whitespace-nowrap">
-                          {formatCurrency(order.total_amount)}
+            <div className="block md:hidden space-y-4">
+              {getGroupedOrders().map((group) => (
+                <div key={group.dateKey} className="space-y-2">
+                  <div className="text-[11px] font-bold text-blue-500 uppercase tracking-wider pl-1 pt-2 sticky top-0 bg-gray-50/90 backdrop-blur-xs py-1 z-10">
+                    {group.displayTitle}
+                  </div>
+                  {group.items.map((order) => (
+                    <div
+                      key={order.id}
+                      onClick={() => handleOpenOrderDetail(order.id)}
+                      className="bg-white shadow-sm border border-gray-100 rounded-xl p-4 active:scale-[0.98] active:bg-gray-50 transition-all duration-200"
+                    >
+                      <div className="flex items-center gap-4">
+                        <LetterAvatar name={order.customer?.name} size="sm" />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between">
+                            <div className="font-bold text-base truncate capitalize">
+                              {order.customer?.name}
+                            </div>
+                            <div className="font-bold text-primary whitespace-nowrap">
+                              {formatCurrency(order.total_amount)}
+                            </div>
+                          </div>
+                          <div className="flex items-center justify-between mt-1">
+                            <div className="text-xs text-muted-foreground flex items-center gap-1">
+                              <span className="font-medium">#{order.order_number}</span>
+                              {order.subscription_id && (
+                                <Badge2
+                                  variant="info"
+                                  className="text-[9px] px-1 h-4 flex items-center gap-0.5"
+                                >
+                                  <Repeat className="h-2.5 w-2.5" />
+                                  Sub
+                                </Badge2>
+                              )}
+                            </div>
+                            <Badge2
+                              variant={getBadgeVariant(order.payment_status, 'payment')}
+                              className="h-5 text-[10px] px-1.5"
+                            >
+                              Payment {getStatusLabel(order.payment_status, PAYMENT_STATUSES)}
+                            </Badge2>
+                          </div>
                         </div>
                       </div>
-                      <div className="flex items-center justify-between mt-1">
-                        <div className="text-xs text-muted-foreground flex items-center gap-1">
-                          <span className="font-medium">#{order.order_number}</span>
-                          {order.subscription_id && (
-                            <Badge2
-                              variant="info"
-                              className="text-[9px] px-1 h-4 flex items-center gap-0.5"
-                            >
-                              <Repeat className="h-2.5 w-2.5" />
-                              Sub
-                            </Badge2>
-                          )}
+
+                      <div className="flex items-center justify-between mt-4 pt-3 border-t border-gray-50">
+                        <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                          <div className="flex items-center gap-1">
+                            <Calendar className="h-3 w-3" />
+                            {formatDate(order.booking_date)}
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <User className="h-3 w-3" />
+                            {order.assigned_agent_name?.split(' ')[0] || 'Unassigned'}
+                            {order.assigned_agent_name && (
+                              <AssigneeResponseTick status={order.assignee_response} size="xs" />
+                            )}
+                          </div>
                         </div>
-                        <Badge2
-                          variant={getBadgeVariant(order.payment_status, 'payment')}
-                          className="h-5 text-[10px] px-1.5"
-                        >
-                          Payment {getStatusLabel(order.payment_status, PAYMENT_STATUSES)}
+                        <Badge2 variant={getBadgeVariant(order.status, 'order')} className="px-2">
+                          {getStatusLabel(order.status, ORDER_STATUSES)}
                         </Badge2>
                       </div>
                     </div>
-                  </div>
-
-                  <div className="flex items-center justify-between mt-4 pt-3 border-t border-gray-50">
-                    <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                      <div className="flex items-center gap-1">
-                        <Calendar className="h-3 w-3" />
-                        {formatDate(order.booking_date)}
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <User className="h-3 w-3" />
-                        {order.assigned_agent_name?.split(' ')[0] || 'Unassigned'}
-                        {order.assigned_agent_name && (
-                          <AssigneeResponseTick status={order.assignee_response} size="xs" />
-                        )}
-                      </div>
-                    </div>
-                    <Badge2 variant={getBadgeVariant(order.status, 'order')} className="px-2">
-                      {getStatusLabel(order.status, ORDER_STATUSES)}
-                    </Badge2>
-                  </div>
+                  ))}
                 </div>
               ))}
 
@@ -721,67 +798,76 @@ const Orders = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {orders.map((order) => (
-                    <tr
-                      key={order.id}
-                      className="border-b last:border-0 hover:bg-muted/50 cursor-pointer"
-                      onClick={() => handleOpenOrderDetail(order.id)}
-                    >
-                      <td className="px-4 py-3">
-                        <div className="font-medium hover:underline text-primary">
-                          #{order.order_number}
-                        </div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-2">
-                          <LetterAvatar name={order.customer?.name} size="xs" />
-                          <div className="font-medium capitalize">{order.customer?.name}</div>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="font-medium capitalize">{order.area}</div>
-                      </td>
-                      <td className="px-4 py-3">{formatDate(order.booking_date)}</td>
-                      <td className="px-4 py-3">
-                        <Badge2 variant={getBadgeVariant(order.status, 'order')}>
-                          {getStatusLabel(order.status, ORDER_STATUSES)}
-                        </Badge2>
-                      </td>
-                      <td className="px-4 py-3">
-                        <Badge2 variant={getBadgeVariant(order.payment_status, 'payment')}>
-                          {getStatusLabel(order.payment_status, PAYMENT_STATUSES)}
-                        </Badge2>
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="font-medium flex items-center gap-2">
-                          {formatCurrency(order.total_amount)}
-                          {order.subscription_id && (
-                            <Badge2
-                              variant="info"
-                              className="w-fit text-[10px] px-1.5 h-5 flex items-center gap-1 cursor-pointer hover:bg-secondary/80"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                navigate(`/subscriptions/${order.subscription_id}`);
-                              }}
-                            >
-                              <Repeat className="h-3 w-3" />
-                              Sub
+                  {getGroupedOrders().map((group) => (
+                    <Fragment key={group.dateKey}>
+                      <tr className="bg-gray-50 border-b border-gray-200/60">
+                        <td colSpan={8} className="px-4 py-2 font-bold text-xs text-blue-500 uppercase tracking-wider">
+                          {group.displayTitle}
+                        </td>
+                      </tr>
+                      {group.items.map((order) => (
+                        <tr
+                          key={order.id}
+                          className="border-b last:border-0 hover:bg-muted/50 cursor-pointer"
+                          onClick={() => handleOpenOrderDetail(order.id)}
+                        >
+                          <td className="px-4 py-3">
+                            <div className="font-medium hover:underline text-primary">
+                              #{order.order_number}
+                            </div>
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="flex items-center gap-2">
+                              <LetterAvatar name={order.customer?.name} size="xs" />
+                              <div className="font-medium capitalize">{order.customer?.name}</div>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="font-medium capitalize">{order.area}</div>
+                          </td>
+                          <td className="px-4 py-3">{formatDate(order.booking_date)}</td>
+                          <td className="px-4 py-3">
+                            <Badge2 variant={getBadgeVariant(order.status, 'order')}>
+                              {getStatusLabel(order.status, ORDER_STATUSES)}
                             </Badge2>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-4 py-3">
-                        {order.assigned_agent_name ? (
-                          <div className="flex items-center gap-2">
-                            <LetterAvatar name={order.assigned_agent_name} size="xs" />
-                            <div className="font-medium">{order.assigned_agent_name}</div>
-                            <AssigneeResponseTick status={order.assignee_response} size="sm" />
-                          </div>
-                        ) : (
-                          <Badge2 variant="danger">Unassigned</Badge2>
-                        )}
-                      </td>
-                    </tr>
+                          </td>
+                          <td className="px-4 py-3">
+                            <Badge2 variant={getBadgeVariant(order.payment_status, 'payment')}>
+                              {getStatusLabel(order.payment_status, PAYMENT_STATUSES)}
+                            </Badge2>
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="font-medium flex items-center gap-2">
+                              {formatCurrency(order.total_amount)}
+                              {order.subscription_id && (
+                                <Badge2
+                                  variant="info"
+                                  className="w-fit text-[10px] px-1.5 h-5 flex items-center gap-1 cursor-pointer hover:bg-secondary/80"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    navigate(`/subscriptions/${order.subscription_id}`);
+                                  }}
+                                >
+                                  <Repeat className="h-3 w-3" />
+                                  Sub
+                                </Badge2>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-4 py-3">
+                            {order.assigned_agent_name ? (
+                              <div className="flex items-center gap-2">
+                                <LetterAvatar name={order.assigned_agent_name} size="xs" />
+                                <div className="font-medium">{order.assigned_agent_name}</div>
+                                <AssigneeResponseTick status={order.assignee_response} size="sm" />
+                              </div>
+                            ) : (
+                              <Badge2 variant="danger">Unassigned</Badge2>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </Fragment>
                   ))}
                 </tbody>
               </table>
@@ -873,7 +959,7 @@ const Orders = () => {
         <Button
           onClick={() => setIsWizardOpen(true)}
           size="icon"
-          className="h-14 w-14 rounded-full shadow-lg bg-primary hover:bg-primary/90 active:scale-90 transition-all duration-200"
+          className="h-14 w-14 rounded-full shadow-lg shadow-blue-500/30 bg-blue-600 hover:bg-blue-700 text-white active:scale-90 transition-all duration-200"
         >
           <Plus className="h-7 w-7" />
         </Button>

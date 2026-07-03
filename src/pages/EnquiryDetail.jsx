@@ -611,8 +611,8 @@ const EnquiryDetail = ({ enquiryId, onClose, onUpdate }) => {
               </Button>
             )}
             <div className="min-w-0 flex-1">
-              <h1 className="text-base md:text-2xl font-bold truncate">
-                Enquiry Details
+              <h1 className="text-base md:text-2xl font-bold truncate flex items-center flex-wrap gap-2">
+                <span>Enquiry Details</span>
               </h1>
               <p className="text-[10px] md:text-sm text-muted-foreground truncate  md:block">
                 Updated {formatDateTime(enquiry.updated_at)}
@@ -673,10 +673,22 @@ const EnquiryDetail = ({ enquiryId, onClose, onUpdate }) => {
           <Badge2 variant={getBadgeVariant(enquiry.status)} className="px-2 md:px-3 py-1 text-xs md:text-sm">
             {ENQUIRY_STATUS_LABELS[enquiry.status]}
           </Badge2>
-          <Badge2 variant="outline" className="px-2 md:px-3 py-1 text-xs md:text-sm">
+          <Badge2 variant="info" className="px-2 md:px-3 py-1 text-xs md:text-sm">
             <Megaphone strokeWidth={2} className="h-2.5 w-2.5 md:h-3 md:w-3 mr-1" />
             {ENQUIRY_SOURCE_LABELS[enquiry.source]}
           </Badge2>
+          {enquiry?.converted_to_order_number && (
+            <Badge2
+              variant="success"
+              className="text-[10px] md:text-xs bg-green-100 hover:bg-green-200 text-green-800 border-green-200 rounded-full px-2.5 py-0.5 cursor-pointer font-semibold shrink-0"
+              onClick={() => {
+                if (onClose) onClose();
+                navigate(`/orders/${enquiry.converted_to_order_id}`);
+              }}
+            >
+              Order #{enquiry.converted_to_order_number}
+            </Badge2>
+          )}
           {enquiry.followup_date && isFollowUpNeeded(enquiry.followup_date) && (
             <Badge2 variant="destructive" className="px-2 md:px-3 py-1 text-xs md:text-sm">
               <Bell className="h-2.5 w-2.5 md:h-3 md:w-3 mr-1" />

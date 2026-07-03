@@ -20,11 +20,11 @@ const useOrderStore = create((set, get) => ({
   agents: [], // All agents (cached)
   isLoading: false,
   error: null,
-  
+
   // Real-time connection state
   realtimeConnected: false,
   realtimeStatus: 'disconnected', // 'disconnected', 'connected', 'connecting', 'failed'
-  
+
   // Filters
   filters: {
     status: '',
@@ -33,7 +33,7 @@ const useOrderStore = create((set, get) => ({
     dateTo: '',
     assignedToId: '',
   },
-  
+
   // Pagination for Orders page
   page: 1,
   hasMore: true,
@@ -42,7 +42,7 @@ const useOrderStore = create((set, get) => ({
   totalCount: 0,
 
   // Actions
-  
+
   /**
    * Set loading state
    */
@@ -82,7 +82,7 @@ const useOrderStore = create((set, get) => ({
         const activeAgents = allAgents.filter(agent => !agent.locked);
         set({ agents: activeAgents });
       })
-      .catch(error => {});
+      .catch(error => { });
   },
 
   /**
@@ -129,13 +129,13 @@ const useOrderStore = create((set, get) => ({
    */
   fetchOrders: async (reset = false) => {
     const state = get();
-    
+
     if (reset) {
       set({ page: 1, orders: [], hasMore: true });
     }
 
     const currentPage = reset ? 1 : state.page;
-    
+
     set({ isLoading: true, error: null });
     try {
       const params = {
@@ -172,7 +172,7 @@ const useOrderStore = create((set, get) => ({
    */
   fetchPage: async (pageNumber) => {
     const state = get();
-    
+
     set({ isLoading: true, error: null });
     try {
       const params = {
@@ -211,44 +211,57 @@ const useOrderStore = create((set, get) => ({
   updateOrder: (updatedOrder) => {
     const state = get();
 
+    // Find the existing order in memory to preserve/merge fields
+    const existingOrder = state.orders.find(o => o.id === updatedOrder.id) ||
+      state.upcomingOrders.find(o => o.id === updatedOrder.id) ||
+      state.completedOrders.find(o => o.id === updatedOrder.id);
+
+    // Normalize updatedOrder to make sure it includes fields for list views (like assigned_agent_name)
+    const normalizedOrder = {
+      ...existingOrder,
+      ...updatedOrder,
+      assigned_agent_name: updatedOrder.assigned_agent_name || updatedOrder.assigned_to?.name || (existingOrder ? existingOrder.assigned_agent_name : null),
+      total_amount: updatedOrder.total_amount !== undefined ? String(updatedOrder.total_amount) : (existingOrder ? existingOrder.total_amount : undefined),
+    };
+
     // Update in main orders array
     set({
       orders: state.orders.map(order =>
-        order.id === updatedOrder.id ? updatedOrder : order
+        order.id === normalizedOrder.id ? normalizedOrder : order
       ),
     });
 
     // Update in upcoming/completed orders if they exist
-    const isUpcoming = updatedOrder.status === 'confirmed' || updatedOrder.status === 'in_progress';
-    const isCompleted = updatedOrder.status === 'completed';
+    const isUpcoming = normalizedOrder.status === 'confirmed' || normalizedOrder.status === 'in_progress';
+    const isCompleted = normalizedOrder.status === 'completed';
 
     // Update upcoming orders
     let newUpcoming = state.upcomingOrders.map(order =>
-      order.id === updatedOrder.id ? updatedOrder : order
+      order.id === normalizedOrder.id ? normalizedOrder : order
     );
 
     // Update completed orders
     let newCompleted = state.completedOrders.map(order =>
-      order.id === updatedOrder.id ? updatedOrder : order
+      order.id === normalizedOrder.id ? normalizedOrder : order
     );
 
     // Handle status changes - move between lists
-    if (isCompleted && !state.completedOrders.find(o => o.id === updatedOrder.id)) {
+    if (isCompleted && !state.completedOrders.find(o => o.id === normalizedOrder.id)) {
       // Order became completed, add to completed and remove from upcoming
-      newCompleted = [...newCompleted, updatedOrder];
-      newUpcoming = newUpcoming.filter(o => o.id !== updatedOrder.id);
-    } else if (isUpcoming && !state.upcomingOrders.find(o => o.id === updatedOrder.id)) {
+      newCompleted = [...newCompleted, normalizedOrder];
+      newUpcoming = newUpcoming.filter(o => o.id !== normalizedOrder.id);
+    } else if (isUpcoming && !state.upcomingOrders.find(o => o.id === normalizedOrder.id)) {
       // Order became upcoming, add to upcoming and remove from completed
-      newUpcoming = [...newUpcoming, updatedOrder].sort((a, b) => {
+      newUpcoming = [...newUpcoming, normalizedOrder].sort((a, b) => {
         const timeA = new Date(a.booking_time_from).getTime();
         const timeB = new Date(b.booking_time_from).getTime();
         return timeA - timeB;
       });
-      newCompleted = newCompleted.filter(o => o.id !== updatedOrder.id);
+      newCompleted = newCompleted.filter(o => o.id !== normalizedOrder.id);
     } else if (!isUpcoming && !isCompleted) {
       // Order was cancelled or draft - remove from both lists
-      newUpcoming = newUpcoming.filter(o => o.id !== updatedOrder.id);
-      newCompleted = newCompleted.filter(o => o.id !== updatedOrder.id);
+      newUpcoming = newUpcoming.filter(o => o.id !== normalizedOrder.id);
+      newCompleted = newCompleted.filter(o => o.id !== normalizedOrder.id);
     }
 
     // Filter and sort upcoming orders
@@ -329,15 +342,15 @@ const useOrderStore = create((set, get) => ({
    * Initialize real-time updates via Ably
    */
   initializeRealtime: async () => {
-    
+
     try {
-      
+
       await ablyClient.initialize();
-      
-      
+
+
       // Subscribe to connection state changes
       ablyClient.onConnectionStateChange((state) => {
-        
+
         const stateMap = {
           initialized: 'connecting',
           connecting: 'connecting',
@@ -348,16 +361,16 @@ const useOrderStore = create((set, get) => ({
           closing: 'disconnected',
           closed: 'disconnected',
         };
-        
+
         const mappedStatus = stateMap[state] || 'disconnected';
-        
-        set({ 
+
+        set({
           realtimeConnected: state === 'connected',
           realtimeStatus: mappedStatus
         });
       });
 
-      
+
       // Subscribe to all orders channel
       ablyClient.subscribeToOrders((eventName, data) => {
         get().handleRealtimeEvent(eventName, data);
@@ -372,13 +385,13 @@ const useOrderStore = create((set, get) => ({
    * Handle real-time events from Ably
    */
   handleRealtimeEvent: async (eventName, eventData) => {
-    
+
     const { order_id, data } = eventData;
-    
+
     // Get current user to filter out self-triggered events
     const currentUser = useAuthStore.getState().user;
     const currentUserId = currentUser?.id;
-    
+
     // Skip if this event was triggered by the current user
     if (data?.changed_by_id && currentUserId && data.changed_by_id === currentUserId) {
       return;
@@ -405,7 +418,7 @@ const useOrderStore = create((set, get) => ({
         try {
           const order = await orderService.getOrderById(order_id);
           get().updateOrder(order);
-          
+
           // Show toast notification for status changes
           if (eventName === 'order.status_changed') {
             toast.info(`Order ${order.order_number} status: ${data.new_status}`);
@@ -446,7 +459,7 @@ const useOrderStore = create((set, get) => ({
    */
   disconnectRealtime: () => {
     ablyClient.disconnect();
-    set({ 
+    set({
       realtimeConnected: false,
       realtimeStatus: 'disconnected'
     });

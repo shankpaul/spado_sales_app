@@ -260,7 +260,7 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
       try {
         // Backend API handles parsing (including shortened URLs), expansion, and geocoding
         const addressDetails = await reverseGeocode(address.map_link);
-        
+
         if (addressDetails) {
           // Update address fields with geocoded data
           setAddress(prev => ({
@@ -272,7 +272,7 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
             latitude: addressDetails.latitude !== undefined ? addressDetails.latitude : prev.latitude,
             longitude: addressDetails.longitude !== undefined ? addressDetails.longitude : prev.longitude,
           }));
-          
+
           toast.success('Address details populated from map link');
           setMapLinkError(false);
           saveDraft();
@@ -307,7 +307,7 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
       try {
         const packageIds = packageItems.map(item => parseInt(item.package_id)).filter(id => !isNaN(id));
         const addonIds = addonItems.map(item => parseInt(item.addon_id)).filter(id => !isNaN(id));
-        
+
         if (packageIds.length === 0) {
           setAvailableOffers([]);
           setSelectedOffer(null);
@@ -319,7 +319,7 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
           addon_ids: addonIds,
           customer_id: selectedCustomer.id,
         });
-        
+
         const offers = response.data || [];
         setAvailableOffers(offers);
 
@@ -416,7 +416,7 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
       if (appliedOfferRef.current !== selectedOffer.id) {
         // Check if offer has reward packages or addons
         if ((selectedOffer.reward_packages && selectedOffer.reward_packages.length > 0) ||
-            (selectedOffer.reward_addons && selectedOffer.reward_addons.length > 0)) {
+          (selectedOffer.reward_addons && selectedOffer.reward_addons.length > 0)) {
           applyOfferRewards(selectedOffer);
           appliedOfferRef.current = selectedOffer.id;
           toast.success(`${selectedOffer.name} applied with rewards!`);
@@ -821,13 +821,13 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
   // Check errors in all other steps and collect them
   const checkOtherStepsErrors = () => {
     const errorMessages = [];
-    
+
     for (let step = 1; step <= 4; step++) {
       if (step === currentStep) continue; // Skip current step
-      
+
       const stepErrors = getStepErrors(step);
       const errorCount = Object.keys(stepErrors).length;
-      
+
       if (errorCount > 0) {
         const stepName = ['Customer', 'Packages', 'Add-ons', 'Booking date'][step - 1];
         errorMessages.push({
@@ -837,23 +837,23 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
         });
       }
     }
-    
+
     setOtherStepErrors(errorMessages);
   };
 
   // Step validation (only validate without showing errors unless submit attempted)
   const validateStep = (step, showErrors = false) => {
     const newErrors = getStepErrors(step);
-    
+
     if (showErrors) {
       setErrors(newErrors);
-      
+
       // Also check other steps for errors to display alerts
       if (Object.keys(newErrors).length === 0) {
         checkOtherStepsErrors();
       }
     }
-    
+
     return Object.keys(newErrors).length === 0;
   };
 
@@ -888,27 +888,27 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
   const handleNext = () => {
     // Validate current step before proceeding
     const isValid = validateStep(currentStep, true);
-    
+
     if (!isValid) {
       // Show validation errors and stay on current step
       // toast.error('Please fix the errors before proceeding');
       return;
     }
-    
+
     // Proceed to next step
     const nextStep = currentStep + 1;
     setCurrentStep(nextStep);
-    
+
     // Clear errors for the new step
     setErrors({});
-    
+
     saveDraft(nextStep);
   };
 
   const handleBack = () => {
     setCurrentStep(currentStep - 1);
     setSubmitError(''); // Clear submit errors when navigating back
-    
+
     // If submit was attempted, re-validate to show/update errors for the new step
     if (submitAttempted) {
       const prevStepErrors = getStepErrors(currentStep - 1);
@@ -937,7 +937,7 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
 
   const removePackageItem = (index) => {
     const itemToRemove = packageItems[index];
-    
+
     // If removing a reward item, clear the associated offer
     if (itemToRemove?.is_reward && itemToRemove?.offer_id) {
       if (selectedOffer && selectedOffer.id === itemToRemove.offer_id) {
@@ -947,7 +947,7 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
         return; // removeOfferRewards will handle the removal
       }
     }
-    
+
     setPackageItems(packageItems.filter((_, i) => i !== index));
   };
 
@@ -1009,7 +1009,7 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
     const packageTotal = packageItems.reduce((sum, item) => sum + calculateLineTotal(item), 0);
     const addonTotal = addonItems.reduce((sum, item) => sum + calculateLineTotal(item), 0);
     const subtotal = packageTotal + addonTotal;
-    
+
     // Apply offer discount if selected
     let offerDiscount = 0;
     if (selectedOffer) {
@@ -1019,18 +1019,18 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
         offerDiscount = (subtotal * selectedOffer.discount_value) / 100;
       }
     }
-    
+
     const subtotalAfterDiscount = Math.max(0, subtotal - offerDiscount);
-    
+
     // Apply loyalty points discount (points_to_redeem is the discount value in rupees)
     const pointsDiscount = pointsToRedeem || 0;
     const subtotalAfterPointsDiscount = Math.max(0, subtotalAfterDiscount - pointsDiscount);
-    
+
     const gst = (subtotalAfterPointsDiscount * GST_PERCENTAGE) / 100;
     const totalBeforeRounding = subtotalAfterPointsDiscount + gst;
     const roundedTotal = Math.round(totalBeforeRounding);
     const roundOff = roundedTotal - totalBeforeRounding;
-    
+
     return {
       packages: packageTotal,
       addons: addonTotal,
@@ -1063,7 +1063,7 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
 
   const removeAddonItem = (index) => {
     const itemToRemove = addonItems[index];
-    
+
     // If removing a reward item, clear the associated offer
     if (itemToRemove?.is_reward && itemToRemove?.offer_id) {
       if (selectedOffer && selectedOffer.id === itemToRemove.offer_id) {
@@ -1073,7 +1073,7 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
         return; // removeOfferRewards will handle the removal
       }
     }
-    
+
     setAddonItems(addonItems.filter((_, i) => i !== index));
   };
 
@@ -1104,9 +1104,9 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
     if (offer.reward_packages && offer.reward_packages.length > 0) {
       offer.reward_packages.forEach(pkg => {
         rewardPackageIds.add(pkg.id);
-        
+
         // Check if this reward package is already in the order
-        const existingIndex = packageItems.findIndex(item => 
+        const existingIndex = packageItems.findIndex(item =>
           String(item.package_id) === String(pkg.id) && item.is_reward === true
         );
 
@@ -1134,16 +1134,16 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
     if (offer.reward_addons && offer.reward_addons.length > 0) {
       offer.reward_addons.forEach(addon => {
         rewardAddonIds.add(addon.id);
-        
+
         // Check if this reward addon is already in the order
-        const existingIndex = addonItems.findIndex(item => 
+        const existingIndex = addonItems.findIndex(item =>
           String(item.addon_id) === String(addon.id) && item.is_reward === true
         );
 
         if (existingIndex === -1) {
           // Find the addon details from the addons list to get unit price
           const addonDetails = addons.find(a => String(a.id) === String(addon.id));
-          
+
           // Add new reward addon
           setAddonItems(prev => [...prev, {
             addon_id: String(addon.id),
@@ -1166,12 +1166,12 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
     if (!offerId) return;
 
     // Remove reward packages added by this offer
-    setPackageItems(prev => prev.filter(item => 
+    setPackageItems(prev => prev.filter(item =>
       !(item.is_reward === true && item.offer_id === offerId)
     ));
 
     // Remove reward addons added by this offer
-    setAddonItems(prev => prev.filter(item => 
+    setAddonItems(prev => prev.filter(item =>
       !(item.is_reward === true && item.offer_id === offerId)
     ));
 
@@ -1187,7 +1187,7 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
   const handleSubmit = async (status = null) => {
     setSubmitError(''); // Clear previous errors
     setSubmitAttempted(true); // Mark that submit has been attempted
-    
+
     // Validate all steps and show errors if any
     const allValid = validateAllSteps();
     if (!allValid) {
@@ -1347,7 +1347,7 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
                       const cleanTerm = term.toLowerCase().trim();
                       const name = (customer.name || '').toLowerCase();
                       const phone = (customer.phone || '').toLowerCase();
-                      
+
                       if (name === cleanTerm || phone === cleanTerm) return 100;
                       if (name.startsWith(cleanTerm) || phone.startsWith(cleanTerm)) return 80;
                       if (name.includes(cleanTerm) || phone.includes(cleanTerm)) return 50;
@@ -1358,10 +1358,10 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
                       ...c,
                       score: getCustomerScore(c, customerSearchTerm)
                     }));
-                    
+
                     const bestMatches = scoredCustomers.filter(c => c.score >= 80);
                     const otherMatches = scoredCustomers.filter(c => c.score < 80);
-                    
+
                     const renderCustomerRow = (customer) => (
                       <button
                         key={customer.id}
@@ -1436,7 +1436,7 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
                       // Check if search term looks like a phone number (digits, spaces, +, -, parentheses)
                       const phonePattern = /^[\d\s+\-()]+$/;
                       const isPhone = phonePattern.test(customerSearchTerm.trim());
-                      
+
                       if (isPhone) {
                         // Prefill phone number
                         setNewCustomerInitialData({ phone: customerSearchTerm.trim() });
@@ -1582,7 +1582,7 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
 
         <div>
           <Label className="text-xs flex items-center">Area
-            
+
           </Label>
           <Input
             value={address.area}
@@ -1594,11 +1594,11 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
             placeholder="Area or locality"
           />
           {mapLinkLoading && (
-              <span className="text-blue-500 text-xs flex items-center gap-1 mt-2"><LoaderCircle className="h-3 w-3 mr-1 animate-spin" /> Identifying the Area from map link</span>
-            )}
-            {mapLinkError && !mapLinkLoading && (
-              <span className="text-amber-500 text-xs mt-2">Sorry!! Unable to find the location, please update manually</span>
-            )}
+            <span className="text-blue-500 text-xs flex items-center gap-1 mt-2"><LoaderCircle className="h-3 w-3 mr-1 animate-spin" /> Identifying the Area from map link</span>
+          )}
+          {mapLinkError && !mapLinkLoading && (
+            <span className="text-amber-500 text-xs mt-2">Sorry!! Unable to find the location, please update manually</span>
+          )}
           {errors.area && <p className="text-sm text-destructive mt-1">{errors.area}</p>}
         </div>
 
@@ -1648,241 +1648,245 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
   // Step 2: Package Selection (simplified for now)
   const renderStep2 = () => {
     const hasRewardPackages = packageItems.some(item => item.is_reward);
-    
+
     return (
-    <div className="space-y-4">
-      {renderOtherStepErrors()}
-      <div className="flex justify-between items-center">
-        <Label>Service Packages *</Label>
-        <Button type="button" size="sm" onClick={addPackageItem}>
-          <Plus className="h-4 w-4 mr-1" />
-          Add Package
-        </Button>
-      </div>
-
-      {errors.packages && <p className="text-sm text-destructive">{errors.packages}</p>}
-
-      {hasRewardPackages && (
-        <div className="flex items-start gap-2 p-3 bg-green-50 border border-green-200 rounded-lg text-sm">
-          <Info className="h-4 w-4 text-green-600 mt-0.5 shrink-0" />
-          <div className="text-green-800">
-            <span className="font-medium">Offer rewards included:</span> Items marked with the "Offer Reward" badge are complimentary and cannot be modified or removed.
-          </div>
-        </div>
-      )}
-
-      {packageItems.length === 0 ? (
-        <Card className="p-8 text-center">
-          <ShoppingCart className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-          <p className="text-muted-foreground mb-2">No packages added yet</p>
-          <p className="text-xs text-muted-foreground mb-4">Add service packages to proceed with the order</p>
-          <Button type="button" variant="outline" size="sm" onClick={addPackageItem}>
-            <Plus className="h-4 w-4 mr-2" />
-            Add Service Package
+      <div className="space-y-4">
+        {renderOtherStepErrors()}
+        <div className="flex justify-between items-center">
+          <Label>Service Packages *</Label>
+          <Button type="button" size="sm" onClick={addPackageItem}>
+            <Plus className="h-4 w-4 mr-1" />
+            Add Package
           </Button>
-        </Card>
-      ) : (
-        <div className="space-y-4">
-          {packageItems.map((item, index) => {
-            const hasError = errors[`package_${index}_vehicle_type`] || errors[`package_${index}_package`];
-            return (
-              <Card key={index} className={`p-4 ${item.is_reward ? 'bg-green-50 border-green-200' : ''}`}>
-                <div className="space-y-4">
-                  <div className="flex justify-between items-center">
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium">Service {index + 1}</span>
-                      {item.is_reward && (
-                        <div className="flex items-center gap-1 px-2 py-0.5 bg-green-600 text-white text-xs rounded-full">
-                          <Gift className="h-3 w-3" />
-                          <span>Offer Reward</span>
-                        </div>
-                      )}
-                    </div>
-                    <div className='flex gap-2 items-center'>
-                      {!item.is_reward && (
-                        <>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            className="h-6 text-xs cursor-pointer"
-                            onClick={() => {
-                              setIdentifyDialog({ open: true, index });
-                              setIdentifyBrand('');
-                              setIdentifyModel('');
-                            }}
-                          >
-                            <Search className="h-3 w-3 mr-1" />
-                            Identify Vehicle Type
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setDeletePackageDialog({ open: true, index })}
-                          >
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                          </Button>
-                        </>
-                      )}
-                    </div>
-                  </div>
-
-                  {hasError && (
-                    <div className="flex items-center gap-2 text-destructive text-sm bg-destructive/10 p-2 rounded">
-                      <X className="h-4 w-4" />
-                      <span>
-                        {errors[`package_${index}_vehicle_type`] && 'Vehicle type is required. '}
-                        {errors[`package_${index}_package`] && 'Package selection is required.'}
-                      </span>
-                    </div>
-                  )}
-
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="col-span-2">
-                      <div className={`flex gap-2 `}>
-                        {['hatchback', 'sedan', 'suv', 'luxury'].map((type) => (
-                          <Button
-                            key={type}
-                            type="button"
-                            variant={item.vehicle_type === type ? 'default' : 'outline'}
-                            size="sm"
-                            className="flex-1 h-12 flex flex-col md:flex-row items-center justify-center gap-0  md:gap-2 rounded-lg cursor-pointer active:scale-[0.95] transition-all"
-                            onClick={() => updatePackageItem(index, 'vehicle_type', type)}
-                            disabled={item.is_reward}
-                          >
-                            <VehicleIcon vehicleType={type} size={32} className={item.vehicle_type === type ? 'text-white' : 'text-black'} />
-                            <span className="text-xs capitalize font-semibold -mt-2 md:mt-0">{type}</span>
-                          </Button>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div>
-                      <Label className="text-xs">Package *</Label>
-                      <div>
-                        <Select
-                          value={item.package_id}
-                          onValueChange={(value) => updatePackageItem(index, 'package_id', value)}
-                          disabled={!item.vehicle_type || item.is_reward}
-                        >
-                          <SelectTrigger className="h-8 text-sm">
-                            <SelectValue placeholder="Select package" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {packages
-                              .filter((p) => p.vehicle_type?.toLowerCase() === item.vehicle_type?.toLowerCase())
-                              .map((pkg) => (
-                                <SelectItem key={pkg.id} value={String(pkg.id)}>
-                                  {pkg.name} - ₹{pkg.unit_price || pkg.price || pkg.base_price}
-                                </SelectItem>
-                              ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-
-                    <div>
-                      <Label className="text-xs">Quantity *</Label>
-                      <div className="flex items-center gap-1">
-                        <Button
-                          type="button"
-                          size="icon"
-                          className="h-8 w-8  aspect-square rounded-full"
-                          onClick={() => {
-                            const newQty = Math.max(1, item.quantity - 1);
-                            updatePackageItem(index, 'quantity', newQty);
-                          }}
-                          disabled={item.quantity <= 1 || item.is_reward}
-                        >
-                          <Minus className="h-3 w-3" />
-                        </Button>
-                        <Input
-                          type="number"
-                          min="1"
-                          value={item.quantity}
-                          readOnly
-                          className="h-8 text-sm text-center bg-secondary"
-                        />
-                        <Button
-                          type="button"
-                          size="icon"
-                          className="h-8 w-8 aspect-square rounded-full"
-                          onClick={() => {
-                            updatePackageItem(index, 'quantity', item.quantity + 1);
-                          }}
-                          disabled={item.is_reward}
-                        >
-                          <Plus className="h-3 w-3" />
-                        </Button>
-                      </div>
-                    </div>
-
-                    <div>
-                      <div className="flex items-center space-x-2 mb-1">
-                        <Checkbox
-                          id={`pkg-discount-enable-${index}`}
-                          checked={item.enable_custom_discount || false}
-                          disabled={item.is_reward}
-                          onCheckedChange={(checked) => {
-                            updatePackageItem(index, 'enable_custom_discount', !!checked);
-                            if (!checked) {
-                              // Clear the discount value if disabled
-                              updatePackageItem(index, 'discount_value', 0);
-                            }
-                          }}
-                        />
-                        <label 
-                          htmlFor={`pkg-discount-enable-${index}`} 
-                          className="text-[10px] font-medium text-gray-600 cursor-pointer select-none"
-                        >
-                          Enable Custom Discount
-                        </label>
-                      </div>
-                      <div className="flex gap-1">
-                        <Input
-                          type="number"
-                          min="0"
-                          placeholder="0"
-                          value={item.discount_value || ''}
-                          onChange={(e) => {
-                            const value = e.target.value;
-                            const numValue = value === '' ? 0 : parseFloat(value);
-                            updatePackageItem(index, 'discount_value', isNaN(numValue) ? 0 : numValue);
-                          }}
-                          className="h-8 text-sm"
-                          disabled={item.is_reward || !item.enable_custom_discount}
-                        />
-                        <Select
-                          value={item.discount_type}
-                          onValueChange={(value) => updatePackageItem(index, 'discount_type', value)}
-                          disabled={item.is_reward || !item.enable_custom_discount}
-                        >
-                          <SelectTrigger className="h-8 w-16 text-xs">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value={DISCOUNT_TYPES.FIXED}>₹</SelectItem>
-                            <SelectItem value={DISCOUNT_TYPES.PERCENTAGE}>%</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-
-                    <div className='text-right'>
-                      <Label className="text-sm">Package Amount</Label>
-                      <h2 className="h-8 text-2xl font-bold">
-                        {`₹${calculateLineTotal(item).toFixed(2)}`}
-                      </h2>
-                    </div>
-                  </div>
-                </div>
-              </Card>
-            );
-          })}
         </div>
-      )}
-    </div>
+
+        {errors.packages && <p className="text-sm text-destructive">{errors.packages}</p>}
+
+        {hasRewardPackages && (
+          <div className="flex items-start gap-2 p-3 bg-green-50 border border-green-200 rounded-lg text-sm">
+            <Info className="h-4 w-4 text-green-600 mt-0.5 shrink-0" />
+            <div className="text-green-800">
+              <span className="font-medium">Offer rewards included:</span> Items marked with the "Offer Reward" badge are complimentary and cannot be modified or removed.
+            </div>
+          </div>
+        )}
+
+        {packageItems.length === 0 ? (
+          <Card className="p-8 text-center">
+            <ShoppingCart className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+            <p className="text-muted-foreground mb-2">No packages added yet</p>
+            <p className="text-xs text-muted-foreground mb-4">Add service packages to proceed with the order</p>
+            <Button type="button" variant="outline" size="sm" onClick={addPackageItem}>
+              <Plus className="h-4 w-4 mr-2" />
+              Add Service Package
+            </Button>
+          </Card>
+        ) : (
+          <div className="space-y-4">
+            {packageItems.map((item, index) => {
+              const hasError = errors[`package_${index}_vehicle_type`] || errors[`package_${index}_package`];
+              return (
+                <Card key={index} className={`p-4 ${item.is_reward ? 'bg-green-50 border-green-200' : ''}`}>
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-center">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium">Service {index + 1}</span>
+                        {item.is_reward && (
+                          <div className="flex items-center gap-1 px-2 py-0.5 bg-green-600 text-white text-xs rounded-full">
+                            <Gift className="h-3 w-3" />
+                            <span>Offer Reward</span>
+                          </div>
+                        )}
+                      </div>
+                      <div className='flex gap-2 items-center'>
+                        {!item.is_reward && (
+                          <>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="h-6 text-xs cursor-pointer"
+                              onClick={() => {
+                                setIdentifyDialog({ open: true, index });
+                                setIdentifyBrand('');
+                                setIdentifyModel('');
+                              }}
+                            >
+                              <Search className="h-3 w-3 mr-1" />
+                              Identify Vehicle Type
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setDeletePackageDialog({ open: true, index })}
+                            >
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </>
+                        )}
+                      </div>
+                    </div>
+
+                    {hasError && (
+                      <div className="flex items-center gap-2 text-destructive text-sm bg-destructive/10 p-2 rounded">
+                        <X className="h-4 w-4" />
+                        <span>
+                          {errors[`package_${index}_vehicle_type`] && 'Vehicle type is required. '}
+                          {errors[`package_${index}_package`] && 'Package selection is required.'}
+                        </span>
+                      </div>
+                    )}
+
+                    <div className="space-y-3">
+                      <div>
+                        <div className={`flex gap-2 `}>
+                          {['hatchback', 'sedan', 'suv', 'luxury'].map((type) => (
+                            <Button
+                              key={type}
+                              type="button"
+                              variant={item.vehicle_type === type ? 'default' : 'outline'}
+                              size="sm"
+                              className="flex-1 h-12 flex flex-col md:flex-row items-center justify-center gap-0  md:gap-2 rounded-lg cursor-pointer active:scale-[0.95] transition-all"
+                              onClick={() => updatePackageItem(index, 'vehicle_type', type)}
+                              disabled={item.is_reward}
+                            >
+                              <VehicleIcon vehicleType={type} size={32} className={item.vehicle_type === type ? 'text-white' : 'text-black'} />
+                              <span className="text-xs capitalize font-semibold -mt-2 md:mt-0">{type}</span>
+                            </Button>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="flex items-end gap-3">
+                        <div className="flex-grow min-w-0">
+                          <Label className="text-xs">Package *</Label>
+                          <div>
+                            <Select
+                              value={item.package_id}
+                              onValueChange={(value) => updatePackageItem(index, 'package_id', value)}
+                              disabled={!item.vehicle_type || item.is_reward}
+                            >
+                              <SelectTrigger className="h-8 text-sm w-full">
+                                <SelectValue placeholder="Select package" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {packages
+                                  .filter((p) => p.vehicle_type?.toLowerCase() === item.vehicle_type?.toLowerCase())
+                                  .map((pkg) => (
+                                    <SelectItem key={pkg.id} value={String(pkg.id)}>
+                                      {pkg.name} - ₹{pkg.unit_price || pkg.price || pkg.base_price}
+                                    </SelectItem>
+                                  ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+
+                        <div className="shrink-0">
+                          <Label className="text-xs">Quantity *</Label>
+                          <div className="flex items-center gap-1">
+                            <Button
+                              type="button"
+                              size="icon"
+                              className="h-8 w-8  aspect-square rounded-full"
+                              onClick={() => {
+                                const newQty = Math.max(1, item.quantity - 1);
+                                updatePackageItem(index, 'quantity', newQty);
+                              }}
+                              disabled={item.quantity <= 1 || item.is_reward}
+                            >
+                              <Minus className="h-3 w-3" />
+                            </Button>
+                            <Input
+                              type="number"
+                              min="1"
+                              value={item.quantity}
+                              readOnly
+                              className="h-8 text-sm text-center bg-secondary w-[40px] md:w-[100px]"
+                            />
+                            <Button
+                              type="button"
+                              size="icon"
+                              className="h-8 w-8 aspect-square rounded-full"
+                              onClick={() => {
+                                updatePackageItem(index, 'quantity', item.quantity + 1);
+                              }}
+                              disabled={item.is_reward}
+                            >
+                              <Plus className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <div className="flex items-center space-x-2 mb-1">
+                          <Checkbox
+                            id={`pkg-discount-enable-${index}`}
+                            checked={item.enable_custom_discount || false}
+                            disabled={item.is_reward}
+                            onCheckedChange={(checked) => {
+                              updatePackageItem(index, 'enable_custom_discount', !!checked);
+                              if (!checked) {
+                                // Clear the discount value if disabled
+                                updatePackageItem(index, 'discount_value', 0);
+                              }
+                            }}
+                          />
+                          <label
+                            htmlFor={`pkg-discount-enable-${index}`}
+                            className="text-[10px] font-medium text-gray-600 cursor-pointer select-none"
+                          >
+                            Enable Custom Discount
+                          </label>
+                        </div>
+                        <div className="flex gap-1">
+                          <Input
+                            type="number"
+                            min="0"
+                            placeholder="0"
+                            value={item.discount_value || ''}
+                            onChange={(e) => {
+                              const value = e.target.value;
+                              const numValue = value === '' ? 0 : parseFloat(value);
+                              updatePackageItem(index, 'discount_value', isNaN(numValue) ? 0 : numValue);
+                            }}
+                            className="h-8 text-sm"
+                            disabled={item.is_reward || !item.enable_custom_discount}
+                          />
+                          <Select
+                            value={item.discount_type}
+                            onValueChange={(value) => updatePackageItem(index, 'discount_type', value)}
+                            disabled={item.is_reward || !item.enable_custom_discount}
+                          >
+                            <SelectTrigger className="h-8 w-16 text-xs">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value={DISCOUNT_TYPES.FIXED}>₹</SelectItem>
+                              <SelectItem value={DISCOUNT_TYPES.PERCENTAGE}>%</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+
+                      <div className='text-right'>
+                        <Label className="text-sm">Package Amount</Label>
+                        <h2 className="h-8 text-2xl font-bold">
+                          {`₹${calculateLineTotal(item).toFixed(2)}`}
+                        </h2>
+                      </div>
+                    </div>
+                  </div>
+                </Card>
+              );
+            })}
+          </div>
+        )}
+      </div>
     );
   };
 
@@ -1893,7 +1897,7 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
     return (
       <div className="space-y-4">
         {renderOtherStepErrors()}
-        
+
         {hasRewardAddons && (
           <div className="flex items-start gap-2 p-3 bg-green-50 border border-green-200 rounded-lg text-sm">
             <Info className="h-4 w-4 text-green-600 mt-0.5 shrink-0" />
@@ -1914,176 +1918,179 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
           </Button>
         </div>
 
-      {addonItems.length === 0 ? (
-        <Card className="p-8 text-center">
-          <ShoppingCart className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-          <p className="text-muted-foreground">No add-ons selected</p>
-          <Button type="button" variant="outline" size="sm" className="mt-4" onClick={addAddonItem}>
-            <Plus className="h-4 w-4 mr-2" />
-            Add First Add-on
-          </Button>
-        </Card>
-      ) : (
-        <div className="space-y-4">
-          {addonItems.map((item, index) => {
-            const hasError = errors[`addon_${index}_addon`];
-            return (
-              <Card key={index} className={`p-4 ${item.is_reward ? 'bg-green-50 border-green-200' : ''}`}>
-                <div className="space-y-3">
-                  <div className="flex justify-between items-start">
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium">Add-on {index + 1}</span>
-                      {item.is_reward && (
-                        <div className="flex items-center gap-1 px-2 py-0.5 bg-green-600 text-white text-xs rounded-full">
-                          <Gift className="h-3 w-3" />
-                          <span>Offer Reward</span>
-                        </div>
+        {addonItems.length === 0 ? (
+          <Card className="p-8 text-center">
+            <ShoppingCart className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+            <p className="text-muted-foreground">No add-ons selected</p>
+            <Button type="button" variant="outline" size="sm" className="mt-4" onClick={addAddonItem}>
+              <Plus className="h-4 w-4 mr-2" />
+              Add First Add-on
+            </Button>
+          </Card>
+        ) : (
+          <div className="space-y-4">
+            {addonItems.map((item, index) => {
+              const hasError = errors[`addon_${index}_addon`];
+              return (
+                <Card key={index} className={`p-4 ${item.is_reward ? 'bg-green-50 border-green-200' : ''}`}>
+                  <div className="space-y-3">
+                    <div className="flex justify-between items-start">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium">Add-on {index + 1}</span>
+                        {item.is_reward && (
+                          <div className="flex items-center gap-1 px-2 py-0.5 bg-green-600 text-white text-xs rounded-full">
+                            <Gift className="h-3 w-3" />
+                            <span>Offer Reward</span>
+                          </div>
+                        )}
+                      </div>
+                      {!item.is_reward && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => removeAddonItem(index)}
+                        >
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
                       )}
                     </div>
-                    {!item.is_reward && (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => removeAddonItem(index)}
-                      >
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
+
+                    {hasError && (
+                      <div className="flex items-center gap-2 text-destructive text-sm bg-destructive/10 p-2 rounded">
+                        <X className="h-4 w-4" />
+                        <span>Add-on selection is required</span>
+                      </div>
                     )}
-                  </div>
 
-                  {hasError && (
-                    <div className="flex items-center gap-2 text-destructive text-sm bg-destructive/10 p-2 rounded">
-                      <X className="h-4 w-4" />
-                      <span>Add-on selection is required</span>
+                    <div className="flex items-end gap-3">
+                      <div className="flex-grow min-w-0">
+                        <Label className="text-xs">Add-on Service *</Label>
+                        <div>
+                          <Select
+                            value={item.addon_id}
+                            onValueChange={(value) => updateAddonItem(index, 'addon_id', value)}
+                            disabled={item.is_reward}
+                          >
+                            <SelectTrigger className="h-8 text-sm w-full">
+                              <SelectValue placeholder="Select add-on" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {addons.map((addon) => (
+                                <SelectItem key={addon.id} value={String(addon.id)}>
+                                  {addon.name} - ₹{addon.unit_price || addon.price}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+
+                      <div className="shrink-0">
+                        <Label className="text-xs">Quantity *</Label>
+                        <div className="flex items-center gap-1">
+                          <Button
+                            type="button"
+                            size="icon"
+                            className="h-8 w-8 rounded-full aspect-square"
+                            onClick={() => {
+                              const newQty = Math.max(1, item.quantity - 1);
+                              updateAddonItem(index, 'quantity', newQty);
+                            }}
+                            disabled={item.quantity <= 1 || item.is_reward}
+                          >
+                            <Minus className="h-3 w-3" />
+                          </Button>
+                          <Input
+                            type="number"
+                            min="1"
+                            value={item.quantity}
+                            readOnly
+                            className="h-8 text-sm text-center bg-secondary w-[40px] md:w-[100px]"
+                          />
+                          <Button
+                            type="button"
+                            size="icon"
+                            className="h-8 w-8 rounded-full aspect-square"
+                            onClick={() => {
+                              updateAddonItem(index, 'quantity', item.quantity + 1);
+                            }}
+                            disabled={item.is_reward}
+                          >
+                            <Plus className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      </div>
                     </div>
-                  )}
 
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <Label className="text-xs">Add-on Service *</Label>
+                    <div className="grid grid-cols-2 gap-3 mt-3">
+
+
                       <div>
-                        <Select
-                          value={item.addon_id}
-                          onValueChange={(value) => updateAddonItem(index, 'addon_id', value)}
-                          disabled={item.is_reward}
-                        >
-                          <SelectTrigger className="h-8 text-sm">
-                            <SelectValue placeholder="Select add-on" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {addons.map((addon) => (
-                              <SelectItem key={addon.id} value={String(addon.id)}>
-                                {addon.name} - ₹{addon.unit_price || addon.price}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        <div className="flex items-center space-x-2 mb-1">
+                          <Checkbox
+                            id={`addon-discount-enable-${index}`}
+                            checked={item.enable_custom_discount || false}
+                            disabled={item.is_reward}
+                            onCheckedChange={(checked) => {
+                              updateAddonItem(index, 'enable_custom_discount', !!checked);
+                              if (!checked) {
+                                // Clear the discount value if disabled
+                                updateAddonItem(index, 'discount_value', 0);
+                              }
+                            }}
+                          />
+                          <label
+                            htmlFor={`addon-discount-enable-${index}`}
+                            className="text-[10px] font-medium text-gray-600 cursor-pointer select-none"
+                          >
+                            Enable Custom Discount
+                          </label>
+                        </div>
+                        <div className="flex gap-1">
+                          <Input
+                            type="number"
+                            min="0"
+                            placeholder="0"
+                            value={item.discount_value || ''}
+                            onChange={(e) => {
+                              const value = e.target.value;
+                              const numValue = value === '' ? 0 : parseFloat(value);
+                              updateAddonItem(index, 'discount_value', isNaN(numValue) ? 0 : numValue);
+                            }}
+                            className="h-8 text-sm"
+                            disabled={item.is_reward || !item.enable_custom_discount}
+                          />
+                          <Select
+                            value={item.discount_type}
+                            onValueChange={(value) => updateAddonItem(index, 'discount_type', value)}
+                            disabled={item.is_reward || !item.enable_custom_discount}
+                          >
+                            <SelectTrigger className="h-8 w-16 text-xs">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value={DISCOUNT_TYPES.FIXED}>₹</SelectItem>
+                              <SelectItem value={DISCOUNT_TYPES.PERCENTAGE}>%</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
                       </div>
-                    </div>
 
-                    <div>
-                      <Label className="text-xs">Quantity *</Label>
-                      <div className="flex items-center gap-1">
-                        <Button
-                          type="button"
-                          size="icon"
-                          className="h-8 w-8 rounded-full aspect-square"
-                          onClick={() => {
-                            const newQty = Math.max(1, item.quantity - 1);
-                            updateAddonItem(index, 'quantity', newQty);
-                          }}
-                          disabled={item.quantity <= 1 || item.is_reward}
-                        >
-                          <Minus className="h-3 w-3" />
-                        </Button>
-                        <Input
-                          type="number"
-                          min="1"
-                          value={item.quantity}
-                          readOnly
-                          className="h-8 text-sm text-center bg-secondary"
-                        />
-                        <Button
-                          type="button"
-                          size="icon"
-                          className="h-8 w-8 rounded-full aspect-square"
-                          onClick={() => {
-                            updateAddonItem(index, 'quantity', item.quantity + 1);
-                          }}
-                          disabled={item.is_reward}
-                        >
-                          <Plus className="h-3 w-3" />
-                        </Button>
+                      <div className='text-right'>
+                        <Label className="text-sm">Addon Amount</Label>
+                        <h2 className="h-8 text-2xl font-bold">
+                          {`₹${calculateLineTotal(item).toFixed(2)}`}
+                        </h2>
                       </div>
-                    </div>
-
-
-                    <div>
-                      <div className="flex items-center space-x-2 mb-1">
-                        <Checkbox
-                          id={`addon-discount-enable-${index}`}
-                          checked={item.enable_custom_discount || false}
-                          disabled={item.is_reward}
-                          onCheckedChange={(checked) => {
-                            updateAddonItem(index, 'enable_custom_discount', !!checked);
-                            if (!checked) {
-                              // Clear the discount value if disabled
-                              updateAddonItem(index, 'discount_value', 0);
-                            }
-                          }}
-                        />
-                        <label 
-                          htmlFor={`addon-discount-enable-${index}`} 
-                          className="text-[10px] font-medium text-gray-600 cursor-pointer select-none"
-                        >
-                          Enable Custom Discount
-                        </label>
-                      </div>
-                      <div className="flex gap-1">
-                        <Input
-                          type="number"
-                          min="0"
-                          placeholder="0"
-                          value={item.discount_value || ''}
-                          onChange={(e) => {
-                            const value = e.target.value;
-                            const numValue = value === '' ? 0 : parseFloat(value);
-                            updateAddonItem(index, 'discount_value', isNaN(numValue) ? 0 : numValue);
-                          }}
-                          className="h-8 text-sm"
-                          disabled={item.is_reward || !item.enable_custom_discount}
-                        />
-                        <Select
-                          value={item.discount_type}
-                          onValueChange={(value) => updateAddonItem(index, 'discount_type', value)}
-                          disabled={item.is_reward || !item.enable_custom_discount}
-                        >
-                          <SelectTrigger className="h-8 w-16 text-xs">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value={DISCOUNT_TYPES.FIXED}>₹</SelectItem>
-                            <SelectItem value={DISCOUNT_TYPES.PERCENTAGE}>%</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-
-                    <div className='text-right'>
-                      <Label className="text-sm">Addon Amount</Label>
-                      <h2 className="h-8 text-2xl font-bold">
-                        {`₹${calculateLineTotal(item).toFixed(2)}`}
-                      </h2>
                     </div>
                   </div>
-                </div>
-              </Card>
-            );
-          })}
-        </div>
-      )}
-    </div>
+                </Card>
+              );
+            })}
+          </div>
+        )}
+      </div>
     );
   };
 
@@ -2156,7 +2163,7 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
                         const today = new Date();
                         const todayStr = today.toISOString().split('T')[0];
                         const isToday = bookingDate === todayStr;
-                        
+
                         if (!isToday) {
                           // Not today - show all times
                           return generateTimeOptions().map((time) => (
@@ -2165,12 +2172,12 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
                             </SelectItem>
                           ));
                         }
-                        
+
                         // Today - filter times after current time
                         const currentHour = today.getHours();
                         const currentMinute = today.getMinutes();
                         const currentTimeInMinutes = currentHour * 60 + currentMinute;
-                        
+
                         return generateTimeOptions()
                           .filter((time) => {
                             const [hours, minutes] = time.value.split(':').map(Number);
@@ -2209,22 +2216,22 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
                         const currentHour = today.getHours();
                         const currentMinute = today.getMinutes();
                         const currentTimeInMinutes = currentHour * 60 + currentMinute;
-                        
+
                         return generateTimeOptions()
                           .filter((time) => {
                             const [hours, minutes] = time.value.split(':').map(Number);
                             const timeInMinutes = hours * 60 + minutes;
-                            
+
                             // Must be after the "From" time
                             if (bookingTimeFrom) {
                               const [fromHours, fromMinutes] = bookingTimeFrom.split(':').map(Number);
                               const fromTimeInMinutes = fromHours * 60 + fromMinutes;
                               if (timeInMinutes <= fromTimeInMinutes) return false;
                             }
-                            
+
                             // If today, must be after current time
                             if (isToday && timeInMinutes <= currentTimeInMinutes) return false;
-                            
+
                             return true;
                           })
                           .map((time) => (
@@ -2406,7 +2413,7 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
               />
             </div>
           </div>
-          
+
           <div className='space-y-4'>
             {/* Loyalty Points Redemption Section */}
             <div>
@@ -2477,20 +2484,20 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
                           disabled={loyaltySummary.current_balance < (loyaltySummary.min_redeem_points || 100)}
                           onChange={(e) => {
                             const inputValue = e.target.value;
-                            
+
                             // If empty, keep it empty (don't force to 0)
                             if (inputValue === '') {
                               setPointsToRedeem('');
                               return;
                             }
-                            
+
                             const value = parseInt(inputValue);
                             if (isNaN(value)) {
                               return;
                             }
-                            
+
                             const minPoints = loyaltySummary.min_redeem_points || 100;
-                            
+
                             // Allow typing any value (including below minimum) for flexibility
                             // Only show error when user tries to submit or moves away from input
                             if (value > maxRedeemablePoints) {
@@ -2498,19 +2505,19 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
                               setPointsToRedeem(maxRedeemablePoints);
                               return;
                             }
-                            
+
                             setPointsToRedeem(value);
                           }}
                           onBlur={(e) => {
                             // Validate on blur (when user leaves the input)
                             const value = parseInt(e.target.value);
                             const minPoints = loyaltySummary.min_redeem_points || 100;
-                            
+
                             if (isNaN(value) || e.target.value === '') {
                               setPointsToRedeem('');
                               return;
                             }
-                            
+
                             if (value > 0 && value < minPoints) {
                               toast.error(`Minimum ${minPoints} points required for redemption`);
                               setPointsToRedeem('');
@@ -2559,67 +2566,67 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
             </div>
 
             <Card className="p-4 bg-secondary/50">
-            <div className="space-y-2 text-sm">
-              <div className="flex justify-between">
-                <span>Packages Total:</span>
-                <span className="font-medium">₹{totals.packages.toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Add-ons Total:</span>
-                <span className="font-medium">₹{totals.addons.toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between border-t pt-2">
-                <span>Subtotal:</span>
-                <span className="font-medium">₹{totals.subtotal.toFixed(2)}</span>
-              </div>
-              {totals.offerDiscount > 0 && (
-                <>
-                  <div className="flex justify-between text-green-600">
-                    <span className="flex items-center gap-1">
-                      <Gift className="h-3 w-3" />
-                      Offer Discount:
-                    </span>
-                    <span className="font-medium">-₹{totals.offerDiscount.toFixed(2)}</span>
-                  </div>
-                  <div className="flex justify-between font-semibold">
-                    <span>After Discount:</span>
-                    <span>₹{totals.subtotalAfterDiscount.toFixed(2)}</span>
-                  </div>
-                </>
-              )}
-              {totals.pointsDiscount > 0 && (
-                <>
-                  <div className="flex justify-between text-blue-600">
-                    <span className="flex items-center gap-1">
-                      <Coins className="h-3 w-3" />
-                      Points Redeemed ({pointsToRedeem} pts):
-                    </span>
-                    <span className="font-medium">-₹{totals.pointsDiscount.toFixed(2)}</span>
-                  </div>
-                  <div className="flex justify-between font-semibold">
-                    <span>After Points:</span>
-                    <span>₹{totals.subtotalAfterPointsDiscount.toFixed(2)}</span>
-                  </div>
-                </>
-              )}
-              <div className="flex justify-between">
-                <span>GST ({totals.gstPercentage}%):</span>
-                <span className="font-medium">₹{totals.gst.toFixed(2)}</span>
-              </div>
-              {totals.roundOff !== 0 && (
+              <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
-                  <span>Round Off:</span>
-                  <span className={`font-medium ${totals.roundOff >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                    {totals.roundOff >= 0 ? '+' : ''}₹{totals.roundOff.toFixed(2)}
-                  </span>
+                  <span>Packages Total:</span>
+                  <span className="font-medium">₹{totals.packages.toFixed(2)}</span>
                 </div>
-              )}
-              <div className="flex justify-between text-base font-bold border-t pt-2">
-                <span>Grand Total:</span>
-                <span>₹{totals.total.toFixed(0)}</span>
+                <div className="flex justify-between">
+                  <span>Add-ons Total:</span>
+                  <span className="font-medium">₹{totals.addons.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between border-t pt-2">
+                  <span>Subtotal:</span>
+                  <span className="font-medium">₹{totals.subtotal.toFixed(2)}</span>
+                </div>
+                {totals.offerDiscount > 0 && (
+                  <>
+                    <div className="flex justify-between text-green-600">
+                      <span className="flex items-center gap-1">
+                        <Gift className="h-3 w-3" />
+                        Offer Discount:
+                      </span>
+                      <span className="font-medium">-₹{totals.offerDiscount.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between font-semibold">
+                      <span>After Discount:</span>
+                      <span>₹{totals.subtotalAfterDiscount.toFixed(2)}</span>
+                    </div>
+                  </>
+                )}
+                {totals.pointsDiscount > 0 && (
+                  <>
+                    <div className="flex justify-between text-blue-600">
+                      <span className="flex items-center gap-1">
+                        <Coins className="h-3 w-3" />
+                        Points Redeemed ({pointsToRedeem} pts):
+                      </span>
+                      <span className="font-medium">-₹{totals.pointsDiscount.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between font-semibold">
+                      <span>After Points:</span>
+                      <span>₹{totals.subtotalAfterPointsDiscount.toFixed(2)}</span>
+                    </div>
+                  </>
+                )}
+                <div className="flex justify-between">
+                  <span>GST ({totals.gstPercentage}%):</span>
+                  <span className="font-medium">₹{totals.gst.toFixed(2)}</span>
+                </div>
+                {totals.roundOff !== 0 && (
+                  <div className="flex justify-between">
+                    <span>Round Off:</span>
+                    <span className={`font-medium ${totals.roundOff >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                      {totals.roundOff >= 0 ? '+' : ''}₹{totals.roundOff.toFixed(2)}
+                    </span>
+                  </div>
+                )}
+                <div className="flex justify-between text-base font-bold border-t pt-2">
+                  <span>Grand Total:</span>
+                  <span>₹{totals.total.toFixed(0)}</span>
+                </div>
               </div>
-            </div>
-          </Card>
+            </Card>
           </div>
         </div>
 
@@ -2657,7 +2664,7 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
           handleClose();
         }
       }}>
-        <DialogContent 
+        <DialogContent
           className="max-w-4xl p-0 md:p-6 h-full md:h-auto md:max-h-[90vh] w-full rounded-none md:rounded-xl border-0 md:border overflow-hidden flex flex-col"
           onPointerDownOutside={(e) => {
             // Prevent dialog from closing on outside clicks
@@ -2928,8 +2935,8 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
                     <div>
                       <Label className="text-sm font-semibold text-muted-foreground">Discount Value</Label>
                       <p className="text-lg font-bold text-primary mt-1">
-                        {offerDetailsDialog.offer.discount_type === 'percentage' 
-                          ? `${offerDetailsDialog.offer.discount_value}%` 
+                        {offerDetailsDialog.offer.discount_type === 'percentage'
+                          ? `${offerDetailsDialog.offer.discount_value}%`
                           : `₹${offerDetailsDialog.offer.discount_value}`}
                       </p>
                     </div>
@@ -2953,12 +2960,12 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
                     <div>
                       <Label className="text-sm font-semibold text-muted-foreground">Valid From</Label>
                       <p className="text-sm mt-1">
-                        {offerDetailsDialog.offer.start_date 
-                          ? new Date(offerDetailsDialog.offer.start_date).toLocaleDateString('en-IN', { 
-                              day: 'numeric', 
-                              month: 'short', 
-                              year: 'numeric' 
-                            })
+                        {offerDetailsDialog.offer.start_date
+                          ? new Date(offerDetailsDialog.offer.start_date).toLocaleDateString('en-IN', {
+                            day: 'numeric',
+                            month: 'short',
+                            year: 'numeric'
+                          })
                           : 'N/A'}
                       </p>
                     </div>
@@ -2966,12 +2973,12 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
                     <div>
                       <Label className="text-sm font-semibold text-muted-foreground">Valid Until</Label>
                       <p className="text-sm mt-1">
-                        {offerDetailsDialog.offer.end_date 
-                          ? new Date(offerDetailsDialog.offer.end_date).toLocaleDateString('en-IN', { 
-                              day: 'numeric', 
-                              month: 'short', 
-                              year: 'numeric' 
-                            })
+                        {offerDetailsDialog.offer.end_date
+                          ? new Date(offerDetailsDialog.offer.end_date).toLocaleDateString('en-IN', {
+                            day: 'numeric',
+                            month: 'short',
+                            year: 'numeric'
+                          })
                           : 'N/A'}
                       </p>
                     </div>

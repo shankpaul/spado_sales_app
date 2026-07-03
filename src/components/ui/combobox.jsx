@@ -20,13 +20,13 @@ import {
  * ComboBox Component
  * Searchable select dropdown
  */
-export function ComboBox({ 
-  value, 
-  onValueChange, 
-  options = [], 
-  placeholder = 'Select...', 
-  emptyText = 'No results found.', 
-  className, 
+export function ComboBox({
+  value,
+  onValueChange,
+  options = [],
+  placeholder = 'Select...',
+  emptyText = 'No results found.',
+  className,
   onAddNew,
   onSearchChange,
   searchValue,
@@ -40,7 +40,7 @@ export function ComboBox({
   const handleSearchChange = onSearchChange || setInternalSearch;
 
   // Handle both string arrays and object arrays {value, label}
-  const normalizedOptions = options.map(opt => 
+  const normalizedOptions = options.map(opt =>
     typeof opt === 'string' ? { value: opt, label: opt } : opt
   );
 
@@ -62,7 +62,7 @@ export function ComboBox({
       </PopoverTrigger>
       <PopoverContent className="w-full p-0" align="start">
         <Command shouldFilter={!onSearchChange}>
-          <CommandInput 
+          <CommandInput
             placeholder={`Search ${placeholder.toLowerCase()}...`}
             value={searchTerm}
             onValueChange={handleSearchChange}

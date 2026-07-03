@@ -79,6 +79,12 @@ const Layout = ({ children }) => {
   const [notificationSettingsOpen, setNotificationSettingsOpen] = useState(false);
   const [profileSubmenuOpen, setProfileSubmenuOpen] = useState(false);
 
+  const triggerHapticFeedback = () => {
+    if (typeof window !== 'undefined' && window.navigator && window.navigator.vibrate) {
+      window.navigator.vibrate(15);
+    }
+  };
+
   // Initialize real-time updates for all authenticated pages
   useEffect(() => {
     initializeRealtime();
@@ -382,6 +388,7 @@ const Layout = ({ children }) => {
             {navigationItems.find(i => i.name === 'Dashboard') && (
               <Link
                 to="/dashboard"
+                onClick={triggerHapticFeedback}
                 className={`flex flex-col items-center justify-center flex-1 h-full gap-1 transition-colors ${location.pathname === '/dashboard' ? 'text-primary font-semibold' : 'text-gray-500'}`}
               >
                 <LayoutDashboard className={`h-5 w-5 ${location.pathname === '/dashboard' ? 'stroke-2' : 'stroke-[1.5]'}`} />
@@ -393,6 +400,7 @@ const Layout = ({ children }) => {
             {navigationItems.find(i => i.name === 'Orders') && (
               <Link
                 to="/orders"
+                onClick={triggerHapticFeedback}
                 className={`flex flex-col items-center justify-center flex-1 h-full gap-1 transition-colors ${location.pathname === '/orders' ? 'text-primary font-semibold' : 'text-gray-500'}`}
               >
                 <Calendar className={`h-5 w-5 ${location.pathname === '/orders' ? 'stroke-2' : 'stroke-[1.5]'}`} />
@@ -404,6 +412,7 @@ const Layout = ({ children }) => {
             {navigationItems.find(i => i.name === 'Enquiries') && (
               <Link
                 to="/enquiries"
+                onClick={triggerHapticFeedback}
                 className={`flex flex-col items-center justify-center flex-1 h-full gap-1 transition-colors ${location.pathname === '/enquiries' ? 'text-primary font-semibold' : 'text-gray-500'}`}
               >
                 <PackageOpen className={`h-5 w-5 ${location.pathname === '/enquiries' ? 'stroke-2' : 'stroke-[1.5]'}`} />
@@ -421,6 +430,7 @@ const Layout = ({ children }) => {
             >
               <PopoverTrigger asChild>
                 <button
+                  onClick={triggerHapticFeedback}
                   className={`flex flex-col items-center justify-center flex-1 h-full gap-1 transition-colors ${moreMenuOpen ? 'text-primary' : 'text-gray-500'}`}
                 >
                   <Menu className={`h-5 w-5 ${moreMenuOpen ? 'stroke-2' : 'stroke-[1.5]'}`} />

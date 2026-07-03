@@ -311,8 +311,8 @@ const Offers = () => {
         </div>
 
         {/* Search and Filters - Sticky on Mobile */}
-        <div className="sticky top-0 z-10 mb-6 bg-gray-50/95 backdrop-blur-xs py-2">
-          <div className="flex flex-col sm:flex-row gap-4 w-full">
+        <div className="sticky top-0 z-30 mb-6 bg-background/95 backdrop-blur-xs py-2 -mx-4 px-4 border-b md:relative md:top-0 md:z-0 md:bg-transparent md:backdrop-blur-none md:p-0 md:border-0 md:mb-6">
+          <div className="flex flex-row items-center gap-2 w-full">
             {/* Single Search Field */}
             <div className="relative flex-1 flex gap-2">
               <div className="relative flex-1">
@@ -345,10 +345,10 @@ const Offers = () => {
               <SheetTrigger asChild>
                 <Button
                   variant={hasActiveFilters() ? "default" : "outline"}
-                  className="w-full sm:w-auto relative"
+                  className="w-auto relative shrink-0"
                 >
-                  <Filter className="h-4 w-4 mr-2" />
-                  Filters
+                  <Filter className="h-4 w-4 mr-0 sm:mr-2" />
+                  <span className="hidden sm:inline">Filters</span>
                   {hasActiveFilters() && (
                     <Badge2
                       variant="secondary"

@@ -10,6 +10,13 @@ import {
   SheetTitle,
 } from '../components/ui/sheet';
 import {
+  Drawer,
+  DrawerContent,
+  DrawerHeader,
+  DrawerTitle,
+  DrawerDescription,
+} from '../components/ui/drawer';
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -280,6 +287,112 @@ const Subscriptions = () => {
     // Fetch will be triggered by useEffect watching filter changes
   };
 
+  const renderFilterContent = () => (
+    <>
+      <div className="space-y-4 py-4">
+        {/* Status Filter */}
+        <div className="space-y-2">
+          <label className="text-sm font-medium">Subscription Status</label>
+          <Select value={tempStatusFilter || 'all'} onValueChange={(value) => setTempStatusFilter(value === 'all' ? '' : value)}>
+            <SelectTrigger>
+              <SelectValue placeholder="All statuses" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All statuses</SelectItem>
+              {SUBSCRIPTION_STATUSES.map((status) => (
+                <SelectItem key={status.value} value={status.value}>
+                  {status.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Payment Status Filter */}
+        <div className="space-y-2">
+          <label className="text-sm font-medium">Payment Status</label>
+          <Select value={tempPaymentStatusFilter || 'all'} onValueChange={(value) => setTempPaymentStatusFilter(value === 'all' ? '' : value)}>
+            <SelectTrigger>
+              <SelectValue placeholder="All payment statuses" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All payment statuses</SelectItem>
+              {SUBSCRIPTION_PAYMENT_STATUSES.map((status) => (
+                <SelectItem key={status.value} value={status.value}>
+                  {status.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Vehicle Type Filter */}
+        <div className="space-y-2">
+          <label className="text-sm font-medium">Vehicle Type</label>
+          <Select value={tempVehicleTypeFilter || 'all'} onValueChange={(value) => setTempVehicleTypeFilter(value === 'all' ? '' : value)}>
+            <SelectTrigger>
+              <SelectValue placeholder="All vehicle types" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All vehicle types</SelectItem>
+              <SelectItem value="hatchback">
+                <div className="flex items-center gap-2">
+                  <Car className="h-4 w-4" />
+                  Hatchback
+                </div>
+              </SelectItem>
+              <SelectItem value="sedan">
+                <div className="flex items-center gap-2">
+                  <Car className="h-4 w-4" />
+                  Sedan
+                </div>
+              </SelectItem>
+              <SelectItem value="suv">
+                <div className="flex items-center gap-2">
+                  <Truck className="h-4 w-4" />
+                  SUV
+                </div>
+              </SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Date Range */}
+        <div className="space-y-3">
+          <label className="text-sm font-medium block">Start Date Range</label>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs text-muted-foreground mb-1 block">From</label>
+              <Input
+                type="date"
+                value={tempStartDateFrom}
+                onChange={(e) => setTempStartDateFrom(e.target.value)}
+                max={tempStartDateTo || undefined}
+              />
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground mb-1 block">To</label>
+              <Input
+                type="date"
+                value={tempStartDateTo}
+                onChange={(e) => setTempStartDateTo(e.target.value)}
+                min={tempStartDateFrom || undefined}
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+      <div className="flex gap-3 pt-6">
+        <Button variant="outline" onClick={clearFilters} className="flex-1">
+          Clear All
+        </Button>
+        <Button onClick={applyFilters} className="flex-1">
+          Apply Filters
+        </Button>
+      </div>
+    </>
+  );
+
   // Handle create subscription
   const handleCreateSubscription = () => {
     setSelectedSubscriptionId(null);
@@ -361,8 +474,8 @@ const Subscriptions = () => {
       </div>
 
       {/* Search and Filters - Sticky on Mobile */}
-      <div className="sticky top-0 z-10">
-        <div className="flex flex-col sm:flex-row gap-4 w-full">
+      <div className="sticky top-0 z-30 bg-background/95 backdrop-blur-xs py-2 -mx-4 px-4 border-b md:relative md:top-0 md:z-0 md:bg-transparent md:backdrop-blur-none md:p-0 md:border-0 md:mb-6">
+        <div className="flex flex-row items-center gap-2 w-full">
           {/* Search */}
           <div className="relative flex-1 flex gap-2">
             <div className="relative flex-1">
@@ -389,10 +502,10 @@ const Subscriptions = () => {
           <Button
             variant={activeFilterCount > 0 ? "default" : "outline"}
             onClick={() => setIsFilterOpen(true)}
-            className="w-full sm:w-auto relative"
+            className="w-auto relative shrink-0"
           >
-            <Filter className="h-4 w-4 mr-2" />
-            Filters
+            <Filter className="h-4 w-4 mr-0 sm:mr-2" />
+            <span className="hidden sm:inline">Filters</span>
             {activeFilterCount > 0 && (
               <Badge2
                 variant="secondary"
@@ -797,124 +910,38 @@ const Subscriptions = () => {
         <Button
           onClick={handleCreateSubscription}
           size="icon"
-          className="h-14 w-14 rounded-full shadow-lg bg-primary hover:bg-primary/90 active:scale-90 transition-all duration-200"
+          className="h-14 w-14 rounded-full shadow-lg shadow-blue-500/30 bg-blue-600 hover:bg-blue-700 text-white active:scale-90 transition-all duration-200"
         >
           <Plus className="h-7 w-7" />
         </Button>
       </div>
 
-      {/* Filter Sheet */}
-      <Sheet open={isFilterOpen} onOpenChange={setIsFilterOpen}>
-        <SheetContent side={isMobile ? "bottom" : "right"} className="w-full sm:max-w-md">
-          <SheetHeader>
-            <SheetTitle>Filter Subscriptions</SheetTitle>
-          </SheetHeader>
-
-          <div className="space-y-6 mt-6">
-            {/* Status Filter */}
-            <div>
-              <label className="text-sm font-medium mb-2 block">Subscription Status</label>
-              <Select value={tempStatusFilter || undefined} onValueChange={(value) => setTempStatusFilter(value === 'all' ? '' : value)}>
-                <SelectTrigger>
-                  <SelectValue placeholder="All statuses" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All statuses</SelectItem>
-                  {SUBSCRIPTION_STATUSES.map((status) => (
-                    <SelectItem key={status.value} value={status.value}>
-                      {status.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Payment Status Filter */}
-            <div>
-              <label className="text-sm font-medium mb-2 block">Payment Status</label>
-              <Select value={tempPaymentStatusFilter || undefined} onValueChange={(value) => setTempPaymentStatusFilter(value === 'all' ? '' : value)}>
-                <SelectTrigger>
-                  <SelectValue placeholder="All payment statuses" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All payment statuses</SelectItem>
-                  {SUBSCRIPTION_PAYMENT_STATUSES.map((status) => (
-                    <SelectItem key={status.value} value={status.value}>
-                      {status.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Vehicle Type Filter */}
-            <div>
-              <label className="text-sm font-medium mb-2 block">Vehicle Type</label>
-              <Select value={tempVehicleTypeFilter || undefined} onValueChange={(value) => setTempVehicleTypeFilter(value === 'all' ? '' : value)}>
-                <SelectTrigger>
-                  <SelectValue placeholder="All vehicle types" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All vehicle types</SelectItem>
-                  <SelectItem value="hatchback">
-                    <div className="flex items-center gap-2">
-                      <Car className="h-4 w-4" />
-                      Hatchback
-                    </div>
-                  </SelectItem>
-                  <SelectItem value="sedan">
-                    <div className="flex items-center gap-2">
-                      <Car className="h-4 w-4" />
-                      Sedan
-                    </div>
-                  </SelectItem>
-                  <SelectItem value="suv">
-                    <div className="flex items-center gap-2">
-                      <Truck className="h-4 w-4" />
-                      SUV
-                    </div>
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Start Date Range Filter */}
-            <div className="space-y-3">
-              <label className="text-sm font-medium block">Start Date Range</label>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs text-muted-foreground mb-1 block">From</label>
-                  <Input
-                    type="date"
-                    value={tempStartDateFrom}
-                    onChange={(e) => setTempStartDateFrom(e.target.value)}
-                    max={tempStartDateTo || undefined}
-                  />
-                </div>
-                <div>
-                  <label className="text-xs text-muted-foreground mb-1 block">To</label>
-                  <Input
-                    type="date"
-                    value={tempStartDateTo}
-                    onChange={(e) => setTempStartDateTo(e.target.value)}
-                    min={tempStartDateFrom || undefined}
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Action Buttons */}
-            <div className="flex gap-3 pt-6">
-              <Button variant="outline" onClick={clearFilters} className="flex-1">
-                Clear All
-              </Button>
-              <Button onClick={applyFilters} className="flex-1">
-                Apply Filters
-              </Button>
-            </div>
-          </div>
-        </SheetContent>
-      </Sheet>
+      {/* Filter Drawer/Sheet */}
+      {isMobile ? (
+        <Drawer open={isFilterOpen} onOpenChange={setIsFilterOpen}>
+          <DrawerContent className="max-h-[85vh] px-4 pb-6 overflow-y-auto">
+            <DrawerHeader className="text-left px-0">
+              <DrawerTitle>Filter Subscriptions</DrawerTitle>
+              <DrawerDescription>
+                Apply filters to narrow down your subscription list
+              </DrawerDescription>
+            </DrawerHeader>
+            {renderFilterContent()}
+          </DrawerContent>
+        </Drawer>
+      ) : (
+        <Sheet open={isFilterOpen} onOpenChange={setIsFilterOpen}>
+          <SheetContent side="right" className="w-full sm:max-w-md">
+            <SheetHeader>
+              <SheetTitle>Filter Subscriptions</SheetTitle>
+              <SheetDescription>
+                Apply filters to narrow down your subscription list
+              </SheetDescription>
+            </SheetHeader>
+            {renderFilterContent()}
+          </SheetContent>
+        </Sheet>
+      )}
 
       {/* Subscription Wizard */}
       <SubscriptionWizard

@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { Button } from '../components/ui/button';
+import { Input } from '../components/ui/input';
 import { Card } from '../components/ui/card';
 import { Skeleton } from '../components/ui/skeleton';
 import CustomerContact from '../components/CustomerContact';
@@ -47,6 +48,11 @@ import {
   DrawerTitle,
   DrawerDescription,
 } from '../components/ui/drawer';
+import {
+  Popover,
+  PopoverTrigger,
+  PopoverContent,
+} from '../components/ui/popover';
 import { Textarea } from '../components/ui/textarea';
 import { Checkbox } from '../components/ui/checkbox';
 import { DatePicker } from '../components/ui/date-picker';
@@ -97,10 +103,11 @@ import {
   CalendarClock,
   BadgePlus,
   BadgePercent,
+  Plus,
 } from 'lucide-react';
 import MapPreview from '@/components/MapPreview';
 import VehicleIcon from '../components/VehicleIcon';
-import { formatDate, formatDateTime, formatTime, formatCurrency } from '../lib/utilities';
+import { formatDate, formatDateTime, formatTime, formatCurrency, reverseGeocode } from '../lib/utilities';
 import { Badge2 } from '@/components/ui/badge2';
 import LetterAvatar from '@/components/LetterAvatar';
 import useOrderStore from '../store/orderStore';
@@ -124,6 +131,43 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
   const [activeTab, setActiveTab] = useState('packages');
   const tabsList = ['packages', 'images', 'timeline', 'reassignments'];
 
+  // Add Location states
+  const [isAddLocationOpen, setIsAddLocationOpen] = useState(false);
+  const [mapLink, setMapLink] = useState('');
+  const [detectedArea, setDetectedArea] = useState('');
+  const [detectedCity, setDetectedCity] = useState('');
+  const [reverseGeocodingLoading, setReverseGeocodingLoading] = useState(false);
+  const [geocodedAddress, setGeocodedAddress] = useState(null);
+
+  // Debounced reverse geocoding on mapLink input change
+  useEffect(() => {
+    if (!mapLink || mapLink.trim() === '') {
+      setDetectedArea('');
+      setDetectedCity('');
+      setGeocodedAddress(null);
+      return;
+    }
+
+    const timeoutId = setTimeout(async () => {
+      setReverseGeocodingLoading(true);
+      try {
+        const addressDetails = await reverseGeocode(mapLink);
+        if (addressDetails) {
+          setDetectedArea(addressDetails.area || '');
+          setDetectedCity(addressDetails.city || '');
+          setGeocodedAddress(addressDetails);
+          toast.success('Location details identified successfully!');
+        }
+      } catch (error) {
+        toast.error('Failed to parse location from map link.');
+      } finally {
+        setReverseGeocodingLoading(false);
+      }
+    }, 1000);
+
+    return () => clearTimeout(timeoutId);
+  }, [mapLink]);
+
   // Image viewer state
   const [imageViewerOpen, setImageViewerOpen] = useState(false);
   const [currentImageType, setCurrentImageType] = useState(null); // 'before', 'after', 'payment_proof', 'google_review'
@@ -134,30 +178,37 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
 
   // Swipe logic for tabs
-  const [touchStart, setTouchStart] = useState(null);
-  const [touchEnd, setTouchEnd] = useState(null);
+  const [touchStart, setTouchStart] = useState({ x: 0, y: 0 });
+  const [touchEnd, setTouchEnd] = useState({ x: 0, y: 0 });
   const minSwipeDistance = 60;
 
   const onTouchStart = (e) => {
-    setTouchEnd(null);
-    setTouchStart(e.targetTouches[0].clientX);
+    setTouchEnd({ x: 0, y: 0 });
+    setTouchStart({
+      x: e.targetTouches[0].clientX,
+      y: e.targetTouches[0].clientY
+    });
   };
 
   const onTouchMove = (e) => {
-    setTouchEnd(e.targetTouches[0].clientX);
+    setTouchEnd({
+      x: e.targetTouches[0].clientX,
+      y: e.targetTouches[0].clientY
+    });
   };
 
   const onTouchEnd = () => {
-    if (!touchStart || !touchEnd) return;
-    const distance = touchStart - touchEnd;
-    const isLeftSwipe = distance > minSwipeDistance;
-    const isRightSwipe = distance < -minSwipeDistance;
+    if (!touchStart.x || !touchEnd.x) return;
+    const distanceX = touchStart.x - touchEnd.x;
+    const distanceY = touchStart.y - touchEnd.y;
 
-    if (isLeftSwipe || isRightSwipe) {
+    if (Math.abs(distanceX) > Math.abs(distanceY) && Math.abs(distanceX) > minSwipeDistance) {
+      const isLeftSwipe = distanceX > 0;
+      const isRightSwipe = distanceX < 0;
       const currentIndex = tabsList.indexOf(activeTab);
+
       if (isLeftSwipe && currentIndex < tabsList.length - 1) {
         setActiveTab(tabsList[currentIndex + 1]);
-        // Subtle haptic feedback feel
         if (window.navigator?.vibrate) window.navigator.vibrate(10);
       } else if (isRightSwipe && currentIndex > 0) {
         setActiveTab(tabsList[currentIndex - 1]);
@@ -249,9 +300,15 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
     if (!dateTimeString) return '';
     try {
       const date = new Date(dateTimeString);
-      const hours = String(date.getHours()).padStart(2, '0');
-      const minutes = String(date.getMinutes()).padStart(2, '0');
-      return `${hours}:${minutes}`;
+      if (isNaN(date.getTime())) return '';
+      const formatter = new Intl.DateTimeFormat('en-US', {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false,
+        hourCycle: 'h23',
+        timeZone: 'Asia/Kolkata'
+      });
+      return formatter.format(date);
     } catch {
       return '';
     }
@@ -310,6 +367,37 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
     } catch (error) {
       toast.error('Failed to load order details');
       navigate('/orders');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSaveLocation = async () => {
+    if (!geocodedAddress) {
+      toast.error('No valid location resolved yet. Please enter a valid map link.');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      await orderService.updateOrder(id, {
+        area: geocodedAddress.area,
+        city: geocodedAddress.city,
+        district: geocodedAddress.district,
+        state: geocodedAddress.state,
+        map_link: mapLink,
+        latitude: geocodedAddress.latitude,
+        longitude: geocodedAddress.longitude,
+      });
+      toast.success('Location attached to order successfully');
+      setIsAddLocationOpen(false);
+      setMapLink('');
+      setDetectedArea('');
+      setDetectedCity('');
+      setGeocodedAddress(null);
+      await fetchOrderDetails(true);
+    } catch (error) {
+      toast.error('Failed to update location');
     } finally {
       setLoading(false);
     }
@@ -570,6 +658,7 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
       await fetchOrderDetails(true);
       setTimeout(() => fetchTimeline(), 0);
     } catch (error) {
+      console.log(error)
       toast.error(error.response?.data?.errors?.join('\n') || 'Failed to record payment');
     } finally {
       setRecordingPayment(false);
@@ -883,6 +972,17 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
                 <span>Order date <span className="font-medium text-foreground">{formatDate(order.created_at)}</span></span>
                 <span>•</span>
                 <span>Order from <span className="font-medium text-foreground">{order.customer?.name}</span></span>
+                {order.converted_from_enquiry_id && (
+                  <>
+                    <span>•</span>
+                    <span>Created from <Link
+                      to={`/enquiries/${order.converted_from_enquiry_id}`}
+                      className="font-medium text-primary hover:underline"
+                    >
+                      Enquiry #{order.converted_from_enquiry_id}
+                    </Link></span>
+                  </>
+                )}
                 {order.source && (
                   <>
                     <span>•</span>
@@ -912,7 +1012,33 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
                   </div>
                   <div className="flex flex-col">
                     <span className="text-xs uppercase tracking-wider font-bold text-muted-foreground opacity-70">Service Location</span>
-                    <span className="text-sm font-semibold capitalize text-foreground">{order.address.area || 'N/A'}, {order.address.city || 'N/A'}</span>
+                    {(!order.address || (!order.address.area && !order.address.city && !order.address.map_link)) ? (
+                      <div className="mt-1">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-8 gap-1.5 text-primary border-primary/30 hover:bg-primary/5 cursor-pointer"
+                          onClick={() => setIsAddLocationOpen(true)}
+                        >
+                          <Plus className="h-3.5 w-3.5" />
+                          Add Location
+                        </Button>
+                      </div>
+                    ) : (
+                      <span className="text-sm font-semibold capitalize text-foreground flex items-center flex-wrap gap-x-2">
+                        {order.address.area || 'N/A'}, {order.address.city || 'N/A'}
+                        {order.address.map_link && (
+                          <a
+                            href={order.address.map_link}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-xs text-primary hover:underline font-normal normal-case inline-flex items-center gap-0.5"
+                          >
+                            <ExternalLink className="h-3 w-3" /> View Map
+                          </a>
+                        )}
+                      </span>
+                    )}
                   </div>
                 </div>
 
@@ -974,7 +1100,7 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
             </div>
 
             {/* Action Buttons */}
-            <div className="flex flex-col sm:flex-row gap-3">
+            <div className="flex flex-row gap-3">
               {isEditable && (
                 <>
                   {order.status === 'draft' && <Button
@@ -1033,32 +1159,44 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
               <Tabs
                 value={activeTab}
                 onValueChange={setActiveTab}
-                className="space-y-6 border rounded-lg"
+                className="space-y-6 border rounded-xl p-4 bg-white shadow-xs"
               >
-                <TabsList className="grid w-full grid-cols-4 bg-transparent border-b rounded-none h-auto p-0">
+                <TabsList className="grid w-full grid-cols-4 bg-gray-100 p-1 rounded-lg h-10">
                   <TabsTrigger
                     value="packages"
-                    className="rounded-none border-b-2 cursor-pointer border-transparent data-[state=active]:border-foreground data-[state=active]:bg-transparent"
+                    className="rounded-md py-1 text-sm font-semibold capitalize transition-all cursor-pointer data-[state=active]:bg-white data-[state=active]:text-foreground data-[state=active]:shadow-sm flex items-center justify-center gap-1 sm:gap-1.5"
                   >
-                    Packages
+                    <span className="truncate">Packages</span>
+                    <Badge2 variant="secondary" className="px-1.5 py-0.5 text-[9px] sm:text-[10px] leading-none rounded-full flex-shrink-0">
+                      {(order.packages?.length || 0) + (order.addons?.length || 0)}
+                    </Badge2>
                   </TabsTrigger>
                   <TabsTrigger
                     value="images"
-                    className="rounded-none border-b-2 cursor-pointer border-transparent data-[state=active]:border-foreground data-[state=active]:bg-transparent"
+                    className="rounded-md py-1 text-sm font-semibold capitalize transition-all cursor-pointer data-[state=active]:bg-white data-[state=active]:text-foreground data-[state=active]:shadow-sm flex items-center justify-center gap-1 sm:gap-1.5"
                   >
-                    Images
+                    <span className="truncate">Images</span>
+                    <Badge2 variant="secondary" className="px-1.5 py-0.5 text-[9px] sm:text-[10px] leading-none rounded-full flex-shrink-0">
+                      {(order.image_urls?.before_images?.length || 0) + (order.image_urls?.after_images?.length || 0)}
+                    </Badge2>
                   </TabsTrigger>
                   <TabsTrigger
                     value="timeline"
-                    className="rounded-none border-b-2 cursor-pointer border-transparent data-[state=active]:border-foreground data-[state=active]:bg-transparent"
+                    className="rounded-md py-1 text-sm font-semibold capitalize transition-all cursor-pointer data-[state=active]:bg-white data-[state=active]:text-foreground data-[state=active]:shadow-sm flex items-center justify-center gap-1 sm:gap-1.5"
                   >
-                    Timeline
+                    <span className="truncate">Timeline</span>
+                    <Badge2 variant="secondary" className="px-1.5 py-0.5 text-[9px] sm:text-[10px] leading-none rounded-full flex-shrink-0">
+                      {timeline?.length || 0}
+                    </Badge2>
                   </TabsTrigger>
                   <TabsTrigger
                     value="reassignments"
-                    className="rounded-none border-b-2 cursor-pointer border-transparent data-[state=active]:border-foreground data-[state=active]:bg-transparent"
+                    className="rounded-md py-1 text-sm font-semibold capitalize transition-all cursor-pointer data-[state=active]:bg-white data-[state=active]:text-foreground data-[state=active]:shadow-sm flex items-center justify-center gap-1 sm:gap-1.5"
                   >
-                    Assignments
+                    <span className="truncate">Assignments</span>
+                    <Badge2 variant="secondary" className="px-1.5 py-0.5 text-[9px] sm:text-[10px] leading-none rounded-full flex-shrink-0">
+                      {reassignments?.length || 0}
+                    </Badge2>
                   </TabsTrigger>
                 </TabsList>
 
@@ -1281,7 +1419,7 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
                     {reassignments.length > 0 ? (
                       reassignments.map((item, index) => (
                         <div key={index} className="flex items-start gap-3 py-2 border-b last:border-0">
-                          <LetterAvatar name={item.assigned_to} size="sm" className="text-primary" />
+                          <LetterAvatar name={item.assigned_to} size="sm" className="text-white" />
                           <div className="flex-1">
                             <div className="flex items-center gap-2 mb-1">
                               <span className="font-medium">{item.assigned_to}</span>
@@ -1599,6 +1737,29 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
             <div className="border rounded-lg">
               <div className="p-4 border-b flex items-center justify-between">
                 <h3 className="font-semibold">Customer</h3>
+                {order.image_urls?.customer_signature && (
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Badge2
+                        variant="success"
+                        className="flex items-center gap-1 cursor-pointer select-none py-0.5 px-2 bg-green-100 hover:bg-green-200 text-green-800 border-green-200 rounded-full text-[11px] font-semibold"
+                      >
+                        Signed
+                        <CheckCircle2 className="h-3 w-3 text-green-700" />
+                      </Badge2>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-64 p-3 bg-white border shadow-md rounded-lg z-50">
+                      <div className="text-xs font-semibold text-gray-500 mb-2 uppercase">Customer Signature</div>
+                      <div className="bg-gray-50 p-2 rounded border flex items-center justify-center">
+                        <img
+                          src={order.image_urls.customer_signature}
+                          alt="Customer Signature"
+                          className="max-h-24 object-contain"
+                        />
+                      </div>
+                    </PopoverContent>
+                  </Popover>
+                )}
               </div>
               <div className="p-4">
                 <div className="flex items-center gap-3">
@@ -2843,6 +3004,117 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
               >
                 {cancelling && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                 Confirm Cancellation
+              </Button>
+            </div>
+          </div>
+        </DrawerContent>
+      </Drawer>
+
+      {/* Add Location Dialog - Desktop */}
+      <Dialog open={isAddLocationOpen && !isMobile} onOpenChange={setIsAddLocationOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Add Service Location</DialogTitle>
+            <DialogDescription>
+              Enter a Google Maps link to automatically resolve the service address.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <label htmlFor="map-link-desktop" className="text-sm font-medium">Google Maps Link</label>
+              <Input
+                id="map-link-desktop"
+                type="text"
+                placeholder="Paste Google Maps URL here..."
+                value={mapLink}
+                onChange={(e) => setMapLink(e.target.value)}
+                className="w-full"
+              />
+            </div>
+
+            {reverseGeocodingLoading && (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground py-2 justify-center bg-gray-50 rounded-lg">
+                <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                <span>Identifying area details...</span>
+              </div>
+            )}
+
+            {detectedArea && (
+              <div className="p-3 bg-green-50 border border-green-200 rounded-lg text-sm space-y-1">
+                <div className="font-semibold text-green-800">Identified Location:</div>
+                <div className="text-green-700">{detectedArea}, {detectedCity}</div>
+              </div>
+            )}
+          </div>
+
+          <div className="flex justify-end gap-3">
+            <Button variant="outline" onClick={() => setIsAddLocationOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSaveLocation}
+              disabled={!geocodedAddress || loading}
+            >
+              {loading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Save Location
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Location Drawer - Mobile */}
+      <Drawer open={isAddLocationOpen && isMobile} onOpenChange={setIsAddLocationOpen}>
+        <DrawerContent className="max-h-[90vh]">
+          <DrawerHeader className="px-4 text-left">
+            <DrawerTitle>Add Service Location</DrawerTitle>
+            <DrawerDescription>
+              Enter a Google Maps link to automatically resolve the service address.
+            </DrawerDescription>
+          </DrawerHeader>
+
+          <div className="px-4 pb-6 space-y-4 overflow-y-auto">
+            <div className="space-y-2">
+              <label htmlFor="map-link-mobile" className="text-sm font-medium">Google Maps Link</label>
+              <Input
+                id="map-link-mobile"
+                type="text"
+                placeholder="Paste Google Maps URL here..."
+                value={mapLink}
+                onChange={(e) => setMapLink(e.target.value)}
+                className="w-full"
+              />
+            </div>
+
+            {reverseGeocodingLoading && (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground py-2 justify-center bg-gray-50 rounded-lg">
+                <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                <span>Identifying area details...</span>
+              </div>
+            )}
+
+            {detectedArea && (
+              <div className="p-3 bg-green-50 border border-green-200 rounded-lg text-sm space-y-1">
+                <div className="font-semibold text-green-800">Identified Location:</div>
+                <div className="text-green-700">{detectedArea}, {detectedCity}</div>
+              </div>
+            )}
+
+            <div className="flex gap-3 pt-2">
+              <Button
+                variant="outline"
+                onClick={() => setIsAddLocationOpen(false)}
+                className="flex-1"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleSaveLocation}
+                disabled={!geocodedAddress || loading}
+                className="flex-1"
+              >
+                {loading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                Save
               </Button>
             </div>
           </div>

@@ -55,6 +55,7 @@ function App() {
           richColors
           closeButton
           duration={4000}
+          visibleToasts={1}
           toastOptions={{
             style: { zIndex: 9999 },
             className: 'pointer-events-auto',
