@@ -1180,47 +1180,49 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
                 onValueChange={setActiveTab}
                 className="space-y-6 border rounded-xl p-4 bg-white shadow-xs"
               >
-                <TabsList className="flex w-full overflow-x-auto no-scrollbar bg-gray-100 p-1 rounded-lg h-10 gap-1">
-                  <TabsTrigger
-                    value="packages"
-                    className="rounded-md py-1 text-sm font-semibold capitalize transition-all cursor-pointer data-[state=active]:bg-white data-[state=active]:text-foreground data-[state=active]:shadow-sm flex items-center justify-center gap-1 sm:gap-1.5 flex-1 min-w-[115px] sm:min-w-0 flex-shrink-0 whitespace-nowrap"
-                  >
-                    <span className="truncate">Packages</span>
-                    <Badge2 variant="secondary" className="px-1.5 py-0.5 text-[9px] sm:text-[10px] leading-none rounded-full flex-shrink-0">
-                      {(order.packages?.length || 0) + (order.addons?.length || 0)}
-                    </Badge2>
-                  </TabsTrigger>
-                  <TabsTrigger
-                    value="images"
-                    className="rounded-md py-1 text-sm font-semibold capitalize transition-all cursor-pointer data-[state=active]:bg-white data-[state=active]:text-foreground data-[state=active]:shadow-sm flex items-center justify-center gap-1 sm:gap-1.5 flex-1 min-w-[115px] sm:min-w-0 flex-shrink-0 whitespace-nowrap"
-                  >
-                    <span className="truncate">Images</span>
-                    <Badge2 variant="secondary" className="px-1.5 py-0.5 text-[9px] sm:text-[10px] leading-none rounded-full flex-shrink-0">
-                      {(order.image_urls?.before_images?.length || 0) + (order.image_urls?.after_images?.length || 0)}
-                    </Badge2>
-                  </TabsTrigger>
-                  <TabsTrigger
-                    value="timeline"
-                    className="rounded-md py-1 text-sm font-semibold capitalize transition-all cursor-pointer data-[state=active]:bg-white data-[state=active]:text-foreground data-[state=active]:shadow-sm flex items-center justify-center gap-1 sm:gap-1.5 flex-1 min-w-[115px] sm:min-w-0 flex-shrink-0 whitespace-nowrap"
-                  >
-                    <span className="truncate">Timeline</span>
-                    <Badge2 variant="secondary" className="px-1.5 py-0.5 text-[9px] sm:text-[10px] leading-none rounded-full flex-shrink-0">
-                      {timeline?.length || 0}
-                    </Badge2>
-                  </TabsTrigger>
-                  <TabsTrigger
-                    value="reassignments"
-                    className="rounded-md py-1 text-sm font-semibold capitalize transition-all cursor-pointer data-[state=active]:bg-white data-[state=active]:text-foreground data-[state=active]:shadow-sm flex items-center justify-center gap-1 sm:gap-1.5 flex-1 min-w-[115px] sm:min-w-0 flex-shrink-0 whitespace-nowrap"
-                  >
-                    <span className="truncate">Assignments</span>
-                    <Badge2 variant="secondary" className="px-1.5 py-0.5 text-[9px] sm:text-[10px] leading-none rounded-full flex-shrink-0">
-                      {reassignments?.length || 0}
-                    </Badge2>
-                  </TabsTrigger>
-                </TabsList>
+                <div className="overflow-x-auto no-scrollbar">
+                  <TabsList className="flex w-max min-w-full bg-gray-100 p-1 rounded-lg h-10 gap-1">
+                    <TabsTrigger
+                      value="packages"
+                      className="rounded-md py-1 px-3 text-sm font-semibold capitalize transition-all cursor-pointer data-[state=active]:bg-white data-[state=active]:text-foreground data-[state=active]:shadow-sm flex items-center justify-center gap-1.5 flex-shrink-0 whitespace-nowrap"
+                    >
+                      <span>Packages</span>
+                      <Badge2 variant="secondary" className="px-1.5 py-0.5 text-[9px] sm:text-[10px] leading-none rounded-full flex-shrink-0">
+                        {(order.packages?.length || 0) + (order.addons?.length || 0)}
+                      </Badge2>
+                    </TabsTrigger>
+                    <TabsTrigger
+                      value="images"
+                      className="rounded-md py-1 px-3 text-sm font-semibold capitalize transition-all cursor-pointer data-[state=active]:bg-white data-[state=active]:text-foreground data-[state=active]:shadow-sm flex items-center justify-center gap-1.5 flex-shrink-0 whitespace-nowrap"
+                    >
+                      <span>Images</span>
+                      <Badge2 variant="secondary" className="px-1.5 py-0.5 text-[9px] sm:text-[10px] leading-none rounded-full flex-shrink-0">
+                        {(order.image_urls?.before_images?.length || 0) + (order.image_urls?.after_images?.length || 0)}
+                      </Badge2>
+                    </TabsTrigger>
+                    <TabsTrigger
+                      value="timeline"
+                      className="rounded-md py-1 px-3 text-sm font-semibold capitalize transition-all cursor-pointer data-[state=active]:bg-white data-[state=active]:text-foreground data-[state=active]:shadow-sm flex items-center justify-center gap-1.5 flex-shrink-0 whitespace-nowrap"
+                    >
+                      <span>Timeline</span>
+                      <Badge2 variant="secondary" className="px-1.5 py-0.5 text-[9px] sm:text-[10px] leading-none rounded-full flex-shrink-0">
+                        {timeline?.length || 0}
+                      </Badge2>
+                    </TabsTrigger>
+                    <TabsTrigger
+                      value="reassignments"
+                      className="rounded-md py-1 px-3 text-sm font-semibold capitalize transition-all cursor-pointer data-[state=active]:bg-white data-[state=active]:text-foreground data-[state=active]:shadow-sm flex items-center justify-center gap-1.5 flex-shrink-0 whitespace-nowrap"
+                    >
+                      <span>Assignments</span>
+                      <Badge2 variant="secondary" className="px-1.5 py-0.5 text-[9px] sm:text-[10px] leading-none rounded-full flex-shrink-0">
+                        {reassignments?.length || 0}
+                      </Badge2>
+                    </TabsTrigger>
+                  </TabsList>
+                </div>
 
                 {/* Packages Tab */}
-                <TabsContent value="packages" className="space-y-6 mt-6 px-4 data-[state=active]:animate-in data-[state=active]:fade-in-50 data-[state=active]:slide-in-from-right-4 data-[state=active]:duration-300 data-[state=active]:ease-out">
+                <TabsContent value="packages" className="space-y-6 mt-6 data-[state=active]:animate-in data-[state=active]:fade-in-50 data-[state=active]:slide-in-from-right-4 data-[state=active]:duration-300 data-[state=active]:ease-out">
                   {/* Packages */}
                   <div>
                     <div className="flex items-center justify-between mb-4">
