@@ -180,7 +180,7 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
   // Swipe logic for tabs
   const [touchStart, setTouchStart] = useState({ x: 0, y: 0 });
   const [touchEnd, setTouchEnd] = useState({ x: 0, y: 0 });
-  const minSwipeDistance = 60;
+  const minSwipeDistance = 45;
 
   const onTouchStart = (e) => {
     setTouchEnd({ x: 0, y: 0 });
@@ -966,110 +966,132 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Left Column - Main Content */}
           <div className="lg:col-span-2 space-y-6">
-            {/* Order Meta */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-sm text-muted-foreground">
-              <div className="flex flex-wrap items-center gap-2">
-                <span>Order date <span className="font-medium text-foreground">{formatDate(order.created_at)}</span></span>
-                <span>•</span>
-                <span>Order from <span className="font-medium text-foreground">{order.customer?.name}</span></span>
-                {order.converted_from_enquiry_id && (
-                  <>
-                    <span>•</span>
-                    <span>Created from <Link
-                      to={`/enquiries/${order.converted_from_enquiry_id}`}
-                      className="font-medium text-primary hover:underline"
-                    >
-                      Enquiry #{order.converted_from_enquiry_id}
-                    </Link></span>
-                  </>
-                )}
-                {order.source && (
-                  <>
-                    <span>•</span>
-                    <span>Purchased via <span className="font-medium text-foreground">{order.source}</span></span>
-                  </>
-                )}
-                {order.subscription_id && (
-                  <>
-                    <span>•</span>
-                    <span>Purchased via <button
-                      onClick={() => navigate(`/subscriptions/${order.subscription_id}`)}
-                      className="font-medium text-primary hover:underline cursor-pointer"
-                    >
-                      Monthly Subscription
-                    </button></span>
-                  </>
-                )}
-              </div>
+            {/* Order Meta Strip */}
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-muted-foreground bg-gray-50 border rounded-xl px-4 py-2.5">
+              <span>Ordered <span className="font-semibold text-foreground">{formatDate(order.created_at)}</span></span>
+              <span className="text-gray-300">•</span>
+              <span>Customer <span className="font-semibold text-foreground">{order.customer?.name}</span></span>
+              {order.converted_from_enquiry_id && (
+                <>
+                  <span className="text-gray-300">•</span>
+                  <Link
+                    to={`/enquiries/${order.converted_from_enquiry_id}`}
+                    className="font-semibold text-primary hover:underline"
+                  >
+                    Enquiry #{order.converted_from_enquiry_id}
+                  </Link>
+                </>
+              )}
+              {order.source && (
+                <>
+                  <span className="text-gray-300">•</span>
+                  <span>Via <span className="font-semibold text-foreground">{order.source}</span></span>
+                </>
+              )}
+              {order.subscription_id && (
+                <>
+                  <span className="text-gray-300">•</span>
+                  <button
+                    onClick={() => navigate(`/subscriptions/${order.subscription_id}`)}
+                    className="font-semibold text-primary hover:underline cursor-pointer"
+                  >
+                    Monthly Subscription
+                  </button>
+                </>
+              )}
             </div>
 
             {/* Service Location */}
-            <div className="py-4 px-4 bg-gray-50 rounded-lg border">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-y-3 gap-x-6">
-                <div className="flex items-start gap-3">
-                  <div className="p-2 bg-primary/10 rounded-full flex-shrink-0">
-                    <MapPin className="h-4 w-4 text-primary" />
-                  </div>
-                  <div className="flex flex-col">
-                    <span className="text-xs uppercase tracking-wider font-bold text-muted-foreground opacity-70">Service Location</span>
-                    {(!order.address || (!order.address.area && !order.address.city && !order.address.map_link)) ? (
-                      <div className="mt-1">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="h-8 gap-1.5 text-primary border-primary/30 hover:bg-primary/5 cursor-pointer"
-                          onClick={() => setIsAddLocationOpen(true)}
-                        >
-                          <Plus className="h-3.5 w-3.5" />
-                          Add Location
-                        </Button>
-                      </div>
-                    ) : (
-                      <span className="text-sm font-semibold capitalize text-foreground flex items-center flex-wrap gap-x-2">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Location Card */}
+              <div className="bg-white border rounded-xl p-4 shadow-xs flex items-start gap-3">
+                <div className="p-2 bg-primary/10 rounded-full flex-shrink-0 text-primary">
+                  <MapPin className="h-4 w-4" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <span className="text-[10px] uppercase tracking-wider font-bold text-muted-foreground opacity-70 block mb-1">
+                    Service Location
+                  </span>
+                  {(!order.address || (!order.address.area && !order.address.city && !order.address.map_link)) ? (
+                    <div className="mt-1">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-8 gap-1.5 text-primary border-primary/30 hover:bg-primary/5 cursor-pointer"
+                        onClick={() => setIsAddLocationOpen(true)}
+                      >
+                        <Plus className="h-3.5 w-3.5" />
+                        Add Location
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="space-y-1.5">
+                      <p className="text-sm font-semibold capitalize text-foreground leading-tight truncate">
                         {order.address.area || 'N/A'}, {order.address.city || 'N/A'}
+                      </p>
+                      <div className="flex flex-wrap gap-2 items-center">
                         {order.address.map_link && (
                           <a
                             href={order.address.map_link}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="text-xs text-primary hover:underline font-normal normal-case inline-flex items-center gap-0.5"
+                            className="text-xs text-primary hover:text-primary/80 font-medium inline-flex items-center gap-1 bg-primary/5 px-2 py-0.5 rounded-md transition-colors"
                           >
                             <ExternalLink className="h-3 w-3" /> View Map
                           </a>
                         )}
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-3 justify-between">
-                  <div className="flex items-start gap-3">
-                    <div className="p-2 bg-blue-50 rounded-full flex-shrink-0">
-                      <Calendar1Icon className="h-4 w-4 text-blue-600" />
+                        {isEditable && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-5 px-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-secondary gap-1"
+                            onClick={() => setIsAddLocationOpen(true)}
+                          >
+                            <Edit className="h-3 w-3" /> Edit
+                          </Button>
+                        )}
+                      </div>
                     </div>
-                    <div className="flex flex-col">
-                      <span className="text-xs uppercase tracking-wider font-bold text-muted-foreground opacity-70">Scheduled Time</span>
-                      <span className="text-sm font-semibold text-foreground">
-                        {formatDate(order.booking_date)} at {formatTime(order.booking_time_from)} - {formatTime(order.booking_time_to)}
-                      </span>
-                    </div>
-                  </div>
-                  {isEditable && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={handleOpenBookingEdit}
-                      className="h-8 -mt-1"
-                    >
-                      <CalendarClock className="h-4 w-4 mr-1" />
-                      <span className=" md:inline">Edit</span>
-                    </Button>
                   )}
                 </div>
               </div>
 
-              {/* Progress Bar */}
-              {/* <div className="flex items-center gap-2 mb-4">
+              {/* Scheduled Time Card */}
+              <div className="bg-white border rounded-xl p-4 shadow-xs flex items-start gap-3">
+                <div className="p-2 bg-blue-50 rounded-full flex-shrink-0 text-blue-600">
+                  <Calendar1Icon className="h-4 w-4" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex justify-between items-start gap-2">
+                    <div>
+                      <span className="text-[10px] uppercase tracking-wider font-bold text-muted-foreground opacity-70 block mb-1">
+                        Scheduled Time
+                      </span>
+                      <p className="text-sm font-semibold text-foreground leading-tight">
+                        {formatDate(order.booking_date)}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-0.5 font-medium">
+                        {formatTime(order.booking_time_from)} - {formatTime(order.booking_time_to)}
+                      </p>
+                    </div>
+                    {isEditable && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleOpenBookingEdit}
+                        className="h-8 text-xs font-semibold px-2 gap-1 text-primary border-primary/20 hover:bg-primary/5 cursor-pointer flex-shrink-0"
+                      >
+                        <CalendarClock className="h-3.5 w-3.5" />
+                        <span>Reschedule</span>
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Progress Bar */}
+            {/* <div className="flex items-center gap-2 mb-4">
                 {['Order Confirmed', 'In Progress', 'Completed'].map((stage, index) => {
                   // Map stages to order statuses
                   const stageStatusMap = ['confirmed', 'in_progress', 'completed'];
@@ -1097,57 +1119,54 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
                   );
                 })}
               </div> */}
-            </div>
 
             {/* Action Buttons */}
-            <div className="flex flex-row gap-3">
-              {isEditable && (
-                <>
-                  {order.status === 'draft' && <Button
-                    variant="success"
-                    onClick={() => handleStatusChange('confirmed')}
-                    className="flex-1"
-                  >
-                    Confirm
-                  </Button>}
-                  {(order.status === 'confirmed' || order.status === 'in_progress') && (
+            {(isEditable || (order.status === 'completed' && !order.feedback_submitted_at)) && (
+              <div className="flex flex-row gap-2.5">
+                {isEditable && (
+                  <>
+                    {order.status === 'draft' && (
+                      <Button
+                        variant="success"
+                        onClick={() => handleStatusChange('confirmed')}
+                        className="flex-1 gap-1.5"
+                      >
+                        <CheckCircle2 className="h-4 w-4" />
+                        Confirm Order
+                      </Button>
+                    )}
+                    {(order.status === 'confirmed' || order.status === 'in_progress') && (
+                      <Button
+                        variant="success"
+                        onClick={() => handleStatusChange('completed')}
+                        className="flex-1 gap-1.5"
+                        disabled={!order?.assigned_to}
+                      >
+                        <CheckCircle2 className="h-4 w-4" />
+                        Complete Order
+                      </Button>
+                    )}
                     <Button
-                      variant="success"
-                      onClick={() => handleStatusChange('completed')}
-                      className="flex-1"
-                      disabled={!order?.assigned_to}
+                      variant="destructive"
+                      onClick={() => setIsCancelDialogOpen(true)}
+                      className="flex-1 gap-1.5"
                     >
-                      Complete Order
+                      <Ban className="h-4 w-4" />
+                      Cancel
                     </Button>
-                  )}
+                  </>
+                )}
+                {order.status === 'completed' && !order.feedback_submitted_at && (
                   <Button
-                    variant="destructive"
-                    onClick={() => setIsCancelDialogOpen(true)}
-                    className="flex-1"
+                    onClick={() => setIsFeedbackDialogOpen(true)}
+                    className="flex-1 gap-1.5 bg-blue-600 hover:bg-blue-700 text-white"
                   >
-                    Cancel Order
+                    <MessageSquare className="h-4 w-4" />
+                    Add Feedback
                   </Button>
-                  {/* <Button
-                    onClick={() => setIsWizardOpen(true)}
-                    className="flex-1 bg-orange-500 hover:bg-orange-600 text-white"
-                  >
-                    Edit Order
-                    <ChevronRight className="h-4 w-4 ml-2" />
-                  </Button> */}
-                </>
-              )}
-
-              {/* Feedback Button - show when order is completed and feedback not submitted */}
-              {order.status === 'completed' && !order.feedback_submitted_at && (
-                <Button
-                  onClick={() => setIsFeedbackDialogOpen(true)}
-                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
-                >
-                  <MessageSquare className="h-4 w-4 mr-2" />
-                  Add Feedback
-                </Button>
-              )}
-            </div>
+                )}
+              </div>
+            )}
 
             {/* Swipable Tabs Section */}
             <div
@@ -1161,10 +1180,10 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
                 onValueChange={setActiveTab}
                 className="space-y-6 border rounded-xl p-4 bg-white shadow-xs"
               >
-                <TabsList className="grid w-full grid-cols-4 bg-gray-100 p-1 rounded-lg h-10">
+                <TabsList className="flex w-full overflow-x-auto no-scrollbar bg-gray-100 p-1 rounded-lg h-10 gap-1">
                   <TabsTrigger
                     value="packages"
-                    className="rounded-md py-1 text-sm font-semibold capitalize transition-all cursor-pointer data-[state=active]:bg-white data-[state=active]:text-foreground data-[state=active]:shadow-sm flex items-center justify-center gap-1 sm:gap-1.5"
+                    className="rounded-md py-1 text-sm font-semibold capitalize transition-all cursor-pointer data-[state=active]:bg-white data-[state=active]:text-foreground data-[state=active]:shadow-sm flex items-center justify-center gap-1 sm:gap-1.5 flex-1 min-w-[115px] sm:min-w-0 flex-shrink-0 whitespace-nowrap"
                   >
                     <span className="truncate">Packages</span>
                     <Badge2 variant="secondary" className="px-1.5 py-0.5 text-[9px] sm:text-[10px] leading-none rounded-full flex-shrink-0">
@@ -1173,7 +1192,7 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
                   </TabsTrigger>
                   <TabsTrigger
                     value="images"
-                    className="rounded-md py-1 text-sm font-semibold capitalize transition-all cursor-pointer data-[state=active]:bg-white data-[state=active]:text-foreground data-[state=active]:shadow-sm flex items-center justify-center gap-1 sm:gap-1.5"
+                    className="rounded-md py-1 text-sm font-semibold capitalize transition-all cursor-pointer data-[state=active]:bg-white data-[state=active]:text-foreground data-[state=active]:shadow-sm flex items-center justify-center gap-1 sm:gap-1.5 flex-1 min-w-[115px] sm:min-w-0 flex-shrink-0 whitespace-nowrap"
                   >
                     <span className="truncate">Images</span>
                     <Badge2 variant="secondary" className="px-1.5 py-0.5 text-[9px] sm:text-[10px] leading-none rounded-full flex-shrink-0">
@@ -1182,7 +1201,7 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
                   </TabsTrigger>
                   <TabsTrigger
                     value="timeline"
-                    className="rounded-md py-1 text-sm font-semibold capitalize transition-all cursor-pointer data-[state=active]:bg-white data-[state=active]:text-foreground data-[state=active]:shadow-sm flex items-center justify-center gap-1 sm:gap-1.5"
+                    className="rounded-md py-1 text-sm font-semibold capitalize transition-all cursor-pointer data-[state=active]:bg-white data-[state=active]:text-foreground data-[state=active]:shadow-sm flex items-center justify-center gap-1 sm:gap-1.5 flex-1 min-w-[115px] sm:min-w-0 flex-shrink-0 whitespace-nowrap"
                   >
                     <span className="truncate">Timeline</span>
                     <Badge2 variant="secondary" className="px-1.5 py-0.5 text-[9px] sm:text-[10px] leading-none rounded-full flex-shrink-0">
@@ -1191,7 +1210,7 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
                   </TabsTrigger>
                   <TabsTrigger
                     value="reassignments"
-                    className="rounded-md py-1 text-sm font-semibold capitalize transition-all cursor-pointer data-[state=active]:bg-white data-[state=active]:text-foreground data-[state=active]:shadow-sm flex items-center justify-center gap-1 sm:gap-1.5"
+                    className="rounded-md py-1 text-sm font-semibold capitalize transition-all cursor-pointer data-[state=active]:bg-white data-[state=active]:text-foreground data-[state=active]:shadow-sm flex items-center justify-center gap-1 sm:gap-1.5 flex-1 min-w-[115px] sm:min-w-0 flex-shrink-0 whitespace-nowrap"
                   >
                     <span className="truncate">Assignments</span>
                     <Badge2 variant="secondary" className="px-1.5 py-0.5 text-[9px] sm:text-[10px] leading-none rounded-full flex-shrink-0">
@@ -1201,45 +1220,41 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
                 </TabsList>
 
                 {/* Packages Tab */}
-                <TabsContent value="packages" className="space-y-6 mt-6 px-4">
+                <TabsContent value="packages" className="space-y-6 mt-6 px-4 data-[state=active]:animate-in data-[state=active]:fade-in-50 data-[state=active]:slide-in-from-right-4 data-[state=active]:duration-300 data-[state=active]:ease-out">
                   {/* Packages */}
                   <div>
                     <div className="flex items-center justify-between mb-4">
                       <h3 className="font-semibold text-lg">Service Packages</h3>
                       <Badge2 variant="outline" className="text-xs">{order.packages?.length || 0} items</Badge2>
                     </div>
-                    <div className="space-y-4">
+                    <div className="space-y-3">
                       {order.packages && order.packages.length > 0 ? (
                         order.packages.map((item, index) => (
-                          <div key={index} className="flex gap-4  border-b last:border-0">
-                            <div className="w-20 h-20 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                              <VehicleIcon vehicleType={item.vehicle_type} size={40} className="text-gray-600" />
+                          <div key={index} className="flex gap-3 p-3 rounded-xl border bg-white hover:bg-gray-50/50 transition-colors">
+                            <div className="w-12 h-12 bg-blue-50 rounded-xl flex items-center justify-center flex-shrink-0 border border-blue-100">
+                              <VehicleIcon vehicleType={item.vehicle_type} size={28} className="text-blue-600" />
                             </div>
                             <div className="flex-1 min-w-0">
-                              <h4 className="font-semibold text-sm mb-2">{item.package_name}</h4>
-                              <div className="text-sm space-y-1">
-                                <div>{item.description}</div>
-                                <div className="flex items-center gap-2 flex-wrap">
-                                  <span className="capitalize">{item.vehicle_type}</span>
-                                  {item.brand && item.model && (
-                                    <>
-                                      <span>•</span>
-                                      <span>{item.brand} {item.model}</span>
-                                    </>
+                              <div className="flex items-start justify-between gap-2">
+                                <h4 className="font-semibold text-sm leading-tight">{item.package_name}</h4>
+                                <div className="text-right flex-shrink-0">
+                                  <div className="font-bold text-base">{formatCurrency(item.total_price)}</div>
+                                  {item.discount > 0 && (
+                                    <span className="text-[10px] font-medium text-green-700 bg-green-50 border border-green-100 rounded-full px-1.5 py-0.5">
+                                      -{formatCurrency(item.price - item.total_price)} off
+                                    </span>
                                   )}
-                                  <span>•</span>
-                                  <span>Quantity {item.quantity}</span>
                                 </div>
-                                <div className='text-muted-foreground'>{item.notes}</div>
                               </div>
-                            </div>
-                            <div className="text-right flex-shrink-0">
-                              <div className="font-semibold text-lg">{formatCurrency(item.total_price)}</div>
-                              {item.discount > 0 && (
-                                <div className="text-sm text-destructive mt-1">
-                                  Discount -{formatCurrency(item.price - item.total_price)}
-                                </div>
-                              )}
+                              {item.description && <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{item.description}</p>}
+                              <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-1.5">
+                                <span className="text-xs capitalize bg-secondary px-2 py-0.5 rounded-full font-medium">{item.vehicle_type}</span>
+                                {item.brand && item.model && (
+                                  <span className="text-xs text-muted-foreground">{item.brand} {item.model}</span>
+                                )}
+                                <span className="text-xs text-muted-foreground">Qty: {item.quantity}</span>
+                              </div>
+                              {item.notes && <p className="text-xs text-muted-foreground mt-1 italic">{item.notes}</p>}
                             </div>
                           </div>
                         ))
@@ -1259,27 +1274,25 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
                         <h3 className="font-semibold text-lg">Add-on Services</h3>
                         <Badge2 variant="secondary" className="text-xs">{order.addons.length} items</Badge2>
                       </div>
-                      <div className="space-y-4">
-
+                      <div className="space-y-3">
                         {order.addons.map((item, index) => (
-                          <div key={index} className="flex gap-4 border-b last:border-0">
-                            <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                              <BadgePlus size={20} className="text-gray-600" />
+                          <div key={index} className="flex gap-3 p-3 rounded-xl border bg-white hover:bg-gray-50/50 transition-colors">
+                            <div className="w-12 h-12 bg-green-50 rounded-xl flex items-center justify-center flex-shrink-0 border border-green-100">
+                              <BadgePlus size={22} className="text-green-600" />
                             </div>
-
                             <div className="flex-1 min-w-0">
-                              <h4 className="font-semibold text-sm mb-2 capitalize">{item.addon_name}</h4>
-                              <div className="text-sm ">
-                                Quantity {item.quantity}
-                              </div>
-                            </div>
-                            <div className="text-right flex-shrink-0">
-                              <div className="font-semibold text-lg">{formatCurrency(item.total_price)}</div>
-                              {item.discount > 0 && (
-                                <div className="text-sm text-destructive mt-1">
-                                  Discount -{formatCurrency(item.price - item.total_price)}
+                              <div className="flex items-start justify-between gap-2">
+                                <h4 className="font-semibold text-sm capitalize leading-tight">{item.addon_name}</h4>
+                                <div className="text-right flex-shrink-0">
+                                  <div className="font-bold text-base">{formatCurrency(item.total_price)}</div>
+                                  {item.discount > 0 && (
+                                    <span className="text-[10px] font-medium text-green-700 bg-green-50 border border-green-100 rounded-full px-1.5 py-0.5">
+                                      -{formatCurrency(item.price - item.total_price)} off
+                                    </span>
+                                  )}
                                 </div>
-                              )}
+                              </div>
+                              <span className="text-xs text-muted-foreground mt-1 block">Qty: {item.quantity}</span>
                             </div>
                           </div>
                         ))}
@@ -1291,7 +1304,7 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
                 </TabsContent>
 
                 {/* Images Tab */}
-                <TabsContent value="images" className="space-y-6 mt-6 px-2">
+                <TabsContent value="images" className="space-y-6 mt-6 px-2 data-[state=active]:animate-in data-[state=active]:fade-in-50 data-[state=active]:slide-in-from-right-4 data-[state=active]:duration-300 data-[state=active]:ease-out">
                   {/* Before Images */}
                   <div>
                     <div className="flex items-center justify-between mb-4">
@@ -1376,7 +1389,7 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
                 </TabsContent>
 
                 {/* Timeline Tab */}
-                <TabsContent value="timeline" className="mt-6 px-2">
+                <TabsContent value="timeline" className="mt-6 px-2 data-[state=active]:animate-in data-[state=active]:fade-in-50 data-[state=active]:slide-in-from-right-4 data-[state=active]:duration-300 data-[state=active]:ease-out">
                   <div className="space-y-2">
                     {timeline.length > 0 ? (
                       timeline.map((event, index) => (
@@ -1414,7 +1427,7 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
                 </TabsContent>
 
                 {/* Reassignments Tab */}
-                <TabsContent value="reassignments" className="mt-6 px-2">
+                <TabsContent value="reassignments" className="mt-6 px-2 data-[state=active]:animate-in data-[state=active]:fade-in-50 data-[state=active]:slide-in-from-right-4 data-[state=active]:duration-300 data-[state=active]:ease-out">
                   <div className="space-y-2">
                     {reassignments.length > 0 ? (
                       reassignments.map((item, index) => (
@@ -1462,12 +1475,11 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
             </div>
             }
 
-            <div className="p-4 border rounded-lg bg-slate-50">
+            <div className="rounded-xl border bg-white shadow-xs overflow-hidden">
               {/* Payment Details */}
-              <div >
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="font-semibold text-lg">Payment Details</h3>
-
+              <div>
+                <div className="flex items-center justify-between px-5 py-3.5 border-b bg-gray-50/60">
+                  <h3 className="font-semibold text-base">Payment Details</h3>
                   <div className="flex items-center gap-2">
                     {order.payment_method && (
                       <Badge2 variant="outline" className="text-xs uppercase">
@@ -1477,25 +1489,10 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
                     <Badge2 variant={getBadgeVariant(order.payment_status, 'payment')}>
                       {getStatusLabel(order.payment_status, PAYMENT_STATUSES)}
                     </Badge2>
-                    {order.payment_status !== 'paid' && (
-                      <Button
-                        size="sm"
-                        className="h-7 px-2 text-xs bg-blue-600 hover:bg-blue-700 text-white"
-                        onClick={() => {
-                          setRecordPaymentMethod('');
-                          setRecordPaymentVerified(false);
-                          setIsPaymentDialogOpen(true);
-                        }}
-                      >
-                        <span className="font-semibold">₹</span>
-                        Add Payment
-                      </Button>
-                    )}
-
                   </div>
                 </div>
 
-                <div className="space-y-3 max-w-md ml-auto">
+                <div className="p-5 space-y-2.5">
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">
                       Subtotal ({(order.packages?.length || 0) + (order.addons?.length || 0)} items)
@@ -1561,66 +1558,45 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
                     </div>
                   )}
 
-                  <div className="border-t pt-3 flex justify-between items-center">
+                  <div className="border-t pt-3 mt-1 flex justify-between items-center">
                     <span className="font-semibold">Total</span>
                     <span className="text-2xl font-bold">{formatCurrency(order.total_amount)}</span>
                   </div>
 
-                  {/* Payment Breakdown */}
-                  {/* {(order.received_amount || order.points_redeemed > 0) && (
-                    <div className="border-t pt-3 mt-3 space-y-2">
-                      <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
-                        Payment Breakdown
-                      </div>
-                      
-                      {order.points_redeemed > 0 && (
-                        <div className="flex justify-between text-sm">
-                          <div className="flex items-center gap-1.5 text-blue-600">
-                            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
-                            <span className="font-medium">Loyalty Points Used</span>
-                          </div>
-                          <span className="font-semibold text-blue-600">
-                            {order.points_redeemed} pts ({formatCurrency(order.points_discount || order.points_redeemed)})
-                          </span>
-                        </div>
-                      )}
-                      
-                      {order.received_amount && (
-                        <div className="flex justify-between text-sm">
-                          <div className="flex items-center gap-1.5">
-                            <svg className="h-4 w-4 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
-                            </svg>
-                            <span className="font-medium">Amount Paid</span>
-                          </div>
-                          <span className="font-semibold text-green-600">{formatCurrency(order.received_amount)}</span>
-                        </div>
-                      )}
-                    </div>
-                  )} */}
-                </div>
-
-                {/* Payment Proof */}
-                {order.image_urls?.payment_proof && (
-                  <div className="mt-4 pt-4 border-t">
-                    <button
+                  {order.payment_status !== 'paid' && (
+                    <Button
+                      className="w-full mt-2 gap-1.5 bg-blue-600 hover:bg-blue-700 text-white"
                       onClick={() => {
-                        setCurrentImageType('payment_proof');
-                        setCurrentImageIndex(0);
-                        setImageViewerOpen(true);
-                        setImageZoom(1);
-                        setImagePosition({ x: 0, y: 0 });
+                        setRecordPaymentMethod('');
+                        setRecordPaymentVerified(false);
+                        setIsPaymentDialogOpen(true);
                       }}
-                      className="flex items-center gap-2 text-sm text-primary hover:text-primary/80 transition-colors"
                     >
-                      <Paperclip className="h-4 w-4" />
-                      <span className="underline">Payment Proof Attached</span>
-                      <ImageIcon className="h-3 w-3" />
-                    </button>
-                  </div>
-                )}
+                      <span className="font-bold text-base">₹</span>
+                      Record Payment
+                    </Button>
+                  )}
+
+                  {/* Payment Proof */}
+                  {order.image_urls?.payment_proof && (
+                    <div className="pt-3 border-t">
+                      <button
+                        onClick={() => {
+                          setCurrentImageType('payment_proof');
+                          setCurrentImageIndex(0);
+                          setImageViewerOpen(true);
+                          setImageZoom(1);
+                          setImagePosition({ x: 0, y: 0 });
+                        }}
+                        className="flex items-center gap-2 text-sm text-primary hover:text-primary/80 transition-colors"
+                      >
+                        <Paperclip className="h-4 w-4" />
+                        <span className="underline">Payment Proof Attached</span>
+                        <ImageIcon className="h-3 w-3" />
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -1675,26 +1651,26 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
           </div>
 
           {/* Right Column - Sidebar */}
-          <div className="space-y-6">
+          <div className="space-y-4">
             {/* Assigned Agent */}
-            <div ref={assignedAgentRef} className="border rounded-lg">
-              <div className="p-4 border-b">
-                <h3 className="font-semibold">Assigned Agent</h3>
+            <div ref={assignedAgentRef} className="rounded-xl border bg-white shadow-xs overflow-hidden">
+              <div className="px-4 py-3 border-b bg-gray-50/60 flex items-center justify-between">
+                <h3 className="font-semibold text-sm">Assigned Agent</h3>
               </div>
               <div className="p-4 space-y-3">
                 <div className="flex items-center gap-3">
-                  <LetterAvatar name={order.assigned_to?.name} size="md" className="text-white" />
+                  <LetterAvatar name={order.assigned_to?.name} size="md" className="text-white flex-shrink-0" />
                   <div className="flex-1 min-w-0">
-                    <div className="font-medium text-sm">
+                    <div className="font-semibold text-sm">
                       {
                         order.assigned_to?.name ? <>
                           {order.assigned_to?.name}
                           <Badge2 variant="info" className="mx-2 capitalize">{order.assignee_response}</Badge2></> :
-                          'Unassigned'
+                          <span className="text-muted-foreground italic">Unassigned</span>
                       }
                     </div>
                     {order.assigned_to?.email && (
-                      <div className="text-xs text-muted-foreground truncate">
+                      <div className="text-xs text-muted-foreground truncate mt-0.5">
                         {order.assigned_to.email}
                       </div>
                     )}
@@ -1734,9 +1710,9 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
             </div>
 
             {/* Customer */}
-            <div className="border rounded-lg">
-              <div className="p-4 border-b flex items-center justify-between">
-                <h3 className="font-semibold">Customer</h3>
+            <div className="rounded-xl border bg-white shadow-xs overflow-hidden">
+              <div className="px-4 py-3 border-b bg-gray-50/60 flex items-center justify-between">
+                <h3 className="font-semibold text-sm">Customer</h3>
                 {order.image_urls?.customer_signature && (
                   <Popover>
                     <PopoverTrigger asChild>
@@ -1842,15 +1818,15 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
             </div>
 
             {/* Order Note */}
-            <div className="border rounded-lg">
-              <div className="p-4 border-b flex items-center justify-between">
-                <h3 className="font-semibold">Order Note</h3>
+            <div className="rounded-xl border bg-white shadow-xs overflow-hidden">
+              <div className="px-4 py-3 border-b bg-gray-50/60 flex items-center justify-between">
+                <h3 className="font-semibold text-sm">Order Note</h3>
                 {isEditable && !editingNote ? (
-                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => {
+                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => {
                     setNoteText(order.notes || '');
                     setEditingNote(true);
                   }}>
-                    <Edit className="h-4 w-4" />
+                    <Edit className="h-3.5 w-3.5" />
                   </Button>
                 ) : null}
               </div>
@@ -1877,9 +1853,11 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
                     </div>
                   </div>
                 ) : (
-                  <p className="text-sm font-mono whitespace-pre-wrap">
-                    {order.notes || 'No notes added'}
-                  </p>
+                  <div className="bg-gray-50 rounded-lg p-3 border min-h-[64px]">
+                    <p className="text-sm font-mono whitespace-pre-wrap text-foreground">
+                      {order.notes || <span className="text-muted-foreground italic">No notes added</span>}
+                    </p>
+                  </div>
                 )}
               </div>
             </div>

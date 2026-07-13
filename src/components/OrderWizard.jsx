@@ -589,6 +589,12 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
   const extractTimeFromDateTime = (dateTimeString) => {
     if (!dateTimeString) return '';
     try {
+      if (typeof dateTimeString === 'string' && dateTimeString.includes('T')) {
+        const timePart = dateTimeString.split('T')[1];
+        if (timePart && timePart.length >= 5) {
+          return timePart.substring(0, 5);
+        }
+      }
       const date = new Date(dateTimeString);
       const hours = String(date.getHours()).padStart(2, '0');
       const minutes = String(date.getMinutes()).padStart(2, '0');
@@ -602,6 +608,9 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
   const extractDateFromDateTime = (dateTimeString) => {
     if (!dateTimeString) return '';
     try {
+      if (typeof dateTimeString === 'string' && dateTimeString.includes('T')) {
+        return dateTimeString.split('T')[0];
+      }
       const date = new Date(dateTimeString);
       const year = date.getFullYear();
       const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -819,11 +828,17 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
   };
 
   // Check errors in all other steps and collect them
-  const checkOtherStepsErrors = () => {
+  const checkOtherStepsErrors = (activeStep = currentStep) => {
     const errorMessages = [];
 
+    // Only check other steps if submit has been attempted
+    if (!submitAttempted) {
+      setOtherStepErrors([]);
+      return;
+    }
+
     for (let step = 1; step <= 4; step++) {
-      if (step === currentStep) continue; // Skip current step
+      if (step === activeStep) continue; // Skip active step
 
       const stepErrors = getStepErrors(step);
       const errorCount = Object.keys(stepErrors).length;
@@ -850,7 +865,7 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
 
       // Also check other steps for errors to display alerts
       if (Object.keys(newErrors).length === 0) {
-        checkOtherStepsErrors();
+        checkOtherStepsErrors(step);
       }
     }
 
@@ -878,7 +893,7 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
       setCurrentStep(firstInvalidStep);
       const currentStepErrors = getStepErrors(firstInvalidStep);
       setErrors(currentStepErrors);
-      checkOtherStepsErrors();
+      checkOtherStepsErrors(firstInvalidStep);
     }
 
     return allValid;
@@ -901,19 +916,23 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
 
     // Clear errors for the new step
     setErrors({});
+    checkOtherStepsErrors(nextStep);
 
     saveDraft(nextStep);
   };
 
   const handleBack = () => {
-    setCurrentStep(currentStep - 1);
+    const prevStep = currentStep - 1;
+    setCurrentStep(prevStep);
     setSubmitError(''); // Clear submit errors when navigating back
 
     // If submit was attempted, re-validate to show/update errors for the new step
     if (submitAttempted) {
-      const prevStepErrors = getStepErrors(currentStep - 1);
+      const prevStepErrors = getStepErrors(prevStep);
       setErrors(prevStepErrors);
-      checkOtherStepsErrors();
+      checkOtherStepsErrors(prevStep);
+    } else {
+      setOtherStepErrors([]);
     }
   };
 
@@ -2158,38 +2177,11 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
                       <SelectValue placeholder="Pick time" />
                     </SelectTrigger>
                     <SelectContent className="max-h-60 overflow-y-auto">
-                      {(() => {
-                        // Check if booking date is today
-                        const today = new Date();
-                        const todayStr = today.toISOString().split('T')[0];
-                        const isToday = bookingDate === todayStr;
-
-                        if (!isToday) {
-                          // Not today - show all times
-                          return generateTimeOptions().map((time) => (
-                            <SelectItem key={time.value} value={time.value}>
-                              {time.label}
-                            </SelectItem>
-                          ));
-                        }
-
-                        // Today - filter times after current time
-                        const currentHour = today.getHours();
-                        const currentMinute = today.getMinutes();
-                        const currentTimeInMinutes = currentHour * 60 + currentMinute;
-
-                        return generateTimeOptions()
-                          .filter((time) => {
-                            const [hours, minutes] = time.value.split(':').map(Number);
-                            const timeInMinutes = hours * 60 + minutes;
-                            return timeInMinutes > currentTimeInMinutes;
-                          })
-                          .map((time) => (
-                            <SelectItem key={time.value} value={time.value}>
-                              {time.label}
-                            </SelectItem>
-                          ));
-                      })()}
+                      {generateTimeOptions().map((time) => (
+                        <SelectItem key={time.value} value={time.value}>
+                          {time.label}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                   {errors.bookingTimeFrom && <p className="text-sm text-destructive mt-1">{errors.bookingTimeFrom}</p>}
@@ -2208,38 +2200,23 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
                       <SelectValue placeholder="Pick time" />
                     </SelectTrigger>
                     <SelectContent className="max-h-60 overflow-y-auto">
-                      {(() => {
-                        // Check if booking date is today
-                        const today = new Date();
-                        const todayStr = today.toISOString().split('T')[0];
-                        const isToday = bookingDate === todayStr;
-                        const currentHour = today.getHours();
-                        const currentMinute = today.getMinutes();
-                        const currentTimeInMinutes = currentHour * 60 + currentMinute;
-
-                        return generateTimeOptions()
-                          .filter((time) => {
+                      {generateTimeOptions()
+                        .filter((time) => {
+                          // Must be after the "From" time
+                          if (bookingTimeFrom) {
                             const [hours, minutes] = time.value.split(':').map(Number);
+                            const [fromHours, fromMinutes] = bookingTimeFrom.split(':').map(Number);
                             const timeInMinutes = hours * 60 + minutes;
-
-                            // Must be after the "From" time
-                            if (bookingTimeFrom) {
-                              const [fromHours, fromMinutes] = bookingTimeFrom.split(':').map(Number);
-                              const fromTimeInMinutes = fromHours * 60 + fromMinutes;
-                              if (timeInMinutes <= fromTimeInMinutes) return false;
-                            }
-
-                            // If today, must be after current time
-                            if (isToday && timeInMinutes <= currentTimeInMinutes) return false;
-
-                            return true;
-                          })
-                          .map((time) => (
-                            <SelectItem key={time.value} value={time.value}>
-                              {time.label}
-                            </SelectItem>
-                          ));
-                      })()}
+                            const fromTimeInMinutes = fromHours * 60 + fromMinutes;
+                            return timeInMinutes > fromTimeInMinutes;
+                          }
+                          return true;
+                        })
+                        .map((time) => (
+                          <SelectItem key={time.value} value={time.value}>
+                            {time.label}
+                          </SelectItem>
+                        ))}
                     </SelectContent>
                   </Select>
                   {errors.bookingTimeTo && <p className="text-sm text-destructive mt-1">{errors.bookingTimeTo}</p>}
