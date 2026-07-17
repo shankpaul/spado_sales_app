@@ -424,7 +424,7 @@ const useOrderStore = create((set, get) => ({
             toast.info(`Order ${order.order_number} status: ${data.new_status}`);
           } else if (eventName === 'order.assigned' || eventName === 'order.reassigned') {
             toast.info(`Order ${order.order_number} ${eventName === 'order.assigned' ? 'assigned' : 'reassigned'}`);
-          } else if (eventName === 'order.assignee_response_updated') {
+          } else if (eventName === 'order.assignee_response_updated' && data.assignee_response !== 'accepted') {
             toast.info(`Order ${order.order_number} response: ${data.assignee_response}`);
           }
         } catch (error) {

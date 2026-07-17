@@ -47,6 +47,7 @@ import customerService from '../services/customerService';
 import offerService from '../services/offerService';
 import loyaltyService from '../services/loyaltyService';
 import enquiryService from '../services/enquiryService';
+import campaignService from '../services/campaignService';
 import useOrderStore from '../store/orderStore';
 import VehicleIdentifier from './VehicleIdentifier';
 import { getVehicleType } from '../lib/vehicleData';
@@ -84,6 +85,9 @@ import {
   Percent,
   Coins,
   Info,
+  Clock,
+  FileText,
+  User,
 } from 'lucide-react';
 
 /**
@@ -118,6 +122,16 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
   const [selectedOffer, setSelectedOffer] = useState(null);
   const [loadingOffers, setLoadingOffers] = useState(false);
   const [offerDetailsDialog, setOfferDetailsDialog] = useState({ open: false, offer: null });
+
+  // Coupon states
+  const [couponCode, setCouponCode] = useState('');
+  const [isCouponVerified, setIsCouponVerified] = useState(false);
+  const [verifyingCoupon, setVerifyingCoupon] = useState(false);
+  const [verifiedCouponData, setVerifiedCouponData] = useState(null);
+  const [couponError, setCouponError] = useState('');
+  const [isCustomerCouponsOpen, setIsCustomerCouponsOpen] = useState(false);
+  const [customerCoupons, setCustomerCoupons] = useState([]);
+  const [loadingCustomerCoupons, setLoadingCustomerCoupons] = useState(false);
 
   // Loyalty points states
   const [loyaltySummary, setLoyaltySummary] = useState(null);
@@ -325,18 +339,26 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
 
         // Check if previously selected offer is still valid
         if (selectedOffer) {
-          const isStillValid = offers.some(offer => offer.id === selectedOffer.id);
-          if (!isStillValid) {
-            // Remove offer if no longer valid
-            removeOfferRewards(selectedOffer.id);
-            setSelectedOffer(null);
+          // Protect offer if it was applied via a verified coupon code (either coupon_required or any coupon-applied offer)
+          const isCouponLinked = isCouponVerified;
+          if (!isCouponLinked) {
+            const isStillValid = offers.some(offer => offer.id === selectedOffer.id);
+            if (!isStillValid) {
+              // Remove offer if no longer valid
+              removeOfferRewards(selectedOffer.id);
+              setSelectedOffer(null);
+            }
           }
         }
       } catch (error) {
         setAvailableOffers([]);
         if (selectedOffer) {
-          removeOfferRewards(selectedOffer.id);
-          setSelectedOffer(null);
+          // Protect offer if it was applied via a verified coupon code
+          const isCouponLinked = isCouponVerified;
+          if (!isCouponLinked) {
+            removeOfferRewards(selectedOffer.id);
+            setSelectedOffer(null);
+          }
         }
       } finally {
         setLoadingOffers(false);
@@ -401,10 +423,14 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
     // If an offer is selected but not in available offers, it was already removed in fetchOffers
     // This useEffect is now mainly for edge cases
     if (selectedOffer && availableOffers.length > 0) {
-      const isStillAvailable = availableOffers.some(offer => offer.id === selectedOffer.id);
-      if (!isStillAvailable) {
-        removeOfferRewards(selectedOffer.id);
-        setSelectedOffer(null);
+      // Protect offer if it was applied via a verified coupon code
+      const isCouponLinked = isCouponVerified;
+      if (!isCouponLinked) {
+        const isStillAvailable = availableOffers.some(offer => offer.id === selectedOffer.id);
+        if (!isStillAvailable) {
+          removeOfferRewards(selectedOffer.id);
+          setSelectedOffer(null);
+        }
       }
     }
   }, [availableOffers, selectedOffer, currentStep, loadingOffers]);
@@ -476,6 +502,9 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
     setCustomerPhone(data.customerPhone || '');
     setNotes(data.notes || '');
     setSelectedOffer(data.selectedOffer || null);
+    setCouponCode(data.couponCode || '');
+    setIsCouponVerified(data.isCouponVerified || false);
+    setVerifiedCouponData(data.verifiedCouponData || null);
   };
 
   // Save to localStorage (only for new orders, not edit mode)
@@ -496,6 +525,9 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
       address,
       notes,
       selectedOffer,
+      couponCode,
+      isCouponVerified,
+      verifiedCouponData,
     };
 
     localStorage.setItem(
@@ -510,6 +542,124 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
   // Clear draft
   const clearDraft = () => {
     localStorage.removeItem(STORAGE_KEYS.ORDER_WIZARD_DRAFT);
+  };
+
+  const verifyAndApplyCoupon = async (code) => {
+    if (!code) {
+      setCouponError('Please enter a coupon code');
+      return;
+    }
+    if (!selectedCustomer) {
+      setCouponError('Please select a customer first');
+      return;
+    }
+
+    setVerifyingCoupon(true);
+    setCouponError('');
+    try {
+      const phone = customerPhone || selectedCustomer.phone || '';
+      const response = await campaignService.validateCoupon(
+        code.trim().toUpperCase(),
+        selectedCustomer.id,
+        phone
+      );
+
+      if (response.valid && response.data) {
+        setIsCouponVerified(true);
+        setVerifiedCouponData(response.data);
+        setCouponCode(code.trim().toUpperCase());
+        toast.success('Coupon verified successfully!');
+
+        // Auto-apply the linked offer from coupon
+        const couponData = response.data;
+        const offerId = couponData.offer_id;
+
+        if (offerId && offerId > 0) {
+          try {
+            const offerRes = await offerService.getOfferById(offerId);
+            if (offerRes && offerRes.data) {
+              setSelectedOffer(offerRes.data);
+              saveDraft();
+            } else {
+              // Build fallback offer from coupon data
+              setSelectedOffer({
+                id: offerId,
+                name: couponData.offer_name || 'Coupon Offer',
+                description: '',
+                discount_type: 'fixed',
+                discount_value: 0,
+                coupon_required: true,
+              });
+              saveDraft();
+            }
+          } catch (_) {
+            // Offer fetch failed — build minimal offer object from coupon data
+            setSelectedOffer({
+              id: offerId,
+              name: couponData.offer_name || 'Coupon Offer',
+              description: '',
+              discount_type: 'fixed',
+              discount_value: 0,
+              coupon_required: true,
+            });
+            saveDraft();
+          }
+        } else {
+          toast.error('Associated offer not found for this coupon.');
+        }
+        setIsCustomerCouponsOpen(false);
+      } else {
+        setCouponError('Coupon is invalid or cannot be applied');
+      }
+    } catch (error) {
+      const msg = error.response?.data?.errors?.[0] || 'Coupon validation failed';
+      setCouponError(msg);
+      toast.error(msg);
+    } finally {
+      setVerifyingCoupon(false);
+    }
+  };
+
+  const handleVerifyCoupon = async () => {
+    await verifyAndApplyCoupon(couponCode);
+  };
+
+  const fetchCustomerCoupons = async () => {
+    if (!selectedCustomer) return;
+    setLoadingCustomerCoupons(true);
+    try {
+      const phone = customerPhone || selectedCustomer.phone || '';
+      if (!phone) {
+        setCustomerCoupons([]);
+        return;
+      }
+      const response = await campaignService.getAllCoupons({ search: phone });
+      const coupons = response.data || [];
+      // Filter usable coupons: status !== 'cancelled', 'completed', 'expired' and has remaining uses
+      const activeCoupons = coupons.filter(coupon => 
+        coupon.status !== 'cancelled' && 
+        coupon.status !== 'completed' && 
+        coupon.status !== 'expired' &&
+        coupon.remaining_uses > 0
+      );
+      setCustomerCoupons(activeCoupons);
+    } catch (err) {
+      toast.error('Failed to fetch customer coupons');
+    } finally {
+      setLoadingCustomerCoupons(false);
+    }
+  };
+
+  const handleRemoveOffer = () => {
+    if (selectedOffer) {
+      removeOfferRewards(selectedOffer.id);
+    }
+    setSelectedOffer(null);
+    setCouponCode('');
+    setIsCouponVerified(false);
+    setVerifiedCouponData(null);
+    setCouponError('');
+    saveDraft();
   };
 
   // Fetch initial data
@@ -719,6 +869,37 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
           setPointsToRedeem(order.points_redeemed);
         }
 
+        // Set offer and coupon code if present
+        if (order.offer) {
+          setSelectedOffer(order.offer);
+        }
+        if (order.coupon_code) {
+          setCouponCode(order.coupon_code);
+          setIsCouponVerified(true);
+
+          // Prefill verifiedCouponData with fallback placeholder
+          setVerifiedCouponData({
+            code: order.coupon_code,
+            offer_id: order.offer_id,
+            offer_name: order.offer?.name,
+            campaign_name: 'Campaign Offer',
+            remaining_uses: 0,
+          });
+
+          const phone = order.customer_phone || order.customer?.phone || '';
+          campaignService.validateCoupon(
+            order.coupon_code.trim().toUpperCase(),
+            order.customer_id,
+            phone
+          ).then((couponRes) => {
+            if (couponRes && couponRes.valid && couponRes.data) {
+              setVerifiedCouponData(couponRes.data);
+            }
+          }).catch(() => {
+            // Keep fallback on error
+          });
+        }
+
       }
     } catch (error) {
       toast.error('Failed to load order data');
@@ -773,6 +954,13 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
     setSelectedOffer(null);
     setAvailableOffers([]);
     appliedOfferRef.current = null;
+    setCouponCode('');
+    setIsCouponVerified(false);
+    setVerifiedCouponData(null);
+    setCouponError('');
+    setPointsToRedeem('');
+    setLoyaltySummary(null);
+    setMaxRedeemablePoints(0);
   };
 
   // Close handler
@@ -821,6 +1009,11 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
       // Validate time range
       if (bookingTimeFrom && bookingTimeTo && bookingTimeFrom >= bookingTimeTo) {
         stepErrors.bookingTimeTo = 'End time must be after start time';
+      }
+
+      // Validate coupon requirements
+      if (selectedOffer && selectedOffer.coupon_required && !isCouponVerified) {
+        stepErrors.coupon = 'A verified coupon is required for the selected offer';
       }
     }
 
@@ -1029,13 +1222,16 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
     const addonTotal = addonItems.reduce((sum, item) => sum + calculateLineTotal(item), 0);
     const subtotal = packageTotal + addonTotal;
 
-    // Apply offer discount if selected
+    // Apply offer discount if selected (and verified if coupon is required)
     let offerDiscount = 0;
     if (selectedOffer) {
-      if (selectedOffer.discount_type === 'fixed') {
-        offerDiscount = selectedOffer.discount_value;
-      } else if (selectedOffer.discount_type === 'percentage') {
-        offerDiscount = (subtotal * selectedOffer.discount_value) / 100;
+      const isEligible = !selectedOffer.coupon_required || isCouponVerified;
+      if (isEligible) {
+        if (selectedOffer.discount_type === 'fixed') {
+          offerDiscount = selectedOffer.discount_value;
+        } else if (selectedOffer.discount_type === 'percentage') {
+          offerDiscount = (subtotal * selectedOffer.discount_value) / 100;
+        }
       }
     }
 
@@ -1232,6 +1428,7 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
         booking_time_to: bookingTimeToISO,
         assigned_to_id: selectedAgent && selectedAgent !== 'unassigned' ? parseInt(selectedAgent, 10) : null,
         offer_id: selectedOffer ? parseInt(selectedOffer.id, 10) : null,
+        coupon_code: isCouponVerified ? couponCode.trim().toUpperCase() : undefined,
         points_redeemed: pointsToRedeem || 0,
         notes,
         packages: packageItems.map((item) => ({
@@ -1324,345 +1521,239 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
   const renderStep1 = () => (
     <div className="space-y-4">
       {renderOtherStepErrors()}
-      <div>
-        <Label>Select Customer *</Label>
-        <div className="relative" ref={customerSearchRef}>
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search customer by name or phone..."
-              value={selectedCustomer ? `${selectedCustomer.name} - ${selectedCustomer.phone}` : customerSearchTerm}
-              onChange={(e) => {
-                const value = e.target.value;
-                setCustomerSearchTerm(value);
-                setSelectedCustomer(null);
-              }}
-              onFocus={() => {
-                if (customerSearchTerm.length >= 2) {
-                  setShowCustomerSuggestions(true);
-                }
-              }}
-              className="pl-10"
-              disabled={!!orderId}
-            />
-            {customerSearchLoading && (
-              <Loader2 className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />
-            )}
+
+      {/* Customer Search */}
+      <div className="rounded-xl border bg-card shadow-sm">
+        <div className="flex items-center gap-2 px-4 pt-4 pb-3 border-b">
+          <div className="flex items-center justify-center w-7 h-7 rounded-lg bg-primary/10">
+            <Search className="h-4 w-4 text-primary" />
           </div>
-
-          {/* Suggestions Dropdown */}
-          {showCustomerSuggestions && customerSearchTerm.length >= 2 && (
-            <Card className="absolute bg-white z-50 w-full mt-1 max-h-64 overflow-y-auto shadow-lg border border-gray-100">
-              {customerSearchLoading ? (
-                <div className="p-4 text-center text-sm text-muted-foreground">
-                  <Loader2 className="h-4 w-4 animate-spin mx-auto mb-2" />
-                  Searching...
-                </div>
-              ) : customers.length > 0 ? (
-                <div className="py-1">
-                  {(() => {
-                    const getCustomerScore = (customer, term) => {
-                      if (!term) return 0;
-                      const cleanTerm = term.toLowerCase().trim();
-                      const name = (customer.name || '').toLowerCase();
-                      const phone = (customer.phone || '').toLowerCase();
-
-                      if (name === cleanTerm || phone === cleanTerm) return 100;
-                      if (name.startsWith(cleanTerm) || phone.startsWith(cleanTerm)) return 80;
-                      if (name.includes(cleanTerm) || phone.includes(cleanTerm)) return 50;
-                      return 10;
-                    };
-
-                    const scoredCustomers = customers.map(c => ({
-                      ...c,
-                      score: getCustomerScore(c, customerSearchTerm)
-                    }));
-
-                    const bestMatches = scoredCustomers.filter(c => c.score >= 80);
-                    const otherMatches = scoredCustomers.filter(c => c.score < 80);
-
-                    const renderCustomerRow = (customer) => (
-                      <button
-                        key={customer.id}
-                        type="button"
-                        className="w-full px-4 py-2.5 text-left hover:bg-secondary active:bg-secondary/80 active:scale-[0.99] transition-all flex flex-col border-b last:border-b-0 border-gray-50"
-                        onClick={() => {
-                          setSelectedCustomer(customer);
-                          setCustomerPhone(customer.phone || ''); // Initialize order-specific phone
-                          setCustomerSearchTerm('');
-                          setShowCustomerSuggestions(false);
-                          setAddress({
-                            area: customer.area || '',
-                            city: customer.city || '',
-                            district: customer.district || '',
-                            state: customer.state || '',
-                            map_link: customer.map_link || '',
-                          });
-                          saveDraft();
-                        }}
-                      >
-                        <div className="font-medium text-gray-900 text-sm">{customer.name}</div>
-                        <div className="text-xs text-muted-foreground flex items-center gap-1.5 mt-0.5">
-                          <Phone className="h-3 w-3 text-gray-400" />
-                          {customer.phone}
-                          {customer.area && (
-                            <>
-                              <span>•</span>
-                              <MapPin className="h-3 w-3 text-gray-400" />
-                              {customer.area}
-                            </>
-                          )}
-                        </div>
-                      </button>
-                    );
-
-                    return (
-                      <>
-                        {bestMatches.length > 0 && (
-                          <div>
-                            <div className="px-3 py-1 text-[10px] font-bold text-emerald-700 bg-emerald-50/70 uppercase tracking-wider">
-                              Best Matches
-                            </div>
-                            <div className="divide-y divide-gray-50">
-                              {bestMatches.map(renderCustomerRow)}
-                            </div>
-                          </div>
-                        )}
-                        {otherMatches.length > 0 && (
-                          <div>
-                            <div className="px-3 py-1 text-[10px] font-bold text-gray-500 bg-gray-50 uppercase tracking-wider border-t border-gray-100">
-                              Other Matches
-                            </div>
-                            <div className="divide-y divide-gray-50">
-                              {otherMatches.map(renderCustomerRow)}
-                            </div>
-                          </div>
-                        )}
-                      </>
-                    );
-                  })()}
-                </div>
-              ) : (
-                <div className="p-6 text-center">
-                  <p className="text-sm text-muted-foreground mb-3">
-                    No customers found matching "{customerSearchTerm}"
-                  </p>
-                  <Button
-                    type="button"
-                    size="sm"
-                    onClick={() => {
-                      setShowCustomerSuggestions(false);
-                      // Check if search term looks like a phone number (digits, spaces, +, -, parentheses)
-                      const phonePattern = /^[\d\s+\-()]+$/;
-                      const isPhone = phonePattern.test(customerSearchTerm.trim());
-
-                      if (isPhone) {
-                        // Prefill phone number
-                        setNewCustomerInitialData({ phone: customerSearchTerm.trim() });
-                      } else {
-                        setNewCustomerInitialData(null);
-                      }
-                      setShowCustomerForm(true);
-                    }}
-                    className="gap-2"
-                  >
-                    <Plus className="h-4 w-4" />
-                    Create New Customer
-                  </Button>
-                </div>
-              )}
-            </Card>
-          )}
+          <span className="font-semibold text-sm">Select Customer</span>
+          <span className="text-red-500 text-xs font-bold ml-0.5">*</span>
         </div>
-        {errors.customer && <p className="text-sm text-destructive mt-1">{errors.customer}</p>}
-      </div>
-
-      {selectedCustomer && (
-        <Card className="p-4 bg-secondary/50">
-          <div className="flex justify-between items-start">
-            <div className="space-y-2 text-sm flex-1">
-              <div><strong>Name:</strong> {selectedCustomer.name}</div>
-
-              {editingCustomer ? (
-                <div className='grid grid-cols-2 gap-2 '>
-                  <div>
-                    <Label className="text-xs">Phone (Order-specific)</Label>
-                    <Input
-                      value={editCustomerData.phone}
-                      onChange={(e) => setEditCustomerData({ ...editCustomerData, phone: e.target.value })}
-                      placeholder="Phone number"
-                      className="h-8"
-                    />
-                  </div>
-                  <div className="flex gap-2 pt-5">
-                    <Button
-                      type="button"
-                      size="sm"
-                      onClick={() => {
-                        setCustomerPhone(editCustomerData.phone);
-                        setAddress({
-                          ...address,
-                          area: editCustomerData.area || address.area,
-                          city: editCustomerData.city || address.city,
-                        });
-                        setEditingCustomer(false);
-                        saveDraft();
-                        toast.success('Order details updated');
-                      }}
-                    >
-                      <Check className="h-3 w-3 mr-1" />
-                      Save
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        setEditingCustomer(false);
-                        setEditCustomerData({ phone: '', area: '', city: '' });
-                      }}
-                    >
-                      Cancel
-                    </Button>
-                  </div>
-                </div>
-              ) : (
-                <>
-                  <div>
-                    <strong>Phone:</strong> {customerPhone || selectedCustomer.phone}
-                    {customerPhone && customerPhone !== selectedCustomer.phone && (
-                      <span className="text-xs text-muted-foreground ml-2">(Order-specific)</span>
-                    )}
-                  </div>
-                </>
+        <div className="p-4 space-y-3">
+          <div className="relative" ref={customerSearchRef}>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search by name or phone..."
+                value={selectedCustomer ? `${selectedCustomer.name} — ${selectedCustomer.phone}` : customerSearchTerm}
+                onChange={(e) => { setCustomerSearchTerm(e.target.value); setSelectedCustomer(null); }}
+                onFocus={() => { if (customerSearchTerm.length >= 2) setShowCustomerSuggestions(true); }}
+                className="pl-10 h-11 text-sm"
+                disabled={!!orderId}
+              />
+              {customerSearchLoading && (
+                <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />
               )}
             </div>
-            <div className="flex gap-1">
+
+            {showCustomerSuggestions && customerSearchTerm.length >= 2 && (
+              <Card className="absolute bg-white z-50 w-full mt-1 max-h-64 overflow-y-auto shadow-lg border border-gray-100">
+                {customerSearchLoading ? (
+                  <div className="p-4 text-center text-sm text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin mx-auto mb-2" />
+                    Searching...
+                  </div>
+                ) : customers.length > 0 ? (
+                  <div className="py-1">
+                    {(() => {
+                      const getScore = (c, term) => {
+                        const t = term.toLowerCase().trim();
+                        const n = (c.name || '').toLowerCase();
+                        const p = (c.phone || '').toLowerCase();
+                        if (n === t || p === t) return 100;
+                        if (n.startsWith(t) || p.startsWith(t)) return 80;
+                        if (n.includes(t) || p.includes(t)) return 50;
+                        return 10;
+                      };
+                      const scored = customers.map(c => ({ ...c, score: getScore(c, customerSearchTerm) }));
+                      const best = scored.filter(c => c.score >= 80);
+                      const others = scored.filter(c => c.score < 80);
+                      const renderRow = (customer) => (
+                        <button
+                          key={customer.id}
+                          type="button"
+                          className="w-full px-4 py-3 text-left hover:bg-secondary active:bg-secondary/80 transition-all flex flex-col border-b last:border-b-0 border-gray-50"
+                          onClick={() => {
+                            setSelectedCustomer(customer);
+                            setCustomerPhone(customer.phone || '');
+                            setCustomerSearchTerm('');
+                            setShowCustomerSuggestions(false);
+                            setAddress({ area: customer.area || '', city: customer.city || '', district: customer.district || '', state: customer.state || '', map_link: customer.map_link || '' });
+                            saveDraft();
+                          }}
+                        >
+                          <div className="font-semibold text-gray-900 text-sm">{customer.name}</div>
+                          <div className="text-xs text-muted-foreground flex items-center gap-1.5 mt-0.5">
+                            <Phone className="h-3 w-3 text-gray-400" />
+                            {customer.phone}
+                            {customer.area && <><span>•</span><MapPin className="h-3 w-3 text-gray-400" />{customer.area}</>}
+                          </div>
+                        </button>
+                      );
+                      return (
+                        <>
+                          {best.length > 0 && (
+                            <div>
+                              <div className="px-3 py-1 text-[10px] font-bold text-emerald-700 bg-emerald-50/70 uppercase tracking-wider">Best Matches</div>
+                              {best.map(renderRow)}
+                            </div>
+                          )}
+                          {others.length > 0 && (
+                            <div>
+                              <div className="px-3 py-1 text-[10px] font-bold text-gray-500 bg-gray-50 uppercase tracking-wider border-t border-gray-100">Other Matches</div>
+                              {others.map(renderRow)}
+                            </div>
+                          )}
+                        </>
+                      );
+                    })()}
+                  </div>
+                ) : (
+                  <div className="p-6 text-center">
+                    <p className="text-sm text-muted-foreground mb-3">No customers found for "{customerSearchTerm}"</p>
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={() => {
+                        setShowCustomerSuggestions(false);
+                        const isPhone = /^[\d\s+\-()]+$/.test(customerSearchTerm.trim());
+                        setNewCustomerInitialData(isPhone ? { phone: customerSearchTerm.trim() } : null);
+                        setShowCustomerForm(true);
+                      }}
+                      className="gap-2"
+                    >
+                      <Plus className="h-4 w-4" />
+                      Create New Customer
+                    </Button>
+                  </div>
+                )}
+              </Card>
+            )}
+          </div>
+          {errors.customer && <p className="text-xs text-destructive font-medium">{errors.customer}</p>}
+        </div>
+      </div>
+
+      {/* Selected Customer Card */}
+      {selectedCustomer && (
+        <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
+          <div className="flex items-center gap-2 px-4 pt-4 pb-3 border-b">
+            <div className="flex items-center justify-center w-7 h-7 rounded-lg bg-green-100">
+              <User className="h-4 w-4 text-green-600" />
+            </div>
+            <span className="font-semibold text-sm text-green-800">Customer Selected</span>
+            <div className="ml-auto flex gap-1">
               {!editingCustomer && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => {
-                    setEditCustomerData({
-                      phone: customerPhone || selectedCustomer.phone || '',
-                      area: address.area || selectedCustomer.area || '',
-                      city: address.city || selectedCustomer.city || '',
-                    });
-                    setEditingCustomer(true);
-                  }}
-                  title="Edit details"
-                >
-                  <PenIcon className="h-4 w-4" />
+                <Button type="button" variant="ghost" size="sm" className="h-7 w-7 p-0"
+                  onClick={() => { setEditCustomerData({ phone: customerPhone || selectedCustomer.phone || '', area: address.area || selectedCustomer.area || '', city: address.city || selectedCustomer.city || '' }); setEditingCustomer(true); }}
+                  title="Edit details">
+                  <PenIcon className="h-3.5 w-3.5" />
                 </Button>
               )}
               {!orderId && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => {
-                    setSelectedCustomer(null);
-                    setCustomerSearchTerm('');
-                    setEditingCustomer(false);
-                  }}
-                >
-                  <X className="h-4 w-4" />
+                <Button type="button" variant="ghost" size="sm" className="h-7 w-7 p-0"
+                  onClick={() => { setSelectedCustomer(null); setCustomerSearchTerm(''); setEditingCustomer(false); }}>
+                  <X className="h-3.5 w-3.5" />
                 </Button>
               )}
             </div>
           </div>
-        </Card>
-      )}
-
-      <div className="space-y-3">
-
-        <div>
-          <Label className="text-xs">Map Link</Label>
-          <div className="relative">
-            <Input
-              value={address.map_link}
-              onChange={(e) => {
-                setAddress({ ...address, map_link: e.target.value });
-              }}
-              placeholder="Google Maps link"
-              disabled={mapLinkLoading}
-            />
-            {mapLinkLoading && (
-              <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-                <div className="h-4 w-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+          <div className="p-4">
+            {editingCustomer ? (
+              <div className="space-y-3">
+                <div>
+                  <Label className="text-xs text-muted-foreground font-medium">Phone (Order-specific)</Label>
+                  <Input
+                    value={editCustomerData.phone}
+                    onChange={(e) => setEditCustomerData({ ...editCustomerData, phone: e.target.value })}
+                    placeholder="Phone number"
+                    className="h-9 mt-1"
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <Button type="button" size="sm" onClick={() => { setCustomerPhone(editCustomerData.phone); setAddress({ ...address, area: editCustomerData.area || address.area, city: editCustomerData.city || address.city }); setEditingCustomer(false); saveDraft(); toast.success('Updated'); }}>
+                    <Check className="h-3 w-3 mr-1" /> Save
+                  </Button>
+                  <Button type="button" variant="outline" size="sm" onClick={() => { setEditingCustomer(false); setEditCustomerData({ phone: '', area: '', city: '' }); }}>
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-2">
+                  <span className="text-base font-bold">{selectedCustomer.name}</span>
+                </div>
+                <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                  <Phone className="h-3.5 w-3.5 shrink-0" />
+                  <span>{customerPhone || selectedCustomer.phone}</span>
+                  {customerPhone && customerPhone !== selectedCustomer.phone && (
+                    <span className="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-medium">Order-specific</span>
+                  )}
+                </div>
               </div>
             )}
           </div>
-          <p className="text-xs text-muted-foreground mt-1">
-            Paste Google Maps link to auto-fill address details
-          </p>
         </div>
+      )}
 
-        <div>
-          <Label className="text-xs flex items-center">Area
-
-          </Label>
-          <Input
-            value={address.area}
-            onChange={(e) => {
-              setAddress({ ...address, area: e.target.value });
-              setMapLinkError(false); // Clear error when user manually edits
-              saveDraft();
-            }}
-            placeholder="Area or locality"
-          />
-          {mapLinkLoading && (
-            <span className="text-blue-500 text-xs flex items-center gap-1 mt-2"><LoaderCircle className="h-3 w-3 mr-1 animate-spin" /> Identifying the Area from map link</span>
-          )}
-          {mapLinkError && !mapLinkLoading && (
-            <span className="text-amber-500 text-xs mt-2">Sorry!! Unable to find the location, please update manually</span>
-          )}
-          {errors.area && <p className="text-sm text-destructive mt-1">{errors.area}</p>}
-        </div>
-
-        {/* <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label className="text-xs">City</Label>
-              <Input
-                value={address.city}
-                onChange={(e) => {
-                  setAddress({ ...address, city: e.target.value });
-                  saveDraft();
-                }}
-                placeholder="City"
-              />
-            </div>
-            
-            <div>
-              <Label className="text-xs">District</Label>
-              <Input
-                value={address.district}
-                onChange={(e) => {
-                  setAddress({ ...address, district: e.target.value });
-                  saveDraft();
-                }}
-                placeholder="District"
-              />
-            </div>
+      {/* Address */}
+      <div className="rounded-xl border bg-card shadow-sm">
+        <div className="flex items-center gap-2 px-4 pt-4 pb-3 border-b">
+          <div className="flex items-center justify-center w-7 h-7 rounded-lg bg-orange-100">
+            <MapPin className="h-4 w-4 text-orange-600" />
           </div>
-          
+          <span className="font-semibold text-sm">Service Address</span>
+        </div>
+        <div className="p-4 space-y-3">
           <div>
-            <Label className="text-xs">State</Label>
+            <Label className="text-xs text-muted-foreground font-medium mb-1 block">Map Link</Label>
+            <div className="relative">
+              <Input
+                value={address.map_link}
+                onChange={(e) => setAddress({ ...address, map_link: e.target.value })}
+                placeholder="Paste Google Maps link..."
+                disabled={mapLinkLoading}
+                className={address.map_link ? "pr-10" : ""}
+              />
+              {mapLinkLoading ? (
+                <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                  <div className="h-4 w-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                </div>
+              ) : address.map_link ? (
+                <button type="button"
+                  onClick={() => { setAddress({ ...address, map_link: '', latitude: 0, longitude: 0, area: '', city: '', district: '', state: '' }); saveDraft(); }}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors p-1">
+                  <X className="h-4 w-4" />
+                </button>
+              ) : null}
+            </div>
+            {mapLinkLoading && (
+              <span className="text-blue-500 text-xs flex items-center gap-1 mt-1.5">
+                <LoaderCircle className="h-3 w-3 animate-spin" /> Identifying location from map link…
+              </span>
+            )}
+            {mapLinkError && !mapLinkLoading && (
+              <span className="text-amber-500 text-xs mt-1.5 block">Unable to find location — please update manually</span>
+            )}
+            <p className="text-[10px] text-muted-foreground mt-1">Paste a Google Maps link to auto-fill area</p>
+          </div>
+          <div>
+            <Label className="text-xs text-muted-foreground font-medium mb-1 block">Area / Locality</Label>
             <Input
-              value={address.state}
-              onChange={(e) => {
-                setAddress({ ...address, state: e.target.value });
-                saveDraft();
-              }}
-              placeholder="State"
+              value={address.area}
+              onChange={(e) => { setAddress({ ...address, area: e.target.value }); setMapLinkError(false); saveDraft(); }}
+              placeholder="e.g. Kakkanad, Ernakulam"
             />
-          </div> */}
-
-
+            {errors.area && <p className="text-xs text-destructive mt-1">{errors.area}</p>}
+          </div>
+        </div>
       </div>
     </div>
   );
+
 
   // Step 2: Package Selection (simplified for now)
   const renderStep2 = () => {
@@ -1671,219 +1762,163 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
     return (
       <div className="space-y-4">
         {renderOtherStepErrors()}
-        <div className="flex justify-between items-center">
-          <Label>Service Packages *</Label>
-          <Button type="button" size="sm" onClick={addPackageItem}>
-            <Plus className="h-4 w-4 mr-1" />
-            Add Package
-          </Button>
-        </div>
-
-        {errors.packages && <p className="text-sm text-destructive">{errors.packages}</p>}
 
         {hasRewardPackages && (
-          <div className="flex items-start gap-2 p-3 bg-green-50 border border-green-200 rounded-lg text-sm">
+          <div className="flex items-start gap-2 p-3 bg-green-50 border border-green-200 rounded-xl text-sm">
             <Info className="h-4 w-4 text-green-600 mt-0.5 shrink-0" />
             <div className="text-green-800">
-              <span className="font-medium">Offer rewards included:</span> Items marked with the "Offer Reward" badge are complimentary and cannot be modified or removed.
+              <span className="font-semibold">Offer rewards included:</span> Items marked with the "Offer Reward" badge are complimentary and cannot be modified or removed.
             </div>
           </div>
         )}
 
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="font-semibold text-sm">Service Packages</p>
+            <p className="text-[11px] text-muted-foreground">Add one or more wash packages</p>
+          </div>
+          <Button type="button" size="sm" onClick={addPackageItem} className="gap-1.5">
+            <Plus className="h-4 w-4" />
+            Add Package
+          </Button>
+        </div>
+
+        {errors.packages && <p className="text-xs text-destructive font-medium">{errors.packages}</p>}
+
         {packageItems.length === 0 ? (
-          <Card className="p-8 text-center">
-            <ShoppingCart className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-            <p className="text-muted-foreground mb-2">No packages added yet</p>
-            <p className="text-xs text-muted-foreground mb-4">Add service packages to proceed with the order</p>
-            <Button type="button" variant="outline" size="sm" onClick={addPackageItem}>
-              <Plus className="h-4 w-4 mr-2" />
+          <div className="rounded-xl border-2 border-dashed border-muted-foreground/20 bg-muted/20 p-10 text-center">
+            <ShoppingCart className="h-10 w-10 mx-auto text-muted-foreground/40 mb-3" />
+            <p className="font-medium text-muted-foreground mb-1">No packages added</p>
+            <p className="text-xs text-muted-foreground mb-4">Add a service package to continue</p>
+            <Button type="button" variant="outline" size="sm" onClick={addPackageItem} className="gap-2">
+              <Plus className="h-4 w-4" />
               Add Service Package
             </Button>
-          </Card>
+          </div>
         ) : (
-          <div className="space-y-4">
+          <div className="space-y-3">
             {packageItems.map((item, index) => {
               const hasError = errors[`package_${index}_vehicle_type`] || errors[`package_${index}_package`];
               return (
-                <Card key={index} className={`p-4 ${item.is_reward ? 'bg-green-50 border-green-200' : ''}`}>
-                  <div className="space-y-4">
-                    <div className="flex justify-between items-center">
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium">Service {index + 1}</span>
-                        {item.is_reward && (
-                          <div className="flex items-center gap-1 px-2 py-0.5 bg-green-600 text-white text-xs rounded-full">
-                            <Gift className="h-3 w-3" />
-                            <span>Offer Reward</span>
-                          </div>
-                        )}
-                      </div>
-                      <div className='flex gap-2 items-center'>
-                        {!item.is_reward && (
-                          <>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              className="h-6 text-xs cursor-pointer"
-                              onClick={() => {
-                                setIdentifyDialog({ open: true, index });
-                                setIdentifyBrand('');
-                                setIdentifyModel('');
-                              }}
-                            >
-                              <Search className="h-3 w-3 mr-1" />
-                              Identify Vehicle Type
-                            </Button>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => setDeletePackageDialog({ open: true, index })}
-                            >
-                              <Trash2 className="h-4 w-4 text-destructive" />
-                            </Button>
-                          </>
-                        )}
-                      </div>
+                <div key={index} className={`rounded-xl border bg-card shadow-sm overflow-hidden ${item.is_reward ? 'border-green-200' : ''}`}>
+                  {/* Card Header */}
+                  <div className={`flex items-center gap-2 px-4 pt-3.5 pb-3 border-b ${item.is_reward ? 'bg-green-50' : 'bg-muted/30'}`}>
+                    <Package className="h-4 w-4 text-muted-foreground" />
+                    <span className="font-semibold text-sm">Service {index + 1}</span>
+                    {item.is_reward && (
+                      <span className="flex items-center gap-1 px-2 py-0.5 bg-green-600 text-white text-[10px] rounded-full font-bold">
+                        <Gift className="h-3 w-3" /> Offer Reward
+                      </span>
+                    )}
+                    <div className="ml-auto flex gap-1">
+                      {!item.is_reward && (
+                        <>
+                          <Button type="button" variant="ghost" size="sm" className="h-7 text-xs gap-1"
+                            onClick={() => { setIdentifyDialog({ open: true, index }); setIdentifyBrand(''); setIdentifyModel(''); }}>
+                            <Search className="h-3 w-3" />
+                            <span className="hidden sm:inline">Identify</span>
+                          </Button>
+                          <Button type="button" variant="ghost" size="sm" className="h-7 w-7 p-0"
+                            onClick={() => setDeletePackageDialog({ open: true, index })}>
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </>
+                      )}
                     </div>
+                  </div>
 
+                  <div className="p-4 space-y-4">
                     {hasError && (
-                      <div className="flex items-center gap-2 text-destructive text-sm bg-destructive/10 p-2 rounded">
-                        <X className="h-4 w-4" />
-                        <span>
-                          {errors[`package_${index}_vehicle_type`] && 'Vehicle type is required. '}
-                          {errors[`package_${index}_package`] && 'Package selection is required.'}
-                        </span>
+                      <div className="flex items-center gap-2 text-destructive text-xs bg-destructive/10 px-3 py-2 rounded-lg">
+                        <X className="h-3.5 w-3.5 shrink-0" />
+                        {errors[`package_${index}_vehicle_type`] && 'Vehicle type is required. '}
+                        {errors[`package_${index}_package`] && 'Package selection is required.'}
                       </div>
                     )}
 
-                    <div className="space-y-3">
-                      <div>
-                        <div className={`flex gap-2 `}>
-                          {['hatchback', 'sedan', 'suv', 'luxury'].map((type) => (
-                            <Button
-                              key={type}
-                              type="button"
-                              variant={item.vehicle_type === type ? 'default' : 'outline'}
-                              size="sm"
-                              className="flex-1 h-12 flex flex-col md:flex-row items-center justify-center gap-0  md:gap-2 rounded-lg cursor-pointer active:scale-[0.95] transition-all"
-                              onClick={() => updatePackageItem(index, 'vehicle_type', type)}
-                              disabled={item.is_reward}
-                            >
-                              <VehicleIcon vehicleType={type} size={32} className={item.vehicle_type === type ? 'text-white' : 'text-black'} />
-                              <span className="text-xs capitalize font-semibold -mt-2 md:mt-0">{type}</span>
-                            </Button>
-                          ))}
-                        </div>
+                    {/* Vehicle Type Selector */}
+                    <div>
+                      <Label className="text-xs text-muted-foreground font-medium mb-2 block">Vehicle Type</Label>
+                      <div className="grid grid-cols-4 gap-1.5">
+                        {['hatchback', 'sedan', 'suv', 'luxury'].map((type) => (
+                          <button
+                            key={type}
+                            type="button"
+                            onClick={() => updatePackageItem(index, 'vehicle_type', type)}
+                            disabled={item.is_reward}
+                            className={`flex flex-col items-center justify-center gap-1 p-2 rounded-xl border-2 transition-all active:scale-95 ${item.vehicle_type === type
+                              ? 'border-primary bg-primary text-white shadow-md'
+                              : 'border-muted-foreground/20 bg-background hover:border-primary/40 hover:bg-primary/5'
+                              }`}
+                          >
+                            <VehicleIcon vehicleType={type} size={28} className={item.vehicle_type === type ? 'text-white' : 'text-foreground'} />
+                            <span className="text-[10px] font-bold capitalize leading-none">{type}</span>
+                          </button>
+                        ))}
                       </div>
+                    </div>
 
-                      <div className="flex items-end gap-3">
-                        <div className="flex-grow min-w-0">
-                          <Label className="text-xs">Package *</Label>
-                          <div>
-                            <Select
-                              value={item.package_id}
-                              onValueChange={(value) => updatePackageItem(index, 'package_id', value)}
-                              disabled={!item.vehicle_type || item.is_reward}
-                            >
-                              <SelectTrigger className="h-8 text-sm w-full">
-                                <SelectValue placeholder="Select package" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {packages
-                                  .filter((p) => p.vehicle_type?.toLowerCase() === item.vehicle_type?.toLowerCase())
-                                  .map((pkg) => (
-                                    <SelectItem key={pkg.id} value={String(pkg.id)}>
-                                      {pkg.name} - ₹{pkg.unit_price || pkg.price || pkg.base_price}
-                                    </SelectItem>
-                                  ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                        </div>
-
-                        <div className="shrink-0">
-                          <Label className="text-xs">Quantity *</Label>
-                          <div className="flex items-center gap-1">
-                            <Button
-                              type="button"
-                              size="icon"
-                              className="h-8 w-8  aspect-square rounded-full"
-                              onClick={() => {
-                                const newQty = Math.max(1, item.quantity - 1);
-                                updatePackageItem(index, 'quantity', newQty);
-                              }}
-                              disabled={item.quantity <= 1 || item.is_reward}
-                            >
-                              <Minus className="h-3 w-3" />
-                            </Button>
-                            <Input
-                              type="number"
-                              min="1"
-                              value={item.quantity}
-                              readOnly
-                              className="h-8 text-sm text-center bg-secondary w-[40px] md:w-[100px]"
-                            />
-                            <Button
-                              type="button"
-                              size="icon"
-                              className="h-8 w-8 aspect-square rounded-full"
-                              onClick={() => {
-                                updatePackageItem(index, 'quantity', item.quantity + 1);
-                              }}
-                              disabled={item.is_reward}
-                            >
-                              <Plus className="h-3 w-3" />
-                            </Button>
-                          </div>
+                    {/* Package + Quantity Row */}
+                    <div className="flex items-end gap-3">
+                      <div className="flex-1 min-w-0">
+                        <Label className="text-xs text-muted-foreground font-medium mb-1 block">Package *</Label>
+                        <Select
+                          value={item.package_id}
+                          onValueChange={(v) => updatePackageItem(index, 'package_id', v)}
+                          disabled={!item.vehicle_type || item.is_reward}
+                        >
+                          <SelectTrigger className="h-9 text-sm w-full">
+                            <SelectValue placeholder={item.vehicle_type ? "Select package" : "Select vehicle type first"} />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {packages.filter((p) => p.vehicle_type?.toLowerCase() === item.vehicle_type?.toLowerCase())
+                              .map((pkg) => (
+                                <SelectItem key={pkg.id} value={String(pkg.id)}>
+                                  {pkg.name} — ₹{pkg.unit_price || pkg.price || pkg.base_price}
+                                </SelectItem>
+                              ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="shrink-0">
+                        <Label className="text-xs text-muted-foreground font-medium mb-1 block">Qty</Label>
+                        <div className="flex items-center gap-1">
+                          <Button type="button" size="icon" className="h-9 w-9 rounded-full"
+                            onClick={() => updatePackageItem(index, 'quantity', Math.max(1, item.quantity - 1))}
+                            disabled={item.quantity <= 1 || item.is_reward}>
+                            <Minus className="h-3.5 w-3.5" />
+                          </Button>
+                          <span className="w-8 text-center font-bold text-sm">{item.quantity}</span>
+                          <Button type="button" size="icon" className="h-9 w-9 rounded-full"
+                            onClick={() => updatePackageItem(index, 'quantity', item.quantity + 1)}
+                            disabled={item.is_reward}>
+                            <Plus className="h-3.5 w-3.5" />
+                          </Button>
                         </div>
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <div className="flex items-center space-x-2 mb-1">
+                    {/* Discount + Amount Row */}
+                    <div className="flex items-end justify-between gap-3">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1.5">
                           <Checkbox
                             id={`pkg-discount-enable-${index}`}
                             checked={item.enable_custom_discount || false}
                             disabled={item.is_reward}
-                            onCheckedChange={(checked) => {
-                              updatePackageItem(index, 'enable_custom_discount', !!checked);
-                              if (!checked) {
-                                // Clear the discount value if disabled
-                                updatePackageItem(index, 'discount_value', 0);
-                              }
-                            }}
+                            onCheckedChange={(checked) => { updatePackageItem(index, 'enable_custom_discount', !!checked); if (!checked) updatePackageItem(index, 'discount_value', 0); }}
                           />
-                          <label
-                            htmlFor={`pkg-discount-enable-${index}`}
-                            className="text-[10px] font-medium text-gray-600 cursor-pointer select-none"
-                          >
-                            Enable Custom Discount
-                          </label>
+                          <label htmlFor={`pkg-discount-enable-${index}`} className="text-[10px] font-medium text-gray-600 cursor-pointer">Custom Discount</label>
                         </div>
                         <div className="flex gap-1">
-                          <Input
-                            type="number"
-                            min="0"
-                            placeholder="0"
+                          <Input type="number" min="0" placeholder="0"
                             value={item.discount_value || ''}
-                            onChange={(e) => {
-                              const value = e.target.value;
-                              const numValue = value === '' ? 0 : parseFloat(value);
-                              updatePackageItem(index, 'discount_value', isNaN(numValue) ? 0 : numValue);
-                            }}
+                            onChange={(e) => { const v = e.target.value; const n = v === '' ? 0 : parseFloat(v); updatePackageItem(index, 'discount_value', isNaN(n) ? 0 : n); }}
                             className="h-8 text-sm"
                             disabled={item.is_reward || !item.enable_custom_discount}
                           />
-                          <Select
-                            value={item.discount_type}
-                            onValueChange={(value) => updatePackageItem(index, 'discount_type', value)}
-                            disabled={item.is_reward || !item.enable_custom_discount}
-                          >
-                            <SelectTrigger className="h-8 w-16 text-xs">
-                              <SelectValue />
-                            </SelectTrigger>
+                          <Select value={item.discount_type} onValueChange={(v) => updatePackageItem(index, 'discount_type', v)} disabled={item.is_reward || !item.enable_custom_discount}>
+                            <SelectTrigger className="h-8 w-14 text-xs"><SelectValue /></SelectTrigger>
                             <SelectContent>
                               <SelectItem value={DISCOUNT_TYPES.FIXED}>₹</SelectItem>
                               <SelectItem value={DISCOUNT_TYPES.PERCENTAGE}>%</SelectItem>
@@ -1891,16 +1926,13 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
                           </Select>
                         </div>
                       </div>
-
-                      <div className='text-right'>
-                        <Label className="text-sm">Package Amount</Label>
-                        <h2 className="h-8 text-2xl font-bold">
-                          {`₹${calculateLineTotal(item).toFixed(2)}`}
-                        </h2>
+                      <div className="text-right shrink-0">
+                        <p className="text-[10px] text-muted-foreground font-medium mb-0.5">Amount</p>
+                        <p className="text-2xl font-black text-primary leading-none">₹{calculateLineTotal(item).toFixed(0)}</p>
                       </div>
                     </div>
                   </div>
-                </Card>
+                </div>
               );
             })}
           </div>
@@ -1908,6 +1940,7 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
       </div>
     );
   };
+
 
   // Step 3: Add-ons (similar to packages but simpler)
   const renderStep3 = () => {
@@ -1918,176 +1951,119 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
         {renderOtherStepErrors()}
 
         {hasRewardAddons && (
-          <div className="flex items-start gap-2 p-3 bg-green-50 border border-green-200 rounded-lg text-sm">
+          <div className="flex items-start gap-2 p-3 bg-green-50 border border-green-200 rounded-xl text-sm">
             <Info className="h-4 w-4 text-green-600 mt-0.5 shrink-0" />
             <div className="text-green-800">
-              <span className="font-medium">Offer rewards included:</span> Items marked with the "Offer Reward" badge are complimentary and cannot be modified or removed.
+              <span className="font-semibold">Offer rewards included:</span> Items marked with the "Offer Reward" badge are complimentary and cannot be modified or removed.
             </div>
           </div>
         )}
 
-        <div className="flex justify-between items-center">
+        <div className="flex items-center justify-between">
           <div>
-            <Label>Add-on Services (Optional)</Label>
-            <p className="text-xs text-muted-foreground">Additional services for the order</p>
+            <p className="font-semibold text-sm">Add-on Services</p>
+            <p className="text-[11px] text-muted-foreground">Optional extra services</p>
           </div>
-          <Button type="button" size="sm" onClick={addAddonItem}>
-            <Plus className="h-4 w-4 mr-1" />
+          <Button type="button" size="sm" onClick={addAddonItem} className="gap-1.5">
+            <Plus className="h-4 w-4" />
             Add Add-on
           </Button>
         </div>
 
         {addonItems.length === 0 ? (
-          <Card className="p-8 text-center">
-            <ShoppingCart className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-            <p className="text-muted-foreground">No add-ons selected</p>
-            <Button type="button" variant="outline" size="sm" className="mt-4" onClick={addAddonItem}>
-              <Plus className="h-4 w-4 mr-2" />
+          <div className="rounded-xl border-2 border-dashed border-muted-foreground/20 bg-muted/20 p-10 text-center">
+            <ShoppingCart className="h-10 w-10 mx-auto text-muted-foreground/40 mb-3" />
+            <p className="font-medium text-muted-foreground mb-1">No add-ons selected</p>
+            <p className="text-xs text-muted-foreground mb-4">Add-ons are optional — you can skip this step</p>
+            <Button type="button" variant="outline" size="sm" onClick={addAddonItem} className="gap-2">
+              <Plus className="h-4 w-4" />
               Add First Add-on
             </Button>
-          </Card>
+          </div>
         ) : (
-          <div className="space-y-4">
+          <div className="space-y-3">
             {addonItems.map((item, index) => {
               const hasError = errors[`addon_${index}_addon`];
               return (
-                <Card key={index} className={`p-4 ${item.is_reward ? 'bg-green-50 border-green-200' : ''}`}>
-                  <div className="space-y-3">
-                    <div className="flex justify-between items-start">
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium">Add-on {index + 1}</span>
-                        {item.is_reward && (
-                          <div className="flex items-center gap-1 px-2 py-0.5 bg-green-600 text-white text-xs rounded-full">
-                            <Gift className="h-3 w-3" />
-                            <span>Offer Reward</span>
-                          </div>
-                        )}
-                      </div>
-                      {!item.is_reward && (
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => removeAddonItem(index)}
-                        >
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
-                      )}
-                    </div>
+                <div key={index} className={`rounded-xl border bg-card shadow-sm overflow-hidden ${item.is_reward ? 'border-green-200' : ''}`}>
+                  <div className={`flex items-center gap-2 px-4 pt-3.5 pb-3 border-b ${item.is_reward ? 'bg-green-50' : 'bg-muted/30'}`}>
+                    <ShoppingCart className="h-4 w-4 text-muted-foreground" />
+                    <span className="font-semibold text-sm">Add-on {index + 1}</span>
+                    {item.is_reward && (
+                      <span className="flex items-center gap-1 px-2 py-0.5 bg-green-600 text-white text-[10px] rounded-full font-bold">
+                        <Gift className="h-3 w-3" /> Offer Reward
+                      </span>
+                    )}
+                    {!item.is_reward && (
+                      <Button type="button" variant="ghost" size="sm" className="ml-auto h-7 w-7 p-0"
+                        onClick={() => removeAddonItem(index)}>
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    )}
+                  </div>
 
+                  <div className="p-4 space-y-4">
                     {hasError && (
-                      <div className="flex items-center gap-2 text-destructive text-sm bg-destructive/10 p-2 rounded">
-                        <X className="h-4 w-4" />
-                        <span>Add-on selection is required</span>
+                      <div className="flex items-center gap-2 text-destructive text-xs bg-destructive/10 px-3 py-2 rounded-lg">
+                        <X className="h-3.5 w-3.5 shrink-0" />
+                        Add-on selection is required
                       </div>
                     )}
 
                     <div className="flex items-end gap-3">
-                      <div className="flex-grow min-w-0">
-                        <Label className="text-xs">Add-on Service *</Label>
-                        <div>
-                          <Select
-                            value={item.addon_id}
-                            onValueChange={(value) => updateAddonItem(index, 'addon_id', value)}
-                            disabled={item.is_reward}
-                          >
-                            <SelectTrigger className="h-8 text-sm w-full">
-                              <SelectValue placeholder="Select add-on" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {addons.map((addon) => (
-                                <SelectItem key={addon.id} value={String(addon.id)}>
-                                  {addon.name} - ₹{addon.unit_price || addon.price}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
+                      <div className="flex-1 min-w-0">
+                        <Label className="text-xs text-muted-foreground font-medium mb-1 block">Add-on Service *</Label>
+                        <Select value={item.addon_id} onValueChange={(v) => updateAddonItem(index, 'addon_id', v)} disabled={item.is_reward}>
+                          <SelectTrigger className="h-9 text-sm w-full">
+                            <SelectValue placeholder="Select add-on" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {addons.map((addon) => (
+                              <SelectItem key={addon.id} value={String(addon.id)}>
+                                {addon.name} — ₹{addon.unit_price || addon.price}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       </div>
-
                       <div className="shrink-0">
-                        <Label className="text-xs">Quantity *</Label>
+                        <Label className="text-xs text-muted-foreground font-medium mb-1 block">Qty</Label>
                         <div className="flex items-center gap-1">
-                          <Button
-                            type="button"
-                            size="icon"
-                            className="h-8 w-8 rounded-full aspect-square"
-                            onClick={() => {
-                              const newQty = Math.max(1, item.quantity - 1);
-                              updateAddonItem(index, 'quantity', newQty);
-                            }}
-                            disabled={item.quantity <= 1 || item.is_reward}
-                          >
-                            <Minus className="h-3 w-3" />
+                          <Button type="button" size="icon" className="h-9 w-9 rounded-full"
+                            onClick={() => updateAddonItem(index, 'quantity', Math.max(1, item.quantity - 1))}
+                            disabled={item.quantity <= 1 || item.is_reward}>
+                            <Minus className="h-3.5 w-3.5" />
                           </Button>
-                          <Input
-                            type="number"
-                            min="1"
-                            value={item.quantity}
-                            readOnly
-                            className="h-8 text-sm text-center bg-secondary w-[40px] md:w-[100px]"
-                          />
-                          <Button
-                            type="button"
-                            size="icon"
-                            className="h-8 w-8 rounded-full aspect-square"
-                            onClick={() => {
-                              updateAddonItem(index, 'quantity', item.quantity + 1);
-                            }}
-                            disabled={item.is_reward}
-                          >
-                            <Plus className="h-3 w-3" />
+                          <span className="w-8 text-center font-bold text-sm">{item.quantity}</span>
+                          <Button type="button" size="icon" className="h-9 w-9 rounded-full"
+                            onClick={() => updateAddonItem(index, 'quantity', item.quantity + 1)}
+                            disabled={item.is_reward}>
+                            <Plus className="h-3.5 w-3.5" />
                           </Button>
                         </div>
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-3 mt-3">
-
-
-                      <div>
-                        <div className="flex items-center space-x-2 mb-1">
+                    <div className="flex items-end justify-between gap-3">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1.5">
                           <Checkbox
                             id={`addon-discount-enable-${index}`}
                             checked={item.enable_custom_discount || false}
                             disabled={item.is_reward}
-                            onCheckedChange={(checked) => {
-                              updateAddonItem(index, 'enable_custom_discount', !!checked);
-                              if (!checked) {
-                                // Clear the discount value if disabled
-                                updateAddonItem(index, 'discount_value', 0);
-                              }
-                            }}
+                            onCheckedChange={(checked) => { updateAddonItem(index, 'enable_custom_discount', !!checked); if (!checked) updateAddonItem(index, 'discount_value', 0); }}
                           />
-                          <label
-                            htmlFor={`addon-discount-enable-${index}`}
-                            className="text-[10px] font-medium text-gray-600 cursor-pointer select-none"
-                          >
-                            Enable Custom Discount
-                          </label>
+                          <label htmlFor={`addon-discount-enable-${index}`} className="text-[10px] font-medium text-gray-600 cursor-pointer">Custom Discount</label>
                         </div>
                         <div className="flex gap-1">
-                          <Input
-                            type="number"
-                            min="0"
-                            placeholder="0"
+                          <Input type="number" min="0" placeholder="0"
                             value={item.discount_value || ''}
-                            onChange={(e) => {
-                              const value = e.target.value;
-                              const numValue = value === '' ? 0 : parseFloat(value);
-                              updateAddonItem(index, 'discount_value', isNaN(numValue) ? 0 : numValue);
-                            }}
+                            onChange={(e) => { const v = e.target.value; const n = v === '' ? 0 : parseFloat(v); updateAddonItem(index, 'discount_value', isNaN(n) ? 0 : n); }}
                             className="h-8 text-sm"
                             disabled={item.is_reward || !item.enable_custom_discount}
                           />
-                          <Select
-                            value={item.discount_type}
-                            onValueChange={(value) => updateAddonItem(index, 'discount_type', value)}
-                            disabled={item.is_reward || !item.enable_custom_discount}
-                          >
-                            <SelectTrigger className="h-8 w-16 text-xs">
-                              <SelectValue />
-                            </SelectTrigger>
+                          <Select value={item.discount_type} onValueChange={(v) => updateAddonItem(index, 'discount_type', v)} disabled={item.is_reward || !item.enable_custom_discount}>
+                            <SelectTrigger className="h-8 w-14 text-xs"><SelectValue /></SelectTrigger>
                             <SelectContent>
                               <SelectItem value={DISCOUNT_TYPES.FIXED}>₹</SelectItem>
                               <SelectItem value={DISCOUNT_TYPES.PERCENTAGE}>%</SelectItem>
@@ -2095,16 +2071,13 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
                           </Select>
                         </div>
                       </div>
-
-                      <div className='text-right'>
-                        <Label className="text-sm">Addon Amount</Label>
-                        <h2 className="h-8 text-2xl font-bold">
-                          {`₹${calculateLineTotal(item).toFixed(2)}`}
-                        </h2>
+                      <div className="text-right shrink-0">
+                        <p className="text-[10px] text-muted-foreground font-medium mb-0.5">Amount</p>
+                        <p className="text-2xl font-black text-primary leading-none">₹{calculateLineTotal(item).toFixed(0)}</p>
                       </div>
                     </div>
                   </div>
-                </Card>
+                </div>
               );
             })}
           </div>
@@ -2112,6 +2085,7 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
       </div>
     );
   };
+
 
   // Step 4: Booking Details
   const renderStep4 = () => {
@@ -2121,492 +2095,557 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
       <div className="space-y-4">
         {renderOtherStepErrors()}
         {submitError && (
-          <div className="flex items-start gap-3 p-4 bg-destructive/10 border border-destructive/20 rounded-lg">
+          <div className="flex items-start gap-3 p-4 bg-destructive/10 border border-destructive/20 rounded-xl">
             <AlertCircle className="h-5 w-5 text-destructive mt-0.5 flex-shrink-0" />
             <div className="flex-1">
-              <p className="text-sm font-medium text-destructive">Error submitting order</p>
-              <p className="text-sm text-destructive/90 mt-1">{submitError}</p>
+              <p className="text-sm font-semibold text-destructive">Submission Error</p>
+              <p className="text-sm text-destructive/80 mt-0.5">{submitError}</p>
             </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-6 w-6 p-0 hover:bg-destructive/20"
-              onClick={() => setSubmitError('')}
-            >
+            <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => setSubmitError('')}>
               <X className="h-4 w-4" />
             </Button>
           </div>
         )}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className='space-y-4'>
-            <div className='flex gap-2'>
-              <div className='w-35 md:w-50'>
-                <Label>Booking Date *</Label>
-                <DatePicker
-                  value={bookingDate}
-                  onChange={(value) => {
-                    setBookingDate(value);
-                    saveDraft();
-                  }}
-                />
-                {errors.bookingDate && <p className="text-sm text-destructive mt-1">{errors.bookingDate}</p>}
-              </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <Label>From *</Label>
-                  <Select
-                    value={bookingTimeFrom}
-                    onValueChange={(value) => {
-                      setBookingTimeFrom(value);
+        <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-5">
 
-                      // Auto-calculate toTime (60 minutes later)
-                      if (value) {
-                        const [hours, minutes] = value.split(':').map(Number);
-                        const fromDate = new Date();
-                        fromDate.setHours(hours, minutes);
-                        fromDate.setMinutes(fromDate.getMinutes() + 120);
-                        const toHours = String(fromDate.getHours()).padStart(2, '0');
-                        const toMinutes = String(fromDate.getMinutes()).padStart(2, '0');
-                        setBookingTimeTo(`${toHours}:${toMinutes}`);
-                      }
-                      saveDraft();
-                    }}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Pick time" />
-                    </SelectTrigger>
-                    <SelectContent className="max-h-60 overflow-y-auto">
-                      {generateTimeOptions().map((time) => (
-                        <SelectItem key={time.value} value={time.value}>
-                          {time.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  {errors.bookingTimeFrom && <p className="text-sm text-destructive mt-1">{errors.bookingTimeFrom}</p>}
+          {/* LEFT COLUMN */}
+          <div className="space-y-4">
+
+            {/* Booking Date & Time */}
+            <div className="rounded-xl border bg-card shadow-sm">
+              <div className="flex items-center gap-2 px-4 pt-4 pb-3 border-b">
+                <div className="flex items-center justify-center w-7 h-7 rounded-lg bg-primary/10">
+                  <Calendar className="h-4 w-4 text-primary" />
                 </div>
-
-                <div>
-                  <Label>To *</Label>
-                  <Select
-                    value={bookingTimeTo}
-                    onValueChange={(value) => {
-                      setBookingTimeTo(value);
-                      saveDraft();
-                    }}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Pick time" />
-                    </SelectTrigger>
-                    <SelectContent className="max-h-60 overflow-y-auto">
-                      {generateTimeOptions()
-                        .filter((time) => {
-                          // Must be after the "From" time
-                          if (bookingTimeFrom) {
-                            const [hours, minutes] = time.value.split(':').map(Number);
-                            const [fromHours, fromMinutes] = bookingTimeFrom.split(':').map(Number);
-                            const timeInMinutes = hours * 60 + minutes;
-                            const fromTimeInMinutes = fromHours * 60 + fromMinutes;
-                            return timeInMinutes > fromTimeInMinutes;
-                          }
-                          return true;
-                        })
-                        .map((time) => (
-                          <SelectItem key={time.value} value={time.value}>
-                            {time.label}
-                          </SelectItem>
-                        ))}
-                    </SelectContent>
-                  </Select>
-                  {errors.bookingTimeTo && <p className="text-sm text-destructive mt-1">{errors.bookingTimeTo}</p>}
+                <span className="font-semibold text-sm">Booking Schedule</span>
+              </div>
+              <div className="p-4 space-y-3">
+                <div className="grid grid-cols-1 sm:grid-cols-[auto_1fr] gap-3 items-start">
+                  <div className="sm:w-44">
+                    <Label className="text-xs text-muted-foreground font-medium mb-1 block">Date *</Label>
+                    <DatePicker
+                      value={bookingDate}
+                      onChange={(value) => { setBookingDate(value); saveDraft(); }}
+                    />
+                    {errors.bookingDate && <p className="text-xs text-destructive mt-1">{errors.bookingDate}</p>}
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <Label className="text-xs text-muted-foreground font-medium mb-1 block">From *</Label>
+                      <Select value={bookingTimeFrom} onValueChange={(value) => {
+                        setBookingTimeFrom(value);
+                        if (value) {
+                          const [hours, minutes] = value.split(':').map(Number);
+                          const fromDate = new Date();
+                          fromDate.setHours(hours, minutes);
+                          fromDate.setMinutes(fromDate.getMinutes() + 120);
+                          setBookingTimeTo(`${String(fromDate.getHours()).padStart(2, '0')}:${String(fromDate.getMinutes()).padStart(2, '0')}`);
+                        }
+                        saveDraft();
+                      }}>
+                        <SelectTrigger><SelectValue placeholder="From" /></SelectTrigger>
+                        <SelectContent className="max-h-60 overflow-y-auto">
+                          {generateTimeOptions().map((t) => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                      {errors.bookingTimeFrom && <p className="text-xs text-destructive mt-1">{errors.bookingTimeFrom}</p>}
+                    </div>
+                    <div>
+                      <Label className="text-xs text-muted-foreground font-medium mb-1 block">To *</Label>
+                      <Select value={bookingTimeTo} onValueChange={(value) => { setBookingTimeTo(value); saveDraft(); }}>
+                        <SelectTrigger><SelectValue placeholder="To" /></SelectTrigger>
+                        <SelectContent className="max-h-60 overflow-y-auto">
+                          {generateTimeOptions().filter((time) => {
+                            if (bookingTimeFrom) {
+                              const [h, m] = time.value.split(':').map(Number);
+                              const [fh, fm] = bookingTimeFrom.split(':').map(Number);
+                              return (h * 60 + m) > (fh * 60 + fm);
+                            }
+                            return true;
+                          }).map((t) => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                      {errors.bookingTimeTo && <p className="text-xs text-destructive mt-1">{errors.bookingTimeTo}</p>}
+                    </div>
+                  </div>
                 </div>
+                {bookingTimeFrom && bookingTimeTo && (
+                  <div className="flex items-center gap-2 text-sm text-blue-600 font-medium bg-blue-50 rounded-lg px-3 py-2">
+                    <Clock className="h-3.5 w-3.5 shrink-0" />
+                    {calculateBookingDuration(bookingTimeFrom, bookingTimeTo)}
+                  </div>
+                )}
               </div>
-
-            </div>
-            {bookingTimeFrom && bookingTimeTo && (
-              <div className='text-blue-500 text-sm font-medium'>
-                {calculateBookingDuration(bookingTimeFrom, bookingTimeTo)}
-              </div>
-            )}
-
-            <div>
-              <Label>Assign Agent (Optional)</Label>
-              <Select value={selectedAgent || "unassigned"} onValueChange={(value) => {
-                setSelectedAgent(value === "unassigned" ? "" : value);
-                saveDraft();
-              }}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Unassigned" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="unassigned">Unassigned</SelectItem>
-                  {agents.filter(agent => !agent.locked).map((agent) => (
-                    <SelectItem key={agent.id} value={String(agent.id)}>
-                      {agent.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
             </div>
 
-            {/* Available Offers Section */}
-            <div>
-              <Label className="flex items-center gap-2">
-                <Gift className="h-4 w-4" />
-                Available Offers
-              </Label>
-              {loadingOffers ? (
-                <div className="space-y-2 mt-2">
-                  <Card className="p-3">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex-1 space-y-2">
-                        <div className="flex items-center gap-2">
-                          <Skeleton className="h-4 w-4" />
-                          <Skeleton className="h-4 w-32" />
-                        </div>
-                        <Skeleton className="h-3 w-full" />
-                        <Skeleton className="h-3 w-2/3" />
-                        <div className="flex items-center gap-1 mt-2">
-                          <Skeleton className="h-3 w-3" />
-                          <Skeleton className="h-3 w-16" />
-                        </div>
-                      </div>
-                      <Skeleton className="h-8 w-16" />
-                    </div>
-                  </Card>
-                  <Card className="p-3">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex-1 space-y-2">
-                        <div className="flex items-center gap-2">
-                          <Skeleton className="h-4 w-4" />
-                          <Skeleton className="h-4 w-40" />
-                        </div>
-                        <Skeleton className="h-3 w-full" />
-                        <Skeleton className="h-3 w-3/4" />
-                        <div className="flex items-center gap-1 mt-2">
-                          <Skeleton className="h-3 w-3" />
-                          <Skeleton className="h-3 w-20" />
-                        </div>
-                      </div>
-                      <Skeleton className="h-8 w-16" />
-                    </div>
-                  </Card>
+            {/* Agent Assignment */}
+            <div className="rounded-xl border bg-card shadow-sm">
+              <div className="flex items-center gap-2 px-4 pt-4 pb-3 border-b">
+                <div className="flex items-center justify-center w-7 h-7 rounded-lg bg-violet-100">
+                  <User className="h-4 w-4 text-violet-600" />
                 </div>
-              ) : availableOffers.length > 0 ? (
-                <div className="space-y-2 mt-2">
-                  {selectedOffer ? (
-                    <Card className="p-3 bg-green-50 border-green-200">
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2">
-                            <Tag className="h-4 w-4 text-green-600" />
-                            <span className="font-medium text-green-700">{selectedOffer.name}</span>
-                          </div>
-                          <p className="text-sm text-muted-foreground mt-1">{selectedOffer.description}</p>
-                          <div className="flex items-center gap-1 mt-2 text-sm font-semibold text-green-600">
-                            <Percent className="h-3 w-3" />
-                            {selectedOffer.discount_type === 'percentage' ? (
-                              <span>{selectedOffer.discount_value}% Off</span>
-                            ) : (
-                              <span>₹{selectedOffer.discount_value} Off</span>
+                <span className="font-semibold text-sm">Assign Agent</span>
+                <span className="ml-auto text-[10px] text-muted-foreground font-medium bg-muted px-2 py-0.5 rounded-full">Optional</span>
+              </div>
+              <div className="p-4">
+                <Select value={selectedAgent || "unassigned"} onValueChange={(value) => {
+                  setSelectedAgent(value === "unassigned" ? "" : value);
+                  saveDraft();
+                }}>
+                  <SelectTrigger><SelectValue placeholder="Unassigned" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="unassigned">Unassigned</SelectItem>
+                    {agents.filter(a => !a.locked).map((agent) => (
+                      <SelectItem key={agent.id} value={String(agent.id)}>{agent.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {/* Offers & Coupons */}
+            <div className="rounded-xl border bg-card shadow-sm">
+              <div className="flex items-center justify-between gap-2 px-4 pt-3 pb-3 border-b">
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center justify-center w-7 h-7 rounded-lg bg-amber-100">
+                    <Gift className="h-4 w-4 text-amber-600" />
+                  </div>
+                  <span className="font-semibold text-sm">Offers & Coupons</span>
+                </div>
+                {selectedCustomer && (
+                  <Button
+                    type="button"
+                    variant="link"
+                    size="sm"
+                    className="h-auto p-0 text-xs font-semibold text-primary cursor-pointer hover:underline"
+                    onClick={() => {
+                      setIsCustomerCouponsOpen(true);
+                      fetchCustomerCoupons();
+                    }}
+                  >
+                    Search Available Coupons
+                  </Button>
+                )}
+              </div>
+              <div className="p-4 space-y-3">
+                {/* Coupon code input when no offer selected */}
+                {!selectedOffer && (
+                  <div className="rounded-lg border border-dashed border-primary/30 bg-primary/5 p-3 space-y-2">
+                    <p className="text-xs font-semibold text-primary flex items-center gap-1.5">
+                      <Tag className="h-3.5 w-3.5" />
+                      Apply Coupon Code
+                    </p>
+                    <div className="flex gap-2">
+                      <Input
+                        placeholder="e.g. COCHIN-HYP-DW02-X87F9B"
+                        value={couponCode}
+                        onChange={(e) => setCouponCode(e.target.value)}
+                        className="uppercase font-mono text-sm h-9 border-gray-300"
+                      />
+                      <Button type="button" disabled={verifyingCoupon} onClick={handleVerifyCoupon}
+                        className="bg-primary hover:bg-primary/90 text-white font-medium h-9 shrink-0">
+                        {verifyingCoupon ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Apply'}
+                      </Button>
+                    </div>
+                    {couponError && <p className="text-xs text-red-500 font-semibold">{couponError}</p>}
+                    <p className="text-[10px] text-muted-foreground">Have a promotional code? Enter it here to unlock rewards.</p>
+                  </div>
+                )}
+
+                {loadingOffers ? (
+                  <div className="space-y-2">
+                    {[1, 2].map(i => (
+                      <div key={i} className="flex items-start justify-between gap-2 p-3 border rounded-lg">
+                        <div className="flex-1 space-y-2">
+                          <div className="flex items-center gap-2"><Skeleton className="h-4 w-4 rounded" /><Skeleton className="h-4 w-32" /></div>
+                          <Skeleton className="h-3 w-full" />
+                        </div>
+                        <Skeleton className="h-8 w-16 rounded" />
+                      </div>
+                    ))}
+                  </div>
+                ) : selectedOffer ? (
+                  <div className="rounded-lg border border-green-200 bg-green-50 p-3 space-y-2">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <Tag className="h-4 w-4 text-green-600 shrink-0" />
+                          <span className="font-semibold text-green-800 text-sm">{selectedOffer.name}</span>
+                          {selectedOffer.coupon_required && (
+                            <span className="bg-amber-100 text-amber-800 text-[10px] px-2 py-0.5 rounded-full font-bold border border-amber-200">Coupon Required</span>
+                          )}
+                          {isCouponVerified && !selectedOffer.coupon_required && (
+                            <span className="bg-indigo-100 text-indigo-800 text-[10px] px-2 py-0.5 rounded-full font-bold border border-indigo-200">Via Coupon</span>
+                          )}
+                        </div>
+                        {selectedOffer.description && (
+                          <p className="text-xs text-green-700/80 mt-1 line-clamp-2">{selectedOffer.description}</p>
+                        )}
+                        <div className="flex items-center gap-1 mt-1.5 text-xs font-bold text-green-700">
+                          <Percent className="h-3 w-3" />
+                          {selectedOffer.discount_type === 'percentage' ? `${selectedOffer.discount_value}% Off` : `₹${selectedOffer.discount_value} Off`}
+                        </div>
+                      </div>
+                      <button type="button" onClick={handleRemoveOffer}
+                        className="text-red-500 hover:text-red-700 cursor-pointer text-xs font-semibold shrink-0 px-2 py-1 rounded hover:bg-red-50 transition-colors">
+                        Remove
+                      </button>
+                    </div>
+                    {(selectedOffer.coupon_required || isCouponVerified) && (
+                      <div className="mt-2 pt-2 border-t border-green-200">
+                        {isCouponVerified ? (
+                          <div className="space-y-1.5">
+
+                            {verifiedCouponData && (
+                              <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[11px] text-gray-600 bg-white/60 rounded-lg p-2.5 mt-1">
+                                <div><span className="font-semibold text-gray-700">Campaign:</span> {verifiedCouponData.campaign_name}</div>
+                                {verifiedCouponData.partner_name && <div><span className="font-semibold text-gray-700">Partner:</span> {verifiedCouponData.partner_name}</div>}
+                                <div><span className="font-semibold text-gray-700">Offer:</span> {verifiedCouponData.offer_name || selectedOffer?.name}</div>
+                                <div><span className="font-semibold text-gray-700">Discount:</span> {selectedOffer?.discount_type === 'percentage' ? `${selectedOffer.discount_value}% Off` : `₹${selectedOffer?.discount_value} Off`}</div>
+                                <div><span className="font-semibold text-gray-700">Uses Left:</span> {verifiedCouponData.remaining_uses}</div>
+                              </div>
                             )}
                           </div>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            removeOfferRewards(selectedOffer.id);
-                            setSelectedOffer(null);
-                            saveDraft();
-                            toast.info('Offer removed');
-                          }}
-                          className="text-red-600 hover:text-red-700 text-sm font-medium px-2 py-1 rounded hover:bg-red-50 transition-colors"
-                        >
-                          Remove
-                        </button>
-                      </div>
-                    </Card>
-                  ) : (
-                    <div className="space-y-2">
-                      {availableOffers.map((offer) => (
-                        <Card key={offer.id} className="p-3 hover:bg-secondary/50 transition-colors">
-                          <div className="flex items-start justify-between gap-2">
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2">
-                                <Tag className="h-4 w-4 text-primary" />
-                                <span className="font-medium">{offer.name}</span>
-                                <button
-                                  type="button"
-                                  onClick={() => setOfferDetailsDialog({ open: true, offer })}
-                                  className="text-blue-600 hover:text-blue-700 p-1 rounded-full hover:bg-blue-50 transition-colors"
-                                  title="View offer details"
-                                >
-                                  <Info className="h-4 w-4" />
-                                </button>
-                              </div>
-                              <p className="text-sm text-muted-foreground mt-1">{offer.description}</p>
-                              <div className="flex items-center gap-1 mt-2 text-xs  text-primary">
-                                <Percent className="h-3 w-3" />
-                                {offer.discount_type === 'percentage' ? (
-                                  <span>{offer.discount_value}% Off</span>
-                                ) : (
-                                  <span>₹{offer.discount_value} Off</span>
-                                )}
-                              </div>
+                        ) : (
+                          <div className="space-y-2">
+                            <p className="text-xs font-semibold text-gray-700">Enter Promo Code to Unlock</p>
+                            <div className="flex gap-2">
+                              <Input placeholder="e.g. THRWDIWALI-A3B9" value={couponCode}
+                                onChange={(e) => setCouponCode(e.target.value)}
+                                className="uppercase font-mono text-sm h-9" />
+                              <Button type="button" disabled={verifyingCoupon} onClick={handleVerifyCoupon}
+                                className="bg-indigo-600 hover:bg-indigo-700 text-white h-9 shrink-0">
+                                {verifyingCoupon ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Verify'}
+                              </Button>
                             </div>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setSelectedOffer(offer);
-                                saveDraft();
-                              }}
-                              className="bg-green-600 hover:bg-green-700 text-white text-sm font-medium px-3 py-1 rounded border border-green-700 transition-colors"
-                            >
-                              Apply
-                            </button>
+                            {couponError && <p className="text-xs text-red-500 font-semibold">{couponError}</p>}
+                            <p className="text-[10px] text-gray-500">This offer requires a valid coupon code for the customer's phone.</p>
                           </div>
-                        </Card>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <p className="text-sm text-muted-foreground py-2">No offers available for the selected items</p>
-              )}
-            </div>
-
-            <div className='flex-grow flex flex-col'>
-              <Label>Notes</Label>
-              <Textarea
-                value={notes}
-                onChange={(e) => {
-                  setNotes(e.target.value);
-                  saveDraft();
-                }}
-                placeholder="Additional notes..."
-                className="flex-grow resize-none"
-                rows={isMobile ? 3 : 5}
-              />
-            </div>
-          </div>
-
-          <div className='space-y-4'>
-            {/* Loyalty Points Redemption Section */}
-            <div>
-              <Label className="flex items-center gap-2">
-                <Coins className="h-4 w-4" />
-                Loyalty Points
-              </Label>
-              {loadingLoyalty ? (
-                <div className="space-y-3 mt-2">
-                  <Card className="p-3">
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <Skeleton className="h-4 w-32" />
-                        <Skeleton className="h-6 w-16" />
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <Skeleton className="h-3 w-24" />
-                        <Skeleton className="h-3 w-12" />
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <Skeleton className="h-3 w-28" />
-                        <Skeleton className="h-3 w-20" />
-                      </div>
-                    </div>
-                  </Card>
-                  <div className="space-y-2">
-                    <Skeleton className="h-4 w-48" />
-                    <div className="flex gap-2">
-                      <Skeleton className="h-10 flex-1" />
-                      <Skeleton className="h-10 w-24" />
-                    </div>
-                  </div>
-                </div>
-              ) : loyaltySummary ? (
-                <div className="space-y-3 mt-2">
-                  <Card className="p-3 bg-blue-50 border-blue-200">
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm font-medium text-blue-900">Available Points:</span>
-                        <span className="text-lg font-bold text-blue-600">{loyaltySummary.current_balance}</span>
-                      </div>
-                      <div className="flex items-center justify-between text-xs text-blue-700">
-                        <span>Points Value:</span>
-                        <span>₹{loyaltySummary.current_value_in_rupees?.toFixed(2)}</span>
-                      </div>
-                      {maxRedeemablePoints > 0 && (
-                        <div className="flex items-center justify-between text-xs text-blue-700">
-                          <span>Max Redeemable:</span>
-                          <span>{maxRedeemablePoints} points (₹{maxRedeemablePoints.toFixed(2)})</span>
-                        </div>
-                      )}
-                    </div>
-                  </Card>
-
-                  {maxRedeemablePoints > 0 && loyaltySummary.current_balance >= (loyaltySummary.min_redeem_points || 100) ? (
-                    <div className="space-y-2">
-                      <Label htmlFor="pointsToRedeem" className="text-sm">
-                        Redeem Points (Min: {loyaltySummary.min_redeem_points})
-                      </Label>
-                      <div className="flex gap-2">
-                        <Input
-                          id="pointsToRedeem"
-                          type="number"
-                          min="0"
-                          max={maxRedeemablePoints}
-                          step="1"
-                          value={pointsToRedeem || ''}
-                          disabled={loyaltySummary.current_balance < (loyaltySummary.min_redeem_points || 100)}
-                          onChange={(e) => {
-                            const inputValue = e.target.value;
-
-                            // If empty, keep it empty (don't force to 0)
-                            if (inputValue === '') {
-                              setPointsToRedeem('');
-                              return;
-                            }
-
-                            const value = parseInt(inputValue);
-                            if (isNaN(value)) {
-                              return;
-                            }
-
-                            const minPoints = loyaltySummary.min_redeem_points || 100;
-
-                            // Allow typing any value (including below minimum) for flexibility
-                            // Only show error when user tries to submit or moves away from input
-                            if (value > maxRedeemablePoints) {
-                              toast.error(`Maximum ${maxRedeemablePoints} points can be redeemed for this order`);
-                              setPointsToRedeem(maxRedeemablePoints);
-                              return;
-                            }
-
-                            setPointsToRedeem(value);
-                          }}
-                          onBlur={(e) => {
-                            // Validate on blur (when user leaves the input)
-                            const value = parseInt(e.target.value);
-                            const minPoints = loyaltySummary.min_redeem_points || 100;
-
-                            if (isNaN(value) || e.target.value === '') {
-                              setPointsToRedeem('');
-                              return;
-                            }
-
-                            if (value > 0 && value < minPoints) {
-                              toast.error(`Minimum ${minPoints} points required for redemption`);
-                              setPointsToRedeem('');
-                            }
-                          }}
-                          placeholder="Enter points to redeem"
-                          className="flex-1"
-                        />
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setPointsToRedeem(maxRedeemablePoints)}
-                          disabled={maxRedeemablePoints === 0}
-                        >
-                          Max
-                        </Button>
-                        {pointsToRedeem > 0 && (
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setPointsToRedeem('')}
-                          >
-                            Clear
-                          </Button>
                         )}
                       </div>
-                      {pointsToRedeem > 0 && (
-                        <p className="text-sm text-green-600 font-medium">
-                          Discount: ₹{(pointsToRedeem || 0).toFixed(2)}
-                        </p>
-                      )}
-                    </div>
-                  ) : (
-                    <p className="text-sm text-muted-foreground">
-                      {loyaltySummary.current_balance < (loyaltySummary.min_redeem_points || 100)
-                        ? `Minimum ${loyaltySummary.min_redeem_points || 100} points required for redemption. Customer currently have ${loyaltySummary.current_balance} points.`
-                        : 'Maximum redeemable points (50% of order value) is 0 for this order amount'}
-                    </p>
-                  )}
-                </div>
-              ) : (
-                <p className="text-sm text-muted-foreground py-2">No loyalty points available</p>
-              )}
+                    )}
+                  </div>
+                ) : availableOffers.length > 0 ? (
+                  <div className="space-y-2">
+                    {availableOffers.map((offer) => (
+                      <Card key={offer.id} className="p-3 hover:bg-secondary/50 transition-colors border">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              <Tag className="h-4 w-4 text-primary shrink-0" />
+                              <span className="font-medium text-sm">{offer.name}</span>
+                              {offer.coupon_required && (
+                                <span className="bg-amber-100 text-amber-800 border border-amber-200 text-[10px] py-0.5 px-2 rounded-full font-bold">Coupon Required</span>
+                              )}
+                              <button type="button" onClick={() => setOfferDetailsDialog({ open: true, offer })}
+                                className="text-blue-500 hover:text-blue-700 p-0.5 rounded hover:bg-blue-50 transition-colors" title="View offer details">
+                                <Info className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
+                            <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{offer.description}</p>
+                            <div className="flex items-center gap-1 mt-1.5 text-xs font-semibold text-primary">
+                              <Percent className="h-3 w-3" />
+                              {offer.discount_type === 'percentage' ? `${offer.discount_value}% Off` : `₹${offer.discount_value} Off`}
+                            </div>
+                          </div>
+                          <button type="button" onClick={() => {
+                            setSelectedOffer(offer);
+                            if (offer.coupon_required) {
+                              setIsCouponVerified(false);
+                              setCouponCode('');
+                              setVerifiedCouponData(null);
+                              setCouponError('');
+                            }
+                            saveDraft();
+                          }} className="bg-green-600 hover:bg-green-700 text-white text-xs font-semibold px-3 py-1.5 rounded transition-colors shrink-0">
+                            Apply
+                          </button>
+                        </div>
+                      </Card>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground py-2 text-center">No offers available for the selected items</p>
+                )}
+              </div>
             </div>
 
-            <Card className="p-4 bg-secondary/50">
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span>Packages Total:</span>
-                  <span className="font-medium">₹{totals.packages.toFixed(2)}</span>
+            {/* Loyalty Points */}
+            <div className="rounded-xl border bg-card shadow-sm">
+              <div className="flex items-center gap-2 px-4 pt-4 pb-3 border-b">
+                <div className="flex items-center justify-center w-7 h-7 rounded-lg bg-blue-100">
+                  <Coins className="h-4 w-4 text-blue-600" />
                 </div>
-                <div className="flex justify-between">
-                  <span>Add-ons Total:</span>
-                  <span className="font-medium">₹{totals.addons.toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between border-t pt-2">
-                  <span>Subtotal:</span>
-                  <span className="font-medium">₹{totals.subtotal.toFixed(2)}</span>
-                </div>
-                {totals.offerDiscount > 0 && (
-                  <>
-                    <div className="flex justify-between text-green-600">
-                      <span className="flex items-center gap-1">
-                        <Gift className="h-3 w-3" />
-                        Offer Discount:
-                      </span>
-                      <span className="font-medium">-₹{totals.offerDiscount.toFixed(2)}</span>
+                <span className="font-semibold text-sm">Loyalty Points</span>
+              </div>
+              <div className="p-4">
+                {loadingLoyalty ? (
+                  <div className="space-y-2">
+                    <Skeleton className="h-16 w-full rounded-lg" />
+                    <Skeleton className="h-9 w-full" />
+                  </div>
+                ) : loyaltySummary ? (
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between p-3 rounded-lg bg-blue-50 border border-blue-100">
+                      <div>
+                        <p className="text-xs text-blue-700 font-medium">Available Balance</p>
+                        <p className="text-xl font-bold text-blue-700">{loyaltySummary.current_balance} <span className="text-xs font-normal">pts</span></p>
+                        <p className="text-[11px] text-blue-600/80 mt-0.5">≈ ₹{loyaltySummary.current_value_in_rupees?.toFixed(2)}</p>
+                      </div>
+                      <div className="w-10 h-10 rounded-full bg-blue-200 flex items-center justify-center">
+                        <Coins className="h-5 w-5 text-blue-600" />
+                      </div>
                     </div>
-                    <div className="flex justify-between font-semibold">
-                      <span>After Discount:</span>
-                      <span>₹{totals.subtotalAfterDiscount.toFixed(2)}</span>
-                    </div>
-                  </>
+                    {maxRedeemablePoints > 0 && loyaltySummary.current_balance >= (loyaltySummary.min_redeem_points || 100) ? (
+                      <div className="space-y-2">
+                        <Label className="text-xs font-semibold text-gray-700">Redeem Points (Min: {loyaltySummary.min_redeem_points})</Label>
+                        <div className="flex gap-2">
+                          <Input
+                            type="number"
+                            min={loyaltySummary.min_redeem_points || 100}
+                            max={maxRedeemablePoints}
+                            value={pointsToRedeem}
+                            onChange={(e) => {
+                              const val = parseInt(e.target.value) || 0;
+                              const minPoints = loyaltySummary.min_redeem_points || 100;
+                              if (val === 0) { setPointsToRedeem(''); return; }
+                              if (val < minPoints) { setPointsToRedeem(minPoints); return; }
+                              if (val > maxRedeemablePoints) { setPointsToRedeem(maxRedeemablePoints); return; }
+                              setPointsToRedeem(val);
+                            }}
+                            onBlur={(e) => {
+                              const val = parseInt(e.target.value) || 0;
+                              const minPoints = loyaltySummary.min_redeem_points || 100;
+                              if (val > 0 && val < minPoints) { setPointsToRedeem(minPoints); }
+                              else if (val === 0) { setPointsToRedeem(''); }
+                            }}
+                            placeholder="Enter points to redeem"
+                            className="flex-1 h-9"
+                            disabled={loyaltySummary.current_balance < (loyaltySummary.min_redeem_points || 100)}
+                          />
+                          <Button type="button" variant="outline" size="sm" onClick={() => setPointsToRedeem(maxRedeemablePoints)} disabled={maxRedeemablePoints === 0}>Max</Button>
+                          {pointsToRedeem > 0 && (
+                            <Button type="button" variant="ghost" size="sm" onClick={() => setPointsToRedeem('')}>Clear</Button>
+                          )}
+                        </div>
+                        {pointsToRedeem > 0 && (
+                          <p className="text-xs text-green-600 font-semibold">−₹{(pointsToRedeem || 0).toFixed(2)} discount applied</p>
+                        )}
+                      </div>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">
+                        {loyaltySummary.current_balance < (loyaltySummary.min_redeem_points || 100)
+                          ? `Minimum ${loyaltySummary.min_redeem_points || 100} pts required. Customer has ${loyaltySummary.current_balance} pts.`
+                          : 'Max redeemable points (50% of order) is 0 for this amount.'}
+                      </p>
+                    )}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground py-1">No loyalty points available</p>
                 )}
-                {totals.pointsDiscount > 0 && (
-                  <>
-                    <div className="flex justify-between text-blue-600">
-                      <span className="flex items-center gap-1">
-                        <Coins className="h-3 w-3" />
-                        Points Redeemed ({pointsToRedeem} pts):
-                      </span>
-                      <span className="font-medium">-₹{totals.pointsDiscount.toFixed(2)}</span>
-                    </div>
-                    <div className="flex justify-between font-semibold">
-                      <span>After Points:</span>
-                      <span>₹{totals.subtotalAfterPointsDiscount.toFixed(2)}</span>
-                    </div>
-                  </>
-                )}
-                <div className="flex justify-between">
-                  <span>GST ({totals.gstPercentage}%):</span>
-                  <span className="font-medium">₹{totals.gst.toFixed(2)}</span>
+              </div>
+            </div>
+
+            {/* Notes */}
+            <div className="rounded-xl border bg-card shadow-sm">
+              <div className="flex items-center gap-2 px-4 pt-4 pb-3 border-b">
+                <div className="flex items-center justify-center w-7 h-7 rounded-lg bg-gray-100">
+                  <FileText className="h-4 w-4 text-gray-500" />
                 </div>
-                {totals.roundOff !== 0 && (
-                  <div className="flex justify-between">
-                    <span>Round Off:</span>
-                    <span className={`font-medium ${totals.roundOff >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                      {totals.roundOff >= 0 ? '+' : ''}₹{totals.roundOff.toFixed(2)}
-                    </span>
+                <span className="font-semibold text-sm">Notes</span>
+                <span className="ml-auto text-[10px] text-muted-foreground font-medium bg-muted px-2 py-0.5 rounded-full">Optional</span>
+              </div>
+              <div className="p-4">
+                <Textarea
+                  value={notes}
+                  onChange={(e) => { setNotes(e.target.value); saveDraft(); }}
+                  placeholder="Additional notes or instructions..."
+                  className="resize-none text-sm"
+                  rows={isMobile ? 3 : 4}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* RIGHT COLUMN: Order Summary */}
+          <div className="space-y-4">
+            <div className="lg:sticky lg:top-4 rounded-xl border bg-card shadow-sm overflow-hidden">
+              <div className="bg-gradient-to-r from-primary/90 to-primary px-4 py-3">
+                <p className="text-white font-bold text-sm tracking-wide">Order Summary</p>
+              </div>
+              <div className="p-4 space-y-3">
+                {/* Package items */}
+                {packageItems.length > 0 && (
+                  <div className="space-y-1.5">
+                    <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Packages</p>
+                    {packageItems.map((item, i) => (
+                      <div key={i} className="flex items-start justify-between gap-2 text-sm">
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium truncate">{item.package_name || 'Package'}</p>
+                          {item.vehicle_type && <p className="text-[10px] text-muted-foreground capitalize">{item.vehicle_type} · qty {item.quantity}</p>}
+                        </div>
+                        <span className="font-semibold shrink-0">₹{calculateLineTotal(item).toFixed(0)}</span>
+                      </div>
+                    ))}
                   </div>
                 )}
-                <div className="flex justify-between text-base font-bold border-t pt-2">
-                  <span>Grand Total:</span>
-                  <span>₹{totals.total.toFixed(0)}</span>
+
+                {/* Addon items */}
+                {addonItems.length > 0 && (
+                  <div className="space-y-1.5 pt-2 border-t">
+                    <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Add-ons</p>
+                    {addonItems.map((item, i) => (
+                      <div key={i} className="flex items-start justify-between gap-2 text-sm">
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium truncate">{item.addon_name || 'Add-on'}</p>
+                          {item.quantity > 1 && <p className="text-[10px] text-muted-foreground">qty {item.quantity}</p>}
+                        </div>
+                        <span className="font-semibold shrink-0">₹{calculateLineTotal(item).toFixed(0)}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Totals */}
+                <div className="pt-3 border-t space-y-2 text-sm">
+                  <div className="flex justify-between text-muted-foreground">
+                    <span>Packages</span><span>₹{totals.packages.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between text-muted-foreground">
+                    <span>Add-ons</span><span>₹{totals.addons.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between font-semibold border-t pt-2">
+                    <span>Subtotal</span><span>₹{totals.subtotal.toFixed(2)}</span>
+                  </div>
+
+                  {totals.offerDiscount > 0 && (
+                    <>
+                      <div className="flex justify-between text-green-600">
+                        <span className="flex items-center gap-1.5">
+                          <Gift className="h-3.5 w-3.5" />
+                          {selectedOffer?.name ? selectedOffer.name.slice(0, 18) + (selectedOffer.name.length > 18 ? '…' : '') : 'Offer'}
+                        </span>
+                        <span className="font-semibold">−₹{totals.offerDiscount.toFixed(2)}</span>
+                      </div>
+                      <div className="flex justify-between font-semibold">
+                        <span>After Offer</span><span>₹{totals.subtotalAfterDiscount.toFixed(2)}</span>
+                      </div>
+                    </>
+                  )}
+
+                  {totals.pointsDiscount > 0 && (
+                    <>
+                      <div className="flex justify-between text-blue-600">
+                        <span className="flex items-center gap-1.5">
+                          <Coins className="h-3.5 w-3.5" />
+                          Points ({pointsToRedeem} pts)
+                        </span>
+                        <span className="font-semibold">−₹{totals.pointsDiscount.toFixed(2)}</span>
+                      </div>
+                      <div className="flex justify-between font-semibold">
+                        <span>After Points</span><span>₹{totals.subtotalAfterPointsDiscount.toFixed(2)}</span>
+                      </div>
+                    </>
+                  )}
+
+                  <div className="flex justify-between text-muted-foreground">
+                    <span>GST ({totals.gstPercentage}%)</span><span>₹{totals.gst.toFixed(2)}</span>
+                  </div>
+                  {totals.roundOff !== 0 && (
+                    <div className="flex justify-between text-xs text-muted-foreground">
+                      <span>Round Off</span>
+                      <span className={totals.roundOff >= 0 ? 'text-green-600' : 'text-red-600'}>
+                        {totals.roundOff >= 0 ? '+' : ''}₹{totals.roundOff.toFixed(2)}
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Grand Total */}
+                <div className="bg-primary/5 border border-primary/20 rounded-lg px-4 py-3 flex items-center justify-between">
+                  <span className="font-bold text-base">Grand Total</span>
+                  <span className="text-2xl font-black text-primary">₹{totals.total.toFixed(0)}</span>
+                </div>
+
+                {/* Applied offer pill */}
+                {selectedOffer && (
+                  <div className="flex items-center gap-2 text-xs bg-green-50 border border-green-200 rounded-lg px-3 py-2">
+                    <Gift className="h-3.5 w-3.5 text-green-600 shrink-0" />
+                    <span className="text-green-800 font-medium truncate">{selectedOffer.name}</span>
+                    {isCouponVerified && <span className="shrink-0 text-green-600 font-bold">✓ Coupon</span>}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    );
+  };
+
+  // Render list of active coupons for selected customer
+  const renderCustomerCouponsList = () => {
+    if (loadingCustomerCoupons) {
+      return (
+        <div className="flex flex-col items-center justify-center py-8 space-y-2">
+          <Loader2 className="h-6 w-6 animate-spin text-primary" />
+          <span className="text-sm text-muted-foreground">Searching coupons...</span>
+        </div>
+      );
+    }
+
+    if (customerCoupons.length === 0) {
+      return (
+        <div className="text-center py-8 text-muted-foreground space-y-2">
+          <Gift className="h-8 w-8 mx-auto opacity-30 text-gray-500" />
+          <p className="text-sm">No active coupons found for this customer.</p>
+        </div>
+      );
+    }
+
+    return (
+      <div className="space-y-3 mt-2">
+        {customerCoupons.map((coupon) => (
+          <Card key={coupon.id} className="p-3 border hover:border-primary/45 hover:bg-primary/5 transition-all">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-1.5">
+                  <span className="font-mono font-bold text-xs bg-primary/10 text-primary px-2 py-0.5 rounded uppercase tracking-wider">
+                    {coupon.code}
+                  </span>
+                </div>
+                <p className="text-xs font-semibold text-gray-700 mt-2">
+                  Campaign: {coupon.campaign_name || 'Campaign Offer'}
+                </p>
+                {coupon.offer_name && (
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Offer: {coupon.offer_name}
+                  </p>
+                )}
+                <div className="flex items-center gap-4 mt-2 text-[11px] text-gray-500">
+                  <div>
+                    <span className="font-semibold text-gray-700">Uses Left:</span> {coupon.remaining_uses} / {coupon.allowed_uses}
+                  </div>
+                  {coupon.expiry_date && (
+                    <div>
+                      <span className="font-semibold text-gray-700">Expiry:</span> {new Date(coupon.expiry_date).toLocaleDateString()}
+                    </div>
+                  )}
                 </div>
               </div>
-            </Card>
-          </div>
-        </div>
-
+              <Button
+                type="button"
+                size="sm"
+                onClick={() => verifyAndApplyCoupon(coupon.code)}
+                className="bg-green-600 hover:bg-green-700 text-white font-semibold text-xs py-1 h-8 px-3 shrink-0 cursor-pointer"
+              >
+                Apply
+              </Button>
+            </div>
+          </Card>
+        ))}
       </div>
     );
   };
@@ -2685,31 +2724,31 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
             </Button>
           </div>
 
+          {/* Desktop Header */}
+          <div className="hidden md:flex items-center justify-between pb-4 border-b mb-4">
+            <div>
+              <h2 className="text-2xl font-bold">
+                {orderId ? 'Edit Order' : 'Create New Order'}
+              </h2>
+              <p className="text-sm text-muted-foreground">
+                Step {currentStep} of 4
+              </p>
+            </div>
+            {!orderId && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowClearConfirm(true)}
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Clear Draft
+              </Button>
+            )}
+          </div>
+
           <div className="flex-1 overflow-y-auto p-4 md:p-0">
             <div className="space-y-6 px-1">
-              {/* Desktop Header */}
-              <div className="hidden md:flex items-center justify-between mb-2">
-                <div>
-                  <h2 className="text-2xl font-bold">
-                    {orderId ? 'Edit Order' : 'Create New Order'}
-                  </h2>
-                  <p className="text-sm text-muted-foreground">
-                    Step {currentStep} of 4
-                  </p>
-                </div>
-                {!orderId && (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setShowClearConfirm(true)}
-                  >
-                    <Trash2 className="h-4 w-4 mr-2" />
-                    Clear Draft
-                  </Button>
-                )}
-              </div>
-
               {/* Step Indicator */}
               {/* {renderStepIndicator()} */}
 
@@ -3006,6 +3045,43 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
               )}
             </DialogContent>
           </Dialog>
+
+          {/* Available Customer Coupons Dialog (Desktop) */}
+          <Dialog open={!isMobile && isCustomerCouponsOpen} onOpenChange={setIsCustomerCouponsOpen}>
+            <DialogContent className="max-w-md">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <Gift className="h-5 w-5 text-primary" />
+                  Available Coupons
+                </DialogTitle>
+                <DialogDescription>
+                  Active promo coupons linked to {selectedCustomer?.name || 'this customer'}
+                </DialogDescription>
+              </DialogHeader>
+              <div className="max-h-[60vh] overflow-y-auto pr-1">
+                {renderCustomerCouponsList()}
+              </div>
+            </DialogContent>
+          </Dialog>
+
+          {/* Available Customer Coupons Drawer (Mobile) */}
+          <Drawer open={isMobile && isCustomerCouponsOpen} onOpenChange={setIsCustomerCouponsOpen}>
+            <DrawerContent>
+              <div className="mx-auto w-12 h-1.5 flex-shrink-0 rounded-full bg-muted my-2" />
+              <DrawerHeader className="text-left px-4">
+                <DrawerTitle className="flex items-center gap-2">
+                  <Gift className="h-5 w-5 text-primary" />
+                  Available Coupons
+                </DrawerTitle>
+                <DrawerDescription>
+                  Active promo coupons linked to {selectedCustomer?.name || 'this customer'}
+                </DrawerDescription>
+              </DrawerHeader>
+              <div className="px-4 pb-8 overflow-y-auto max-h-[60vh]">
+                {renderCustomerCouponsList()}
+              </div>
+            </DrawerContent>
+          </Drawer>
 
           {/* Customer Form Sheet - App Page Feel on Mobile */}
           <Sheet open={showCustomerForm} onOpenChange={(open) => {

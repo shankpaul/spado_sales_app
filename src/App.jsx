@@ -27,6 +27,11 @@ const TodaysWork = lazy(() => import('./pages/TodaysWork'));
 const Packages = lazy(() => import('./pages/Packages'));
 const Addons = lazy(() => import('./pages/Addons'));
 const ChecklistItems = lazy(() => import('./pages/ChecklistItems'));
+const Partners = lazy(() => import('./pages/Partners'));
+const Campaigns = lazy(() => import('./pages/Campaigns'));
+const CampaignForm = lazy(() => import('./pages/CampaignForm'));
+const CampaignDetail = lazy(() => import('./pages/CampaignDetail'));
+const CampaignDashboard = lazy(() => import('./pages/CampaignDashboard'));
 
 // Loading fallback component
 const LoadingFallback = () => (
@@ -197,6 +202,72 @@ function App() {
               <ProtectedRoute allowedRoles={['admin']}>
                 <Layout>
                   <OfferForm />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/partners"
+            element={
+              <ProtectedRoute allowedRoles={['admin', 'sales_executive']}>
+                <Layout>
+                  <Partners />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/campaigns"
+            element={
+              <ProtectedRoute allowedRoles={['admin', 'sales_executive']}>
+                <Layout>
+                  <Campaigns />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/campaigns/analytics"
+            element={
+              <ProtectedRoute allowedRoles={['admin', 'sales_executive']}>
+                <Layout>
+                  <CampaignDashboard />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/campaigns/new"
+            element={
+              <ProtectedRoute allowedRoles={['admin']}>
+                <Layout>
+                  <CampaignForm />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/campaigns/:id"
+            element={
+              <ProtectedRoute allowedRoles={['admin', 'sales_executive']}>
+                <Layout>
+                  <CampaignDetail />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/campaigns/:id/edit"
+            element={
+              <ProtectedRoute allowedRoles={['admin']}>
+                <Layout>
+                  <CampaignForm />
                 </Layout>
               </ProtectedRoute>
             }
