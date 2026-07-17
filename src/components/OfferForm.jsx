@@ -71,6 +71,7 @@ const OfferForm = () => {
     max_usage: 0,
     is_stackable: false,
     is_active: true,
+    coupon_required: false,
     required_package_ids: [],
     reward_package_ids: [],
     required_addon_ids: [],
@@ -144,6 +145,7 @@ const OfferForm = () => {
         max_usage: offer.max_usage,
         is_stackable: offer.is_stackable,
         is_active: offer.is_active,
+        coupon_required: offer.coupon_required || false,
         required_package_ids,
         reward_package_ids,
         required_addon_ids,
@@ -603,6 +605,16 @@ const OfferForm = () => {
                   />
                   <label htmlFor="is_active" className="text-sm font-medium">
                     Active
+                  </label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="coupon_required"
+                    checked={formData.coupon_required}
+                    onCheckedChange={(checked) => handleChange('coupon_required', checked)}
+                  />
+                  <label htmlFor="coupon_required" className="text-sm font-medium">
+                    Coupon Required (Must validate a valid campaign coupon code to apply)
                   </label>
                 </div>
               </div>

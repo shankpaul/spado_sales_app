@@ -32,6 +32,8 @@ import {
   PackageOpen,
   Bell,
   Tag,
+  Gift,
+  Building,
   Package,
   Layers,
 } from 'lucide-react';
@@ -102,47 +104,102 @@ const Layout = ({ children }) => {
     }
   };
 
-  // Navigation items based on user role
-  const getNavigationItems = () => {
-    const commonItems = [
-      { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-    ];
+  // Navigation items grouped by category based on user role
+  const getNavigationGroups = () => {
+    const role = user?.role || 'admin';
 
-    const roleBasedItems = {
+    const groups = {
       admin: [
-        { name: 'Todays Work', href: '/todays-work', icon: ClipboardList },
-        { name: 'Customers', href: '/customers', icon: Users },
-        { name: 'Enquiries', href: '/enquiries', icon: PackageOpen },
-        { name: 'Orders', href: '/orders', icon: Calendar },
-        { name: 'Subscriptions', href: '/subscriptions', icon: Calendar },
-        { name: 'Offers', href: '/offers', icon: Tag },
-        { name: 'Packages', href: '/packages', icon: Package },
-        { name: 'Addons', href: '/addons', icon: Layers },
-        { name: 'Checklists', href: '/checklist-items', icon: ClipboardList },
-        { name: 'System Users', href: '/users', icon: UserCircle },
-        { name: 'Employees', href: '/employees', icon: Briefcase },
-        { name: 'Reports', href: '/reports', icon: BarChart3 },
-        // { name: 'Settings', href: '/settings', icon: Settings },
+        {
+          title: 'Overview',
+          items: [
+            { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+            { name: 'Todays Work', href: '/todays-work', icon: ClipboardList }
+          ]
+        },
+        {
+          title: 'Sales & CRM',
+          items: [
+            { name: 'Customers', href: '/customers', icon: Users },
+            { name: 'Enquiries', href: '/enquiries', icon: PackageOpen },
+            { name: 'Orders', href: '/orders', icon: Calendar },
+            { name: 'Subscriptions', href: '/subscriptions', icon: Calendar }
+          ]
+        },
+        {
+          title: 'Marketing',
+          items: [
+            { name: 'Offers', href: '/offers', icon: Tag },
+            { name: 'Campaigns', href: '/campaigns', icon: Gift },
+            { name: 'Partners', href: '/partners', icon: Building }
+          ]
+        },
+        {
+          title: 'Catalog & Config',
+          items: [
+            { name: 'Packages', href: '/packages', icon: Package },
+            { name: 'Addons', href: '/addons', icon: Layers },
+            { name: 'Checklists', href: '/checklist-items', icon: ClipboardList }
+          ]
+        },
+        {
+          title: 'User Management',
+          items: [
+            { name: 'System Users', href: '/users', icon: UserCircle },
+            { name: 'Employees', href: '/employees', icon: Briefcase },
+            { name: 'Reports', href: '/reports', icon: BarChart3 }
+          ]
+        }
       ],
       sales_executive: [
-        { name: 'Todays Work', href: '/todays-work', icon: ClipboardList },
-        { name: 'Customers', href: '/customers', icon: Users },
-        { name: 'Enquiries', href: '/enquiries', icon: PackageOpen },
-        { name: 'Orders', href: '/orders', icon: Calendar },
-        { name: 'Subscriptions', href: '/subscriptions', icon: Calendar },
+        {
+          title: 'Overview',
+          items: [
+            { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+            { name: 'Todays Work', href: '/todays-work', icon: ClipboardList }
+          ]
+        },
+        {
+          title: 'Sales & CRM',
+          items: [
+            { name: 'Customers', href: '/customers', icon: Users },
+            { name: 'Enquiries', href: '/enquiries', icon: PackageOpen },
+            { name: 'Orders', href: '/orders', icon: Calendar },
+            { name: 'Subscriptions', href: '/subscriptions', icon: Calendar }
+          ]
+        },
+        {
+          title: 'Marketing',
+          items: [
+            { name: 'Campaigns', href: '/campaigns', icon: Gift },
+            { name: 'Partners', href: '/partners', icon: Building }
+          ]
+        }
       ],
       accountant: [
-        { name: 'Transactions', href: '/transactions', icon: DollarSign },
-        { name: 'Reports', href: '/reports', icon: BarChart3 },
-        { name: 'Invoices', href: '/invoices', icon: ClipboardList },
-        { name: 'Payments', href: '/payments', icon: DollarSign },
-      ],
+        {
+          title: 'Overview',
+          items: [
+            { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard }
+          ]
+        },
+        {
+          title: 'Finance',
+          items: [
+            { name: 'Transactions', href: '/transactions', icon: DollarSign },
+            { name: 'Reports', href: '/reports', icon: BarChart3 },
+            { name: 'Invoices', href: '/invoices', icon: ClipboardList },
+            { name: 'Payments', href: '/payments', icon: DollarSign }
+          ]
+        }
+      ]
     };
 
-    return [...commonItems, ...(roleBasedItems[user?.role] || roleBasedItems.admin)];
+    return groups[role] || groups.admin;
   };
 
-  const navigationItems = getNavigationItems();
+  const navigationGroups = getNavigationGroups();
+  const navigationItems = navigationGroups.flatMap(group => group.items);
 
   // Generate breadcrumbs based on current path
   const getBreadcrumbs = () => {
@@ -177,21 +234,35 @@ const Layout = ({ children }) => {
   const NavItem = ({ item, mobile = false, collapsed = false }) => {
     const isActive = location.pathname === item.href;
     const Icon = item.icon;
+    const [isHovered, setIsHovered] = useState(false);
 
     return (
-      <Link
-        to={item.href}
-        onClick={() => mobile && setSidebarOpen(false)}
-        className={`flex items-center text-sm gap-3 rounded-lg transition-colors ${collapsed ? 'px-3 py-2 justify-center' : 'px-4 py-2'
-          } ${isActive
-            ? 'bg-primary text-primary-foreground'
-            : 'text-gray-700 hover:bg-gray-100'
-          }`}
-        title={collapsed ? item.name : undefined}
+      <div
+        className="relative"
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
       >
-        <Icon className="h-5 w-5" strokeWidth={1.5} />
-        {!collapsed && <span className="">{item.name}</span>}
-      </Link>
+        <Link
+          to={item.href}
+          onClick={() => mobile && setSidebarOpen(false)}
+          className={`flex items-center text-sm gap-3 rounded-lg transition-colors ${collapsed ? 'px-3 py-2 justify-center' : 'px-4 py-2'
+            } ${isActive
+              ? 'bg-primary text-primary-foreground shadow-sm font-semibold'
+              : 'text-gray-700 hover:bg-gray-100'
+            }`}
+        >
+          <Icon className="h-5 w-5" strokeWidth={1.5} />
+          {!collapsed && <span className="">{item.name}</span>}
+        </Link>
+
+        {collapsed && isHovered && (
+          <div className="absolute left-full top-1/2 -translate-y-1/2 ml-3 px-3 py-1.5 bg-gray-900 text-white text-xs font-semibold rounded-md whitespace-nowrap shadow-lg z-50 pointer-events-none select-none animate-in fade-in slide-in-from-left-2 duration-150">
+            {item.name}
+            {/* Popover Arrow */}
+            <div className="absolute right-full top-1/2 -translate-y-1/2 border-y-4 border-y-transparent border-r-4 border-r-gray-900" />
+          </div>
+        )}
+      </div>
     );
   };
 
@@ -246,11 +317,24 @@ const Layout = ({ children }) => {
           </div>
 
           {/* Navigation */}
-          <nav className="flex-1 overflow-y-auto p-4 space-y-1">
-            {navigationItems.map((item) => (
-              <NavItem key={item.name} item={item} mobile={true} collapsed={sidebarCollapsed} />
+          <nav className={`flex-grow p-4 space-y-6 ${sidebarCollapsed ? 'overflow-visible' : 'overflow-y-auto'}`}>
+            {navigationGroups.map((group) => (
+              <div key={group.title} className="space-y-2">
+                {!sidebarCollapsed && (
+                  <p className="px-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest leading-none">
+                    {group.title}
+                  </p>
+                )}
+                {sidebarCollapsed && (
+                  <div className="border-b border-gray-200/60 my-2 mx-2" />
+                )}
+                <div className="space-y-1">
+                  {group.items.map((item) => (
+                    <NavItem key={item.name} item={item} mobile={true} collapsed={sidebarCollapsed} />
+                  ))}
+                </div>
+              </div>
             ))}
-
           </nav>
 
           {/* Sidebar Bottom Area (Install button + Connection Status) */}
