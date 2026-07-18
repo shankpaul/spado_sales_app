@@ -302,11 +302,11 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
     return () => clearTimeout(timeoutId);
   }, [address.map_link]);
 
-  // Fetch available offers when step 4 is reached
+  // Fetch available offers when step 5 is reached
   useEffect(() => {
     const fetchOffers = async () => {
-      // Only fetch when on step 4
-      if (currentStep !== 4) {
+      // Only fetch when on step 5
+      if (currentStep !== 5) {
         return;
       }
 
@@ -368,11 +368,11 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
     fetchOffers();
   }, [currentStep, selectedCustomer, packageItems, addonItems]);
 
-  // Fetch loyalty points when customer is selected or step 4 is reached
+  // Fetch loyalty points when customer is selected or step 5 is reached
   useEffect(() => {
     const fetchLoyaltyData = async () => {
-      // Only fetch when on step 4
-      if (currentStep !== 4) {
+      // Only fetch when on step 5
+      if (currentStep !== 5) {
         return;
       }
 
@@ -418,7 +418,7 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
   // Check if selected offer is still valid when available offers change
   useEffect(() => {
     // Only proceed if we're on step 4 and have checked offers
-    if (currentStep !== 4 || loadingOffers) return;
+    if (currentStep !== 5 || loadingOffers) return;
 
     // If an offer is selected but not in available offers, it was already removed in fetchOffers
     // This useEffect is now mainly for edge cases
@@ -1010,7 +1010,9 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
       if (bookingTimeFrom && bookingTimeTo && bookingTimeFrom >= bookingTimeTo) {
         stepErrors.bookingTimeTo = 'End time must be after start time';
       }
+    }
 
+    if (step === 5) {
       // Validate coupon requirements
       if (selectedOffer && selectedOffer.coupon_required && !isCouponVerified) {
         stepErrors.coupon = 'A verified coupon is required for the selected offer';
@@ -1030,14 +1032,14 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
       return;
     }
 
-    for (let step = 1; step <= 4; step++) {
+    for (let step = 1; step <= 5; step++) {
       if (step === activeStep) continue; // Skip active step
 
       const stepErrors = getStepErrors(step);
       const errorCount = Object.keys(stepErrors).length;
 
       if (errorCount > 0) {
-        const stepName = ['Customer', 'Packages', 'Add-ons', 'Booking date'][step - 1];
+        const stepName = ['Customer', 'Packages', 'Add-ons', 'Booking schedule', 'Offers & Summary'][step - 1];
         errorMessages.push({
           step,
           stepName,
@@ -1071,7 +1073,7 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
     let firstInvalidStep = null;
 
     // Check all steps
-    for (let step = 1; step <= 4; step++) {
+    for (let step = 1; step <= 5; step++) {
       const stepErrors = getStepErrors(step);
       if (Object.keys(stepErrors).length > 0) {
         allValid = false;
@@ -1482,6 +1484,8 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
         return renderStep3();
       case 4:
         return renderStep4();
+      case 5:
+        return renderStep5();
       default:
         return null;
     }
@@ -1523,7 +1527,7 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
       {renderOtherStepErrors()}
 
       {/* Customer Search */}
-      <div className="rounded-xl border bg-card shadow-sm">
+      <div className="rounded-xl border bg-card">
         <div className="flex items-center gap-2 px-4 pt-4 pb-3 border-b">
           <div className="flex items-center justify-center w-7 h-7 rounded-lg bg-primary/10">
             <Search className="h-4 w-4 text-primary" />
@@ -1633,74 +1637,67 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
             )}
           </div>
           {errors.customer && <p className="text-xs text-destructive font-medium">{errors.customer}</p>}
+
+          {/* Selected Customer Inline display */}
+          {selectedCustomer && (
+            <div className="flex items-center gap-3 p-3 bg-secondary/30 rounded-xl border border-dashed mt-2">
+              <div className="flex items-center justify-center w-10 h-10 rounded-full bg-primary/10 text-primary font-bold text-base uppercase shrink-0">
+                {selectedCustomer.name.charAt(0)}
+              </div>
+              <div className="flex-1 min-w-0">
+                {editingCustomer ? (
+                  <div className="space-y-2">
+                    <Label className="text-[10px] text-muted-foreground font-medium">Phone (Order-specific)</Label>
+                    <div className="flex gap-1.5 items-center">
+                      <Input
+                        value={editCustomerData.phone}
+                        onChange={(e) => setEditCustomerData({ ...editCustomerData, phone: e.target.value })}
+                        placeholder="Phone number"
+                        className="h-8 text-xs flex-1"
+                      />
+                      <Button type="button" size="sm" className="h-8 text-xs px-2" onClick={() => { setCustomerPhone(editCustomerData.phone); setAddress({ ...address, area: editCustomerData.area || address.area, city: editCustomerData.city || address.city }); setEditingCustomer(false); saveDraft(); toast.success('Updated'); }}>
+                        <Check className="h-3 w-3" />
+                      </Button>
+                      <Button type="button" variant="outline" size="sm" className="h-8 text-xs px-2" onClick={() => { setEditingCustomer(false); setEditCustomerData({ phone: '', area: '', city: '' }); }}>
+                        <X className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <p className="font-bold text-sm text-gray-900 truncate">{selectedCustomer.name}</p>
+                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-0.5">
+                      <Phone className="h-3.5 w-3.5 shrink-0" />
+                      <span>{customerPhone || selectedCustomer.phone}</span>
+                      {customerPhone && customerPhone !== selectedCustomer.phone && (
+                        <span className="text-[9px] bg-amber-100 text-amber-700 px-1.5 py-0.2 rounded font-medium shrink-0">Order-specific</span>
+                      )}
+                    </div>
+                  </>
+                )}
+              </div>
+              {!editingCustomer && (
+                <div className="flex gap-1">
+                  <Button type="button" variant="ghost" size="sm" className="h-8 w-8 p-0 shrink-0 cursor-pointer"
+                    onClick={() => { setEditCustomerData({ phone: customerPhone || selectedCustomer.phone || '', area: address.area || selectedCustomer.area || '', city: address.city || selectedCustomer.city || '' }); setEditingCustomer(true); }}
+                    title="Edit details">
+                    <PenIcon className="h-3.5 w-3.5 text-gray-500" />
+                  </Button>
+                  {!orderId && (
+                    <Button type="button" variant="ghost" size="sm" className="h-8 w-8 p-0 shrink-0 cursor-pointer"
+                      onClick={() => { setSelectedCustomer(null); setCustomerSearchTerm(''); setEditingCustomer(false); }}>
+                      <X className="h-4 w-4 text-gray-500" />
+                    </Button>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Selected Customer Card */}
-      {selectedCustomer && (
-        <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
-          <div className="flex items-center gap-2 px-4 pt-4 pb-3 border-b">
-            <div className="flex items-center justify-center w-7 h-7 rounded-lg bg-green-100">
-              <User className="h-4 w-4 text-green-600" />
-            </div>
-            <span className="font-semibold text-sm text-green-800">Customer Selected</span>
-            <div className="ml-auto flex gap-1">
-              {!editingCustomer && (
-                <Button type="button" variant="ghost" size="sm" className="h-7 w-7 p-0"
-                  onClick={() => { setEditCustomerData({ phone: customerPhone || selectedCustomer.phone || '', area: address.area || selectedCustomer.area || '', city: address.city || selectedCustomer.city || '' }); setEditingCustomer(true); }}
-                  title="Edit details">
-                  <PenIcon className="h-3.5 w-3.5" />
-                </Button>
-              )}
-              {!orderId && (
-                <Button type="button" variant="ghost" size="sm" className="h-7 w-7 p-0"
-                  onClick={() => { setSelectedCustomer(null); setCustomerSearchTerm(''); setEditingCustomer(false); }}>
-                  <X className="h-3.5 w-3.5" />
-                </Button>
-              )}
-            </div>
-          </div>
-          <div className="p-4">
-            {editingCustomer ? (
-              <div className="space-y-3">
-                <div>
-                  <Label className="text-xs text-muted-foreground font-medium">Phone (Order-specific)</Label>
-                  <Input
-                    value={editCustomerData.phone}
-                    onChange={(e) => setEditCustomerData({ ...editCustomerData, phone: e.target.value })}
-                    placeholder="Phone number"
-                    className="h-9 mt-1"
-                  />
-                </div>
-                <div className="flex gap-2">
-                  <Button type="button" size="sm" onClick={() => { setCustomerPhone(editCustomerData.phone); setAddress({ ...address, area: editCustomerData.area || address.area, city: editCustomerData.city || address.city }); setEditingCustomer(false); saveDraft(); toast.success('Updated'); }}>
-                    <Check className="h-3 w-3 mr-1" /> Save
-                  </Button>
-                  <Button type="button" variant="outline" size="sm" onClick={() => { setEditingCustomer(false); setEditCustomerData({ phone: '', area: '', city: '' }); }}>
-                    Cancel
-                  </Button>
-                </div>
-              </div>
-            ) : (
-              <div className="space-y-1.5">
-                <div className="flex items-center gap-2">
-                  <span className="text-base font-bold">{selectedCustomer.name}</span>
-                </div>
-                <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                  <Phone className="h-3.5 w-3.5 shrink-0" />
-                  <span>{customerPhone || selectedCustomer.phone}</span>
-                  {customerPhone && customerPhone !== selectedCustomer.phone && (
-                    <span className="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-medium">Order-specific</span>
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
       {/* Address */}
-      <div className="rounded-xl border bg-card shadow-sm">
+      <div className="rounded-xl border bg-card">
         <div className="flex items-center gap-2 px-4 pt-4 pb-3 border-b">
           <div className="flex items-center justify-center w-7 h-7 rounded-lg bg-orange-100">
             <MapPin className="h-4 w-4 text-orange-600" />
@@ -1796,146 +1793,288 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
             </Button>
           </div>
         ) : (
-          <div className="space-y-3">
-            {packageItems.map((item, index) => {
-              const hasError = errors[`package_${index}_vehicle_type`] || errors[`package_${index}_package`];
-              return (
-                <div key={index} className={`rounded-xl border bg-card shadow-sm overflow-hidden ${item.is_reward ? 'border-green-200' : ''}`}>
-                  {/* Card Header */}
-                  <div className={`flex items-center gap-2 px-4 pt-3.5 pb-3 border-b ${item.is_reward ? 'bg-green-50' : 'bg-muted/30'}`}>
-                    <Package className="h-4 w-4 text-muted-foreground" />
-                    <span className="font-semibold text-sm">Service {index + 1}</span>
-                    {item.is_reward && (
-                      <span className="flex items-center gap-1 px-2 py-0.5 bg-green-600 text-white text-[10px] rounded-full font-bold">
-                        <Gift className="h-3 w-3" /> Offer Reward
-                      </span>
-                    )}
-                    <div className="ml-auto flex gap-1">
-                      {!item.is_reward && (
-                        <>
-                          <Button type="button" variant="ghost" size="sm" className="h-7 text-xs gap-1"
-                            onClick={() => { setIdentifyDialog({ open: true, index }); setIdentifyBrand(''); setIdentifyModel(''); }}>
-                            <Search className="h-3 w-3" />
-                            <span className="hidden sm:inline">Identify</span>
-                          </Button>
-                          <Button type="button" variant="ghost" size="sm" className="h-7 w-7 p-0"
-                            onClick={() => setDeletePackageDialog({ open: true, index })}>
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                          </Button>
-                        </>
+          <>
+            {/* Mobile View - Cards */}
+            <div className="space-y-3 md:hidden">
+              {packageItems.map((item, index) => {
+                const hasError = errors[`package_${index}_vehicle_type`] || errors[`package_${index}_package`];
+                return (
+                  <div key={index} className={`rounded-xl border bg-card overflow-hidden ${item.is_reward ? 'border-green-200' : ''}`}>
+                    <div className={`flex items-center gap-2 px-4 pt-3.5 pb-3 border-b ${item.is_reward ? 'bg-green-50' : 'bg-muted/30'}`}>
+                      <Package className="h-4 w-4 text-muted-foreground" />
+                      <span className="font-semibold text-sm">Service {index + 1}</span>
+                      {item.is_reward && (
+                        <span className="flex items-center gap-1 px-2 py-0.5 bg-green-600 text-white text-[10px] rounded-full font-bold">
+                          <Gift className="h-3 w-3" /> Offer Reward
+                        </span>
                       )}
-                    </div>
-                  </div>
-
-                  <div className="p-4 space-y-4">
-                    {hasError && (
-                      <div className="flex items-center gap-2 text-destructive text-xs bg-destructive/10 px-3 py-2 rounded-lg">
-                        <X className="h-3.5 w-3.5 shrink-0" />
-                        {errors[`package_${index}_vehicle_type`] && 'Vehicle type is required. '}
-                        {errors[`package_${index}_package`] && 'Package selection is required.'}
+                      <div className="ml-auto flex gap-1">
+                        {!item.is_reward && (
+                          <>
+                            <Button type="button" variant="ghost" size="sm" className="h-7 text-xs gap-1"
+                              onClick={() => { setIdentifyDialog({ open: true, index }); setIdentifyBrand(''); setIdentifyModel(''); }}>
+                              <Search className="h-3 w-3" />
+                              <span className="hidden sm:inline">Identify</span>
+                            </Button>
+                            <Button type="button" variant="ghost" size="sm" className="h-7 w-7 p-0"
+                              onClick={() => setDeletePackageDialog({ open: true, index })}>
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </>
+                        )}
                       </div>
-                    )}
+                    </div>
 
-                    {/* Vehicle Type Selector */}
-                    <div>
-                      <Label className="text-xs text-muted-foreground font-medium mb-2 block">Vehicle Type</Label>
-                      <div className="grid grid-cols-4 gap-1.5">
-                        {['hatchback', 'sedan', 'suv', 'luxury'].map((type) => (
-                          <button
-                            key={type}
-                            type="button"
-                            onClick={() => updatePackageItem(index, 'vehicle_type', type)}
-                            disabled={item.is_reward}
-                            className={`flex flex-col items-center justify-center gap-1 p-2 rounded-xl border-2 transition-all active:scale-95 ${item.vehicle_type === type
-                              ? 'border-primary bg-primary text-white shadow-md'
-                              : 'border-muted-foreground/20 bg-background hover:border-primary/40 hover:bg-primary/5'
+                    <div className="p-4 space-y-4">
+                      {hasError && (
+                        <div className="flex items-center gap-2 text-destructive text-xs bg-destructive/10 px-3 py-2 rounded-lg">
+                          <X className="h-3.5 w-3.5 shrink-0" />
+                          {errors[`package_${index}_vehicle_type`] && 'Vehicle type is required. '}
+                          {errors[`package_${index}_package`] && 'Package selection is required.'}
+                        </div>
+                      )}
+
+                      <div>
+                        <Label className="text-xs text-muted-foreground font-medium mb-2 block">Vehicle Type</Label>
+                        <div className="grid grid-cols-4 gap-1.5">
+                          {['hatchback', 'sedan', 'suv', 'luxury'].map((type) => (
+                            <button
+                              key={type}
+                              type="button"
+                              onClick={() => updatePackageItem(index, 'vehicle_type', type)}
+                              disabled={item.is_reward}
+                              className={`flex flex-col items-center justify-center gap-1 p-2 rounded-xl border-2 transition-all active:scale-95 ${
+                                item.vehicle_type === type
+                                  ? 'border-primary bg-primary text-white shadow-md'
+                                  : 'border-muted-foreground/20 bg-background hover:border-primary/40'
                               }`}
+                            >
+                              <VehicleIcon vehicleType={type} size={28} className={item.vehicle_type === type ? 'text-white' : 'text-foreground'} />
+                              <span className="text-[10px] font-bold capitalize leading-none">{type}</span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="flex items-end gap-3">
+                        <div className="flex-1 min-w-0">
+                          <Label className="text-xs text-muted-foreground font-medium mb-1 block">Package *</Label>
+                          <Select
+                            value={item.package_id}
+                            onValueChange={(v) => updatePackageItem(index, 'package_id', v)}
+                            disabled={!item.vehicle_type || item.is_reward}
                           >
-                            <VehicleIcon vehicleType={type} size={28} className={item.vehicle_type === type ? 'text-white' : 'text-foreground'} />
-                            <span className="text-[10px] font-bold capitalize leading-none">{type}</span>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Package + Quantity Row */}
-                    <div className="flex items-end gap-3">
-                      <div className="flex-1 min-w-0">
-                        <Label className="text-xs text-muted-foreground font-medium mb-1 block">Package *</Label>
-                        <Select
-                          value={item.package_id}
-                          onValueChange={(v) => updatePackageItem(index, 'package_id', v)}
-                          disabled={!item.vehicle_type || item.is_reward}
-                        >
-                          <SelectTrigger className="h-9 text-sm w-full">
-                            <SelectValue placeholder={item.vehicle_type ? "Select package" : "Select vehicle type first"} />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {packages.filter((p) => p.vehicle_type?.toLowerCase() === item.vehicle_type?.toLowerCase())
-                              .map((pkg) => (
-                                <SelectItem key={pkg.id} value={String(pkg.id)}>
-                                  {pkg.name} — ₹{pkg.unit_price || pkg.price || pkg.base_price}
-                                </SelectItem>
-                              ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="shrink-0">
-                        <Label className="text-xs text-muted-foreground font-medium mb-1 block">Qty</Label>
-                        <div className="flex items-center gap-1">
-                          <Button type="button" size="icon" className="h-9 w-9 rounded-full"
-                            onClick={() => updatePackageItem(index, 'quantity', Math.max(1, item.quantity - 1))}
-                            disabled={item.quantity <= 1 || item.is_reward}>
-                            <Minus className="h-3.5 w-3.5" />
-                          </Button>
-                          <span className="w-8 text-center font-bold text-sm">{item.quantity}</span>
-                          <Button type="button" size="icon" className="h-9 w-9 rounded-full"
-                            onClick={() => updatePackageItem(index, 'quantity', item.quantity + 1)}
-                            disabled={item.is_reward}>
-                            <Plus className="h-3.5 w-3.5" />
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Discount + Amount Row */}
-                    <div className="flex items-end justify-between gap-3">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-1.5">
-                          <Checkbox
-                            id={`pkg-discount-enable-${index}`}
-                            checked={item.enable_custom_discount || false}
-                            disabled={item.is_reward}
-                            onCheckedChange={(checked) => { updatePackageItem(index, 'enable_custom_discount', !!checked); if (!checked) updatePackageItem(index, 'discount_value', 0); }}
-                          />
-                          <label htmlFor={`pkg-discount-enable-${index}`} className="text-[10px] font-medium text-gray-600 cursor-pointer">Custom Discount</label>
-                        </div>
-                        <div className="flex gap-1">
-                          <Input type="number" min="0" placeholder="0"
-                            value={item.discount_value || ''}
-                            onChange={(e) => { const v = e.target.value; const n = v === '' ? 0 : parseFloat(v); updatePackageItem(index, 'discount_value', isNaN(n) ? 0 : n); }}
-                            className="h-8 text-sm"
-                            disabled={item.is_reward || !item.enable_custom_discount}
-                          />
-                          <Select value={item.discount_type} onValueChange={(v) => updatePackageItem(index, 'discount_type', v)} disabled={item.is_reward || !item.enable_custom_discount}>
-                            <SelectTrigger className="h-8 w-14 text-xs"><SelectValue /></SelectTrigger>
+                            <SelectTrigger className="h-9 text-sm w-full">
+                              <SelectValue placeholder={item.vehicle_type ? "Select package" : "Select vehicle type first"} />
+                            </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value={DISCOUNT_TYPES.FIXED}>₹</SelectItem>
-                              <SelectItem value={DISCOUNT_TYPES.PERCENTAGE}>%</SelectItem>
+                              {packages.filter((p) => p.vehicle_type?.toLowerCase() === item.vehicle_type?.toLowerCase())
+                                .map((pkg) => (
+                                  <SelectItem key={pkg.id} value={String(pkg.id)}>
+                                    {pkg.name} — ₹{pkg.unit_price || pkg.price || pkg.base_price}
+                                  </SelectItem>
+                                ))}
                             </SelectContent>
                           </Select>
                         </div>
+                        <div className="shrink-0">
+                          <Label className="text-xs text-muted-foreground font-medium mb-1 block">Qty</Label>
+                          <div className="flex items-center gap-1">
+                            <Button type="button" size="icon" className="h-9 w-9 rounded-full"
+                              onClick={() => updatePackageItem(index, 'quantity', Math.max(1, item.quantity - 1))}
+                              disabled={item.quantity <= 1 || item.is_reward}>
+                              <Minus className="h-3.5 w-3.5" />
+                            </Button>
+                            <span className="w-8 text-center font-bold text-sm">{item.quantity}</span>
+                            <Button type="button" size="icon" className="h-9 w-9 rounded-full"
+                              onClick={() => updatePackageItem(index, 'quantity', item.quantity + 1)}
+                              disabled={item.is_reward}>
+                              <Plus className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        </div>
                       </div>
-                      <div className="text-right shrink-0">
-                        <p className="text-[10px] text-muted-foreground font-medium mb-0.5">Amount</p>
-                        <p className="text-2xl font-black text-primary leading-none">₹{calculateLineTotal(item).toFixed(0)}</p>
+
+                      <div className="flex items-end justify-between gap-3">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1.5">
+                            <Checkbox
+                              id={`pkg-discount-enable-${index}`}
+                              checked={item.enable_custom_discount || false}
+                              disabled={item.is_reward}
+                              onCheckedChange={(checked) => { updatePackageItem(index, 'enable_custom_discount', !!checked); if (!checked) updatePackageItem(index, 'discount_value', 0); }}
+                            />
+                            <label htmlFor={`pkg-discount-enable-${index}`} className="text-[10px] font-medium text-gray-600 cursor-pointer">Custom Discount</label>
+                          </div>
+                          <div className="flex gap-1">
+                            <Input type="number" min="0" placeholder="0"
+                              value={item.discount_value || ''}
+                              onChange={(e) => { const v = e.target.value; const n = v === '' ? 0 : parseFloat(v); updatePackageItem(index, 'discount_value', isNaN(n) ? 0 : n); }}
+                              className="h-8 text-sm"
+                              disabled={item.is_reward || !item.enable_custom_discount}
+                            />
+                            <Select value={item.discount_type} onValueChange={(v) => updatePackageItem(index, 'discount_type', v)} disabled={item.is_reward || !item.enable_custom_discount}>
+                              <SelectTrigger className="h-8 w-14 text-xs"><SelectValue /></SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value={DISCOUNT_TYPES.FIXED}>₹</SelectItem>
+                                <SelectItem value={DISCOUNT_TYPES.PERCENTAGE}>%</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <p className="text-[10px] text-muted-foreground font-medium mb-0.5">Amount</p>
+                          <p className="text-2xl font-black text-primary leading-none">₹{calculateLineTotal(item).toFixed(0)}</p>
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+
+            {/* Desktop View - Table */}
+            <div className="hidden md:block border rounded-xl overflow-hidden bg-card">
+              <table className="w-full border-collapse text-left">
+                <thead>
+                  <tr className="bg-muted/40 border-b text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                    <th className="p-3 w-40">Vehicle Type</th>
+                    <th className="p-3">Package *</th>
+                    <th className="p-3 w-36">Quantity *</th>
+                    <th className="p-3 w-56">Custom Discount</th>
+                    <th className="p-3 text-right w-28">Amount</th>
+                    <th className="p-3 text-center w-36">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  {packageItems.map((item, index) => {
+                    const hasError = errors[`package_${index}_vehicle_type`] || errors[`package_${index}_package`];
+                    return (
+                      <tr key={index} className={`hover:bg-secondary/20 transition-colors ${item.is_reward ? 'bg-green-50/50' : ''} ${hasError ? 'bg-destructive/5' : ''}`}>
+                        <td className="p-3 align-middle">
+                          <Select
+                            value={item.vehicle_type}
+                            onValueChange={(val) => updatePackageItem(index, 'vehicle_type', val)}
+                            disabled={item.is_reward}
+                          >
+                            <SelectTrigger className="h-9 w-32 border-gray-300 text-sm">
+                              <SelectValue placeholder="Vehicle Type" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="hatchback">Hatchback</SelectItem>
+                              <SelectItem value="sedan">Sedan</SelectItem>
+                              <SelectItem value="suv">SUV</SelectItem>
+                              <SelectItem value="luxury">Luxury</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </td>
+
+                        <td className="p-3 align-middle">
+                          <Select
+                            value={item.package_id}
+                            onValueChange={(v) => updatePackageItem(index, 'package_id', v)}
+                            disabled={!item.vehicle_type || item.is_reward}
+                          >
+                            <SelectTrigger className="h-9 w-full border-gray-300 text-sm">
+                              <SelectValue placeholder={item.vehicle_type ? "Select package" : "Choose vehicle type first"} />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {packages
+                                .filter((p) => p.vehicle_type?.toLowerCase() === item.vehicle_type?.toLowerCase())
+                                .map((pkg) => (
+                                  <SelectItem key={pkg.id} value={String(pkg.id)}>
+                                    {pkg.name} — ₹{pkg.unit_price || pkg.price || pkg.base_price}
+                                  </SelectItem>
+                                ))}
+                            </SelectContent>
+                          </Select>
+                        </td>
+
+                        <td className="p-3 align-middle">
+                          <div className="flex items-center gap-1">
+                            <Button type="button" size="icon" className="h-8 w-8 rounded-full border" variant="outline"
+                              onClick={() => updatePackageItem(index, 'quantity', Math.max(1, item.quantity - 1))}
+                              disabled={item.quantity <= 1 || item.is_reward}>
+                              <Minus className="h-3 w-3" />
+                            </Button>
+                            <span className="w-6 text-center font-bold text-sm">{item.quantity}</span>
+                            <Button type="button" size="icon" className="h-8 w-8 rounded-full border" variant="outline"
+                              onClick={() => updatePackageItem(index, 'quantity', item.quantity + 1)}
+                              disabled={item.is_reward}>
+                              <Plus className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        </td>
+
+                        <td className="p-3 align-middle">
+                          <div className="flex flex-col gap-1.5">
+                            <div className="flex items-center gap-1.5">
+                              <Checkbox
+                                id={`pkg-discount-enable-desktop-${index}`}
+                                checked={item.enable_custom_discount || false}
+                                disabled={item.is_reward}
+                                onCheckedChange={(checked) => {
+                                  updatePackageItem(index, 'enable_custom_discount', !!checked);
+                                  if (!checked) updatePackageItem(index, 'discount_value', 0);
+                                }}
+                              />
+                              <label htmlFor={`pkg-discount-enable-desktop-${index}`} className="text-[10px] font-medium text-gray-600 cursor-pointer select-none">
+                                Enable Discount
+                              </label>
+                            </div>
+                            {item.enable_custom_discount && (
+                              <div className="flex gap-1">
+                                <Input type="number" min="0" placeholder="0"
+                                  value={item.discount_value || ''}
+                                  onChange={(e) => {
+                                    const v = e.target.value;
+                                    const n = v === '' ? 0 : parseFloat(v);
+                                    updatePackageItem(index, 'discount_value', isNaN(n) ? 0 : n);
+                                  }}
+                                  className="h-8 text-sm w-20 border-gray-300"
+                                />
+                                <Select value={item.discount_type} onValueChange={(v) => updatePackageItem(index, 'discount_type', v)}>
+                                  <SelectTrigger className="h-8 w-12 text-xs border-gray-300"><SelectValue /></SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value={DISCOUNT_TYPES.FIXED}>₹</SelectItem>
+                                    <SelectItem value={DISCOUNT_TYPES.PERCENTAGE}>%</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                            )}
+                          </div>
+                        </td>
+
+                        <td className="p-3 align-middle text-right">
+                          <span className="font-bold text-base text-primary">₹{calculateLineTotal(item).toFixed(0)}</span>
+                        </td>
+
+                        <td className="p-3 align-middle text-center">
+                          <div className="flex items-center justify-center gap-1.5">
+                            {!item.is_reward ? (
+                              <>
+                                <Button type="button" variant="ghost" size="sm" className="h-8 text-xs gap-1 border border-primary/20 text-primary hover:bg-primary/5 px-2 cursor-pointer"
+                                  onClick={() => { setIdentifyDialog({ open: true, index }); setIdentifyBrand(''); setIdentifyModel(''); }}>
+                                  <Search className="h-3 w-3" />
+                                  <span>Identify</span>
+                                </Button>
+                                <Button type="button" variant="ghost" size="sm" className="h-8 w-8 p-0 border border-destructive/20 text-destructive hover:bg-destructive/5 cursor-pointer"
+                                  onClick={() => setDeletePackageDialog({ open: true, index })}>
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </>
+                            ) : (
+                              <span className="text-[10px] font-bold text-green-600 bg-green-50 border border-green-200 px-2.5 py-0.5 rounded-full">Reward</span>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
       </div>
     );
@@ -1981,106 +2120,219 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
             </Button>
           </div>
         ) : (
-          <div className="space-y-3">
-            {addonItems.map((item, index) => {
-              const hasError = errors[`addon_${index}_addon`];
-              return (
-                <div key={index} className={`rounded-xl border bg-card shadow-sm overflow-hidden ${item.is_reward ? 'border-green-200' : ''}`}>
-                  <div className={`flex items-center gap-2 px-4 pt-3.5 pb-3 border-b ${item.is_reward ? 'bg-green-50' : 'bg-muted/30'}`}>
-                    <ShoppingCart className="h-4 w-4 text-muted-foreground" />
-                    <span className="font-semibold text-sm">Add-on {index + 1}</span>
-                    {item.is_reward && (
-                      <span className="flex items-center gap-1 px-2 py-0.5 bg-green-600 text-white text-[10px] rounded-full font-bold">
-                        <Gift className="h-3 w-3" /> Offer Reward
-                      </span>
-                    )}
-                    {!item.is_reward && (
-                      <Button type="button" variant="ghost" size="sm" className="ml-auto h-7 w-7 p-0"
-                        onClick={() => removeAddonItem(index)}>
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
-                    )}
-                  </div>
-
-                  <div className="p-4 space-y-4">
-                    {hasError && (
-                      <div className="flex items-center gap-2 text-destructive text-xs bg-destructive/10 px-3 py-2 rounded-lg">
-                        <X className="h-3.5 w-3.5 shrink-0" />
-                        Add-on selection is required
-                      </div>
-                    )}
-
-                    <div className="flex items-end gap-3">
-                      <div className="flex-1 min-w-0">
-                        <Label className="text-xs text-muted-foreground font-medium mb-1 block">Add-on Service *</Label>
-                        <Select value={item.addon_id} onValueChange={(v) => updateAddonItem(index, 'addon_id', v)} disabled={item.is_reward}>
-                          <SelectTrigger className="h-9 text-sm w-full">
-                            <SelectValue placeholder="Select add-on" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {addons.map((addon) => (
-                              <SelectItem key={addon.id} value={String(addon.id)}>
-                                {addon.name} — ₹{addon.unit_price || addon.price}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="shrink-0">
-                        <Label className="text-xs text-muted-foreground font-medium mb-1 block">Qty</Label>
-                        <div className="flex items-center gap-1">
-                          <Button type="button" size="icon" className="h-9 w-9 rounded-full"
-                            onClick={() => updateAddonItem(index, 'quantity', Math.max(1, item.quantity - 1))}
-                            disabled={item.quantity <= 1 || item.is_reward}>
-                            <Minus className="h-3.5 w-3.5" />
-                          </Button>
-                          <span className="w-8 text-center font-bold text-sm">{item.quantity}</span>
-                          <Button type="button" size="icon" className="h-9 w-9 rounded-full"
-                            onClick={() => updateAddonItem(index, 'quantity', item.quantity + 1)}
-                            disabled={item.is_reward}>
-                            <Plus className="h-3.5 w-3.5" />
-                          </Button>
-                        </div>
-                      </div>
+          <>
+            {/* Mobile View - Cards */}
+            <div className="space-y-3 md:hidden">
+              {addonItems.map((item, index) => {
+                const hasError = errors[`addon_${index}_addon`];
+                return (
+                  <div key={index} className={`rounded-xl border bg-card overflow-hidden ${item.is_reward ? 'border-green-200' : ''}`}>
+                    <div className={`flex items-center gap-2 px-4 pt-3.5 pb-3 border-b ${item.is_reward ? 'bg-green-50' : 'bg-muted/30'}`}>
+                      <ShoppingCart className="h-4 w-4 text-muted-foreground" />
+                      <span className="font-semibold text-sm">Add-on {index + 1}</span>
+                      {item.is_reward && (
+                        <span className="flex items-center gap-1 px-2 py-0.5 bg-green-600 text-white text-[10px] rounded-full font-bold">
+                          <Gift className="h-3 w-3" /> Offer Reward
+                        </span>
+                      )}
+                      {!item.is_reward && (
+                        <Button type="button" variant="ghost" size="sm" className="ml-auto h-7 w-7 p-0"
+                          onClick={() => removeAddonItem(index)}>
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      )}
                     </div>
 
-                    <div className="flex items-end justify-between gap-3">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-1.5">
-                          <Checkbox
-                            id={`addon-discount-enable-${index}`}
-                            checked={item.enable_custom_discount || false}
-                            disabled={item.is_reward}
-                            onCheckedChange={(checked) => { updateAddonItem(index, 'enable_custom_discount', !!checked); if (!checked) updateAddonItem(index, 'discount_value', 0); }}
-                          />
-                          <label htmlFor={`addon-discount-enable-${index}`} className="text-[10px] font-medium text-gray-600 cursor-pointer">Custom Discount</label>
+                    <div className="p-4 space-y-4">
+                      {hasError && (
+                        <div className="flex items-center gap-2 text-destructive text-xs bg-destructive/10 px-3 py-2 rounded-lg">
+                          <X className="h-3.5 w-3.5 shrink-0" />
+                          Add-on selection is required
                         </div>
-                        <div className="flex gap-1">
-                          <Input type="number" min="0" placeholder="0"
-                            value={item.discount_value || ''}
-                            onChange={(e) => { const v = e.target.value; const n = v === '' ? 0 : parseFloat(v); updateAddonItem(index, 'discount_value', isNaN(n) ? 0 : n); }}
-                            className="h-8 text-sm"
-                            disabled={item.is_reward || !item.enable_custom_discount}
-                          />
-                          <Select value={item.discount_type} onValueChange={(v) => updateAddonItem(index, 'discount_type', v)} disabled={item.is_reward || !item.enable_custom_discount}>
-                            <SelectTrigger className="h-8 w-14 text-xs"><SelectValue /></SelectTrigger>
+                      )}
+
+                      <div className="flex items-end gap-3">
+                        <div className="flex-1 min-w-0">
+                          <Label className="text-xs text-muted-foreground font-medium mb-1 block">Add-on Service *</Label>
+                          <Select value={item.addon_id} onValueChange={(v) => updateAddonItem(index, 'addon_id', v)} disabled={item.is_reward}>
+                            <SelectTrigger className="h-9 text-sm w-full">
+                              <SelectValue placeholder="Select add-on" />
+                            </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value={DISCOUNT_TYPES.FIXED}>₹</SelectItem>
-                              <SelectItem value={DISCOUNT_TYPES.PERCENTAGE}>%</SelectItem>
+                              {addons.map((addon) => (
+                                <SelectItem key={addon.id} value={String(addon.id)}>
+                                  {addon.name} — ₹{addon.unit_price || addon.price}
+                                </SelectItem>
+                              ))}
                             </SelectContent>
                           </Select>
                         </div>
+                        <div className="shrink-0">
+                          <Label className="text-xs text-muted-foreground font-medium mb-1 block">Qty</Label>
+                          <div className="flex items-center gap-1">
+                            <Button type="button" size="icon" className="h-9 w-9 rounded-full"
+                              onClick={() => updateAddonItem(index, 'quantity', Math.max(1, item.quantity - 1))}
+                              disabled={item.quantity <= 1 || item.is_reward}>
+                              <Minus className="h-3.5 w-3.5" />
+                            </Button>
+                            <span className="w-8 text-center font-bold text-sm">{item.quantity}</span>
+                            <Button type="button" size="icon" className="h-9 w-9 rounded-full"
+                              onClick={() => updateAddonItem(index, 'quantity', item.quantity + 1)}
+                              disabled={item.is_reward}>
+                              <Plus className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        </div>
                       </div>
-                      <div className="text-right shrink-0">
-                        <p className="text-[10px] text-muted-foreground font-medium mb-0.5">Amount</p>
-                        <p className="text-2xl font-black text-primary leading-none">₹{calculateLineTotal(item).toFixed(0)}</p>
+
+                      <div className="flex items-end justify-between gap-3">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1.5">
+                            <Checkbox
+                              id={`addon-discount-enable-${index}`}
+                              checked={item.enable_custom_discount || false}
+                              disabled={item.is_reward}
+                              onCheckedChange={(checked) => { updateAddonItem(index, 'enable_custom_discount', !!checked); if (!checked) updateAddonItem(index, 'discount_value', 0); }}
+                            />
+                            <label htmlFor={`addon-discount-enable-${index}`} className="text-[10px] font-medium text-gray-600 cursor-pointer">Custom Discount</label>
+                          </div>
+                          <div className="flex gap-1">
+                            <Input type="number" min="0" placeholder="0"
+                              value={item.discount_value || ''}
+                              onChange={(e) => { const v = e.target.value; const n = v === '' ? 0 : parseFloat(v); updateAddonItem(index, 'discount_value', isNaN(n) ? 0 : n); }}
+                              className="h-8 text-sm"
+                              disabled={item.is_reward || !item.enable_custom_discount}
+                            />
+                            <Select value={item.discount_type} onValueChange={(v) => updateAddonItem(index, 'discount_type', v)} disabled={item.is_reward || !item.enable_custom_discount}>
+                              <SelectTrigger className="h-8 w-14 text-xs"><SelectValue /></SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value={DISCOUNT_TYPES.FIXED}>₹</SelectItem>
+                                <SelectItem value={DISCOUNT_TYPES.PERCENTAGE}>%</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <p className="text-[10px] text-muted-foreground font-medium mb-0.5">Amount</p>
+                          <p className="text-2xl font-black text-primary leading-none">₹{calculateLineTotal(item).toFixed(0)}</p>
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+
+            {/* Desktop View - Table */}
+            <div className="hidden md:block border rounded-xl overflow-hidden bg-card">
+              <table className="w-full border-collapse text-left">
+                <thead>
+                  <tr className="bg-muted/40 border-b text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                    <th className="p-3">Add-on Service *</th>
+                    <th className="p-3 w-36">Quantity *</th>
+                    <th className="p-3 w-56">Custom Discount</th>
+                    <th className="p-3 text-right w-28">Amount</th>
+                    <th className="p-3 text-center w-24">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  {addonItems.map((item, index) => {
+                    const hasError = errors[`addon_${index}_addon`];
+                    return (
+                      <tr key={index} className={`hover:bg-secondary/20 transition-colors ${item.is_reward ? 'bg-green-50/50' : ''} ${hasError ? 'bg-destructive/5' : ''}`}>
+                        <td className="p-3 align-middle">
+                          <Select value={item.addon_id} onValueChange={(v) => updateAddonItem(index, 'addon_id', v)} disabled={item.is_reward}>
+                            <SelectTrigger className="h-9 w-full border-gray-300 text-sm">
+                              <SelectValue placeholder="Select add-on" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {addons.map((addon) => (
+                                <SelectItem key={addon.id} value={String(addon.id)}>
+                                  {addon.name} — ₹{addon.unit_price || addon.price}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </td>
+
+                        <td className="p-3 align-middle">
+                          <div className="flex items-center gap-1">
+                            <Button type="button" size="icon" className="h-8 w-8 rounded-full border" variant="outline"
+                              onClick={() => updateAddonItem(index, 'quantity', Math.max(1, item.quantity - 1))}
+                              disabled={item.quantity <= 1 || item.is_reward}>
+                              <Minus className="h-3 w-3" />
+                            </Button>
+                            <span className="w-6 text-center font-bold text-sm">{item.quantity}</span>
+                            <Button type="button" size="icon" className="h-8 w-8 rounded-full border" variant="outline"
+                              onClick={() => updateAddonItem(index, 'quantity', item.quantity + 1)}
+                              disabled={item.is_reward}>
+                              <Plus className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        </td>
+
+                        <td className="p-3 align-middle">
+                          <div className="flex flex-col gap-1.5">
+                            <div className="flex items-center gap-1.5">
+                              <Checkbox
+                                id={`addon-discount-enable-desktop-${index}`}
+                                checked={item.enable_custom_discount || false}
+                                disabled={item.is_reward}
+                                onCheckedChange={(checked) => {
+                                  updateAddonItem(index, 'enable_custom_discount', !!checked);
+                                  if (!checked) updateAddonItem(index, 'discount_value', 0);
+                                }}
+                              />
+                              <label htmlFor={`addon-discount-enable-desktop-${index}`} className="text-[10px] font-medium text-gray-600 cursor-pointer select-none">
+                                Enable Discount
+                              </label>
+                            </div>
+                            {item.enable_custom_discount && (
+                              <div className="flex gap-1">
+                                <Input type="number" min="0" placeholder="0"
+                                  value={item.discount_value || ''}
+                                  onChange={(e) => {
+                                    const v = e.target.value;
+                                    const n = v === '' ? 0 : parseFloat(v);
+                                    updateAddonItem(index, 'discount_value', isNaN(n) ? 0 : n);
+                                  }}
+                                  className="h-8 text-sm w-20 border-gray-300"
+                                />
+                                <Select value={item.discount_type} onValueChange={(v) => updateAddonItem(index, 'discount_type', v)}>
+                                  <SelectTrigger className="h-8 w-12 text-xs border-gray-300"><SelectValue /></SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value={DISCOUNT_TYPES.FIXED}>₹</SelectItem>
+                                    <SelectItem value={DISCOUNT_TYPES.PERCENTAGE}>%</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                            )}
+                          </div>
+                        </td>
+
+                        <td className="p-3 align-middle text-right">
+                          <span className="font-bold text-base text-primary">₹{calculateLineTotal(item).toFixed(0)}</span>
+                        </td>
+
+                        <td className="p-3 align-middle text-center">
+                          <div className="flex items-center justify-center">
+                            {!item.is_reward ? (
+                              <Button type="button" variant="ghost" size="sm" className="h-8 w-8 p-0 border border-destructive/20 text-destructive hover:bg-destructive/5 cursor-pointer"
+                                onClick={() => removeAddonItem(index)}>
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            ) : (
+                              <span className="text-[10px] font-bold text-green-600 bg-green-50 border border-green-200 px-2.5 py-0.5 rounded-full">Reward</span>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
       </div>
     );
@@ -2089,6 +2341,138 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
 
   // Step 4: Booking Details
   const renderStep4 = () => {
+    return (
+      <div className="space-y-4 max-w-2xl mx-auto">
+        {renderOtherStepErrors()}
+        {submitError && (
+          <div className="flex items-start gap-3 p-4 bg-destructive/10 border border-destructive/20 rounded-xl">
+            <AlertCircle className="h-5 w-5 text-destructive mt-0.5 flex-shrink-0" />
+            <div className="flex-1">
+              <p className="text-sm font-semibold text-destructive">Submission Error</p>
+              <p className="text-sm text-destructive/80 mt-0.5">{submitError}</p>
+            </div>
+            <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => setSubmitError('')}>
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+        )}
+
+        {/* Booking Date & Time */}
+        <div className="rounded-xl border bg-card">
+          <div className="flex items-center gap-2 px-4 pt-4 pb-3 border-b">
+            <div className="flex items-center justify-center w-7 h-7 rounded-lg bg-primary/10">
+              <Calendar className="h-4 w-4 text-primary" />
+            </div>
+            <span className="font-semibold text-sm">Booking Schedule</span>
+          </div>
+          <div className="p-4 space-y-3">
+            <div className="grid grid-cols-1 sm:grid-cols-[auto_1fr] gap-3 items-start">
+              <div className="sm:w-44">
+                <Label className="text-xs text-muted-foreground font-medium mb-1 block">Date *</Label>
+                <DatePicker
+                  value={bookingDate}
+                  onChange={(value) => { setBookingDate(value); saveDraft(); }}
+                />
+                {errors.bookingDate && <p className="text-xs text-destructive mt-1">{errors.bookingDate}</p>}
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <Label className="text-xs text-muted-foreground font-medium mb-1 block">From *</Label>
+                  <Select value={bookingTimeFrom} onValueChange={(value) => {
+                    setBookingTimeFrom(value);
+                    if (value) {
+                      const [hours, minutes] = value.split(':').map(Number);
+                      const fromDate = new Date();
+                      fromDate.setHours(hours, minutes);
+                      fromDate.setMinutes(fromDate.getMinutes() + 120);
+                      setBookingTimeTo(`${String(fromDate.getHours()).padStart(2, '0')}:${String(fromDate.getMinutes()).padStart(2, '0')}`);
+                    }
+                    saveDraft();
+                  }}>
+                    <SelectTrigger><SelectValue placeholder="From" /></SelectTrigger>
+                    <SelectContent className="max-h-60 overflow-y-auto">
+                      {generateTimeOptions().map((t) => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                  {errors.bookingTimeFrom && <p className="text-xs text-destructive mt-1">{errors.bookingTimeFrom}</p>}
+                </div>
+                <div>
+                  <Label className="text-xs text-muted-foreground font-medium mb-1 block">To *</Label>
+                  <Select value={bookingTimeTo} onValueChange={(value) => { setBookingTimeTo(value); saveDraft(); }}>
+                    <SelectTrigger><SelectValue placeholder="To" /></SelectTrigger>
+                    <SelectContent className="max-h-60 overflow-y-auto">
+                      {generateTimeOptions().filter((time) => {
+                        if (bookingTimeFrom) {
+                          const [h, m] = time.value.split(':').map(Number);
+                          const [fh, fm] = bookingTimeFrom.split(':').map(Number);
+                          return (h * 60 + m) > (fh * 60 + fm);
+                        }
+                        return true;
+                      }).map((t) => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                  {errors.bookingTimeTo && <p className="text-xs text-destructive mt-1">{errors.bookingTimeTo}</p>}
+                </div>
+              </div>
+            </div>
+            {bookingTimeFrom && bookingTimeTo && (
+              <div className="flex items-center gap-2 text-sm text-blue-600 font-medium bg-blue-50 rounded-lg px-3 py-2">
+                <Clock className="h-3.5 w-3.5 shrink-0" />
+                {calculateBookingDuration(bookingTimeFrom, bookingTimeTo)}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Agent Assignment */}
+        <div className="rounded-xl border bg-card">
+          <div className="flex items-center gap-2 px-4 pt-4 pb-3 border-b">
+            <div className="flex items-center justify-center w-7 h-7 rounded-lg bg-violet-100">
+              <User className="h-4 w-4 text-violet-600" />
+            </div>
+            <span className="font-semibold text-sm">Assign Agent</span>
+            <span className="ml-auto text-[10px] text-muted-foreground font-medium bg-muted px-2 py-0.5 rounded-full">Optional</span>
+          </div>
+          <div className="p-4">
+            <Select value={selectedAgent || "unassigned"} onValueChange={(value) => {
+              setSelectedAgent(value === "unassigned" ? "" : value);
+              saveDraft();
+            }}>
+              <SelectTrigger><SelectValue placeholder="Unassigned" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="unassigned">Unassigned</SelectItem>
+                {agents.filter(a => !a.locked).map((agent) => (
+                  <SelectItem key={agent.id} value={String(agent.id)}>{agent.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        {/* Notes */}
+        <div className="rounded-xl border bg-card">
+          <div className="flex items-center gap-2 px-4 pt-4 pb-3 border-b">
+            <div className="flex items-center justify-center w-7 h-7 rounded-lg bg-gray-100">
+              <FileText className="h-4 w-4 text-gray-500" />
+            </div>
+            <span className="font-semibold text-sm">Notes</span>
+            <span className="ml-auto text-[10px] text-muted-foreground font-medium bg-muted px-2 py-0.5 rounded-full">Optional</span>
+          </div>
+          <div className="p-4">
+            <Textarea
+              value={notes}
+              onChange={(e) => { setNotes(e.target.value); saveDraft(); }}
+              placeholder="Additional notes or instructions..."
+              className="resize-none text-sm"
+              rows={isMobile ? 3 : 4}
+            />
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderStep5 = () => {
     const totals = calculateTotals();
 
     return (
@@ -2108,104 +2492,10 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
         )}
 
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-5">
-
-          {/* LEFT COLUMN */}
+          {/* LEFT COLUMN: Offers, Coupons & Loyalty */}
           <div className="space-y-4">
-
-            {/* Booking Date & Time */}
-            <div className="rounded-xl border bg-card shadow-sm">
-              <div className="flex items-center gap-2 px-4 pt-4 pb-3 border-b">
-                <div className="flex items-center justify-center w-7 h-7 rounded-lg bg-primary/10">
-                  <Calendar className="h-4 w-4 text-primary" />
-                </div>
-                <span className="font-semibold text-sm">Booking Schedule</span>
-              </div>
-              <div className="p-4 space-y-3">
-                <div className="grid grid-cols-1 sm:grid-cols-[auto_1fr] gap-3 items-start">
-                  <div className="sm:w-44">
-                    <Label className="text-xs text-muted-foreground font-medium mb-1 block">Date *</Label>
-                    <DatePicker
-                      value={bookingDate}
-                      onChange={(value) => { setBookingDate(value); saveDraft(); }}
-                    />
-                    {errors.bookingDate && <p className="text-xs text-destructive mt-1">{errors.bookingDate}</p>}
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <Label className="text-xs text-muted-foreground font-medium mb-1 block">From *</Label>
-                      <Select value={bookingTimeFrom} onValueChange={(value) => {
-                        setBookingTimeFrom(value);
-                        if (value) {
-                          const [hours, minutes] = value.split(':').map(Number);
-                          const fromDate = new Date();
-                          fromDate.setHours(hours, minutes);
-                          fromDate.setMinutes(fromDate.getMinutes() + 120);
-                          setBookingTimeTo(`${String(fromDate.getHours()).padStart(2, '0')}:${String(fromDate.getMinutes()).padStart(2, '0')}`);
-                        }
-                        saveDraft();
-                      }}>
-                        <SelectTrigger><SelectValue placeholder="From" /></SelectTrigger>
-                        <SelectContent className="max-h-60 overflow-y-auto">
-                          {generateTimeOptions().map((t) => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-                      {errors.bookingTimeFrom && <p className="text-xs text-destructive mt-1">{errors.bookingTimeFrom}</p>}
-                    </div>
-                    <div>
-                      <Label className="text-xs text-muted-foreground font-medium mb-1 block">To *</Label>
-                      <Select value={bookingTimeTo} onValueChange={(value) => { setBookingTimeTo(value); saveDraft(); }}>
-                        <SelectTrigger><SelectValue placeholder="To" /></SelectTrigger>
-                        <SelectContent className="max-h-60 overflow-y-auto">
-                          {generateTimeOptions().filter((time) => {
-                            if (bookingTimeFrom) {
-                              const [h, m] = time.value.split(':').map(Number);
-                              const [fh, fm] = bookingTimeFrom.split(':').map(Number);
-                              return (h * 60 + m) > (fh * 60 + fm);
-                            }
-                            return true;
-                          }).map((t) => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-                      {errors.bookingTimeTo && <p className="text-xs text-destructive mt-1">{errors.bookingTimeTo}</p>}
-                    </div>
-                  </div>
-                </div>
-                {bookingTimeFrom && bookingTimeTo && (
-                  <div className="flex items-center gap-2 text-sm text-blue-600 font-medium bg-blue-50 rounded-lg px-3 py-2">
-                    <Clock className="h-3.5 w-3.5 shrink-0" />
-                    {calculateBookingDuration(bookingTimeFrom, bookingTimeTo)}
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Agent Assignment */}
-            <div className="rounded-xl border bg-card shadow-sm">
-              <div className="flex items-center gap-2 px-4 pt-4 pb-3 border-b">
-                <div className="flex items-center justify-center w-7 h-7 rounded-lg bg-violet-100">
-                  <User className="h-4 w-4 text-violet-600" />
-                </div>
-                <span className="font-semibold text-sm">Assign Agent</span>
-                <span className="ml-auto text-[10px] text-muted-foreground font-medium bg-muted px-2 py-0.5 rounded-full">Optional</span>
-              </div>
-              <div className="p-4">
-                <Select value={selectedAgent || "unassigned"} onValueChange={(value) => {
-                  setSelectedAgent(value === "unassigned" ? "" : value);
-                  saveDraft();
-                }}>
-                  <SelectTrigger><SelectValue placeholder="Unassigned" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="unassigned">Unassigned</SelectItem>
-                    {agents.filter(a => !a.locked).map((agent) => (
-                      <SelectItem key={agent.id} value={String(agent.id)}>{agent.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
             {/* Offers & Coupons */}
-            <div className="rounded-xl border bg-card shadow-sm">
+            <div className="rounded-xl border bg-card">
               <div className="flex items-center justify-between gap-2 px-4 pt-3 pb-3 border-b">
                 <div className="flex items-center gap-2">
                   <div className="flex items-center justify-center w-7 h-7 rounded-lg bg-amber-100">
@@ -2229,7 +2519,6 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
                 )}
               </div>
               <div className="p-4 space-y-3">
-                {/* Coupon code input when no offer selected */}
                 {!selectedOffer && (
                   <div className="rounded-lg border border-dashed border-primary/30 bg-primary/5 p-3 space-y-2">
                     <p className="text-xs font-semibold text-primary flex items-center gap-1.5">
@@ -2296,7 +2585,6 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
                       <div className="mt-2 pt-2 border-t border-green-200">
                         {isCouponVerified ? (
                           <div className="space-y-1.5">
-
                             {verifiedCouponData && (
                               <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[11px] text-gray-600 bg-white/60 rounded-lg p-2.5 mt-1">
                                 <div><span className="font-semibold text-gray-700">Campaign:</span> {verifiedCouponData.campaign_name}</div>
@@ -2372,7 +2660,7 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
             </div>
 
             {/* Loyalty Points */}
-            <div className="rounded-xl border bg-card shadow-sm">
+            <div className="rounded-xl border bg-card">
               <div className="flex items-center gap-2 px-4 pt-4 pb-3 border-b">
                 <div className="flex items-center justify-center w-7 h-7 rounded-lg bg-blue-100">
                   <Coins className="h-4 w-4 text-blue-600" />
@@ -2446,36 +2734,15 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
                 )}
               </div>
             </div>
-
-            {/* Notes */}
-            <div className="rounded-xl border bg-card shadow-sm">
-              <div className="flex items-center gap-2 px-4 pt-4 pb-3 border-b">
-                <div className="flex items-center justify-center w-7 h-7 rounded-lg bg-gray-100">
-                  <FileText className="h-4 w-4 text-gray-500" />
-                </div>
-                <span className="font-semibold text-sm">Notes</span>
-                <span className="ml-auto text-[10px] text-muted-foreground font-medium bg-muted px-2 py-0.5 rounded-full">Optional</span>
-              </div>
-              <div className="p-4">
-                <Textarea
-                  value={notes}
-                  onChange={(e) => { setNotes(e.target.value); saveDraft(); }}
-                  placeholder="Additional notes or instructions..."
-                  className="resize-none text-sm"
-                  rows={isMobile ? 3 : 4}
-                />
-              </div>
-            </div>
           </div>
 
           {/* RIGHT COLUMN: Order Summary */}
           <div className="space-y-4">
-            <div className="lg:sticky lg:top-4 rounded-xl border bg-card shadow-sm overflow-hidden">
+            <div className="lg:sticky lg:top-4 rounded-xl border bg-card overflow-hidden">
               <div className="bg-gradient-to-r from-primary/90 to-primary px-4 py-3">
                 <p className="text-white font-bold text-sm tracking-wide">Order Summary</p>
               </div>
               <div className="p-4 space-y-3">
-                {/* Package items */}
                 {packageItems.length > 0 && (
                   <div className="space-y-1.5">
                     <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Packages</p>
@@ -2491,7 +2758,6 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
                   </div>
                 )}
 
-                {/* Addon items */}
                 {addonItems.length > 0 && (
                   <div className="space-y-1.5 pt-2 border-t">
                     <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Add-ons</p>
@@ -2507,7 +2773,6 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
                   </div>
                 )}
 
-                {/* Totals */}
                 <div className="pt-3 border-t space-y-2 text-sm">
                   <div className="flex justify-between text-muted-foreground">
                     <span>Packages</span><span>₹{totals.packages.toFixed(2)}</span>
@@ -2562,13 +2827,11 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
                   )}
                 </div>
 
-                {/* Grand Total */}
                 <div className="bg-primary/5 border border-primary/20 rounded-lg px-4 py-3 flex items-center justify-between">
                   <span className="font-bold text-base">Grand Total</span>
                   <span className="text-2xl font-black text-primary">₹{totals.total.toFixed(0)}</span>
                 </div>
 
-                {/* Applied offer pill */}
                 {selectedOffer && (
                   <div className="flex items-center gap-2 text-xs bg-green-50 border border-green-200 rounded-lg px-3 py-2">
                     <Gift className="h-3.5 w-3.5 text-green-600 shrink-0" />
@@ -2579,7 +2842,6 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
               </div>
             </div>
           </div>
-
         </div>
       </div>
     );
@@ -2653,7 +2915,7 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
   // Render step indicator
   const renderStepIndicator = () => (
     <div className="flex items-center justify-between mb-4 px-2">
-      {[1, 2, 3, 4].map((step) => (
+      {[1, 2, 3, 4, 5].map((step) => (
         <div key={step} className="flex items-center flex-1">
           <div className={`flex items-center justify-center w-7 h-7 md:w-8 md:h-8 rounded-full border-2 text-xs md:text-sm font-medium transition-colors ${step === currentStep
             ? 'border-primary bg-primary text-primary-foreground'
@@ -2663,7 +2925,7 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
             }`}>
             {step < currentStep ? <Check className="h-4 w-4" /> : step}
           </div>
-          {step < 4 && (
+          {step < 5 && (
             <div className={`flex-1 h-0.5 mx-1 md:mx-2 ${step < currentStep ? 'bg-primary' : 'bg-muted-foreground/30'
               }`} />
           )}
@@ -2710,7 +2972,7 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
                 {orderId ? 'Edit Order' : 'New Order'}
               </h2>
               <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold">
-                Step {currentStep} of 4
+                Step {currentStep} of 5
               </p>
             </div>
             <Button
@@ -2731,7 +2993,7 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
                 {orderId ? 'Edit Order' : 'Create New Order'}
               </h2>
               <p className="text-sm text-muted-foreground">
-                Step {currentStep} of 4
+                Step {currentStep} of 5
               </p>
             </div>
             {!orderId && (
@@ -2792,7 +3054,7 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
               {/* Next/Confirm Buttons Slot */}
               <div className="flex-1 flex justify-end">
                 <div className="flex gap-2">
-                  {currentStep < 4 ? (
+                  {currentStep < 5 ? (
                     <Button
                       type="button"
                       onClick={handleNext}
