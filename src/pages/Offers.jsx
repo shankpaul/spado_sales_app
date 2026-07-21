@@ -310,34 +310,38 @@ const Offers = () => {
           </p>
         </div>
 
-        {/* Search and Filters - Sticky on Mobile */}
-        <div className="sticky top-0 z-30 mb-6 bg-background/95 backdrop-blur-xs py-2 -mx-4 px-4 border-b md:relative md:top-0 md:z-0 md:bg-transparent md:backdrop-blur-none md:p-0 md:border-0 md:mb-6">
-          <div className="flex flex-row items-center gap-2 w-full">
-            {/* Single Search Field */}
-            <div className="relative flex-1 flex gap-2">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search by name or coupon..."
-                  value={searchInput}
-                  onChange={(e) => setSearchInput(e.target.value)}
-                  onKeyPress={handleSearchKeyPress}
-                  className="pl-10 pr-10 bg-white border-gray-200 shadow-xs"
-                />
-                {searchInput && (
-                  <button
-                    onClick={clearSearch}
-                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                    type="button"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                )}
-              </div>
-              <Button onClick={handleSearch} variant="default" className="shrink-0 hidden sm:flex">
-                <Search className="h-4 w-4 mr-2" />
-                Search
-              </Button>
+        {/* Search and Filters - Partners Page Style */}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 bg-white p-4 rounded-xl shadow-xs border border-gray-100 mb-6">
+          {/* Single Search Field */}
+          <div className="relative flex-1 max-w-md flex gap-2">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <Input
+                placeholder="Search by name or coupon..."
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+                onKeyPress={handleSearchKeyPress}
+                className="pl-10 pr-10"
+              />
+              {searchInput && (
+                <button
+                  onClick={clearSearch}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
+                  type="button"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              )}
+            </div>
+            <Button onClick={handleSearch} variant="default" className="shrink-0 hidden sm:flex cursor-pointer">
+              <Search className="h-4 w-4 mr-2" />
+              Search
+            </Button>
+          </div>
+
+          <div className="flex items-center gap-4 justify-between sm:justify-end">
+            <div className="text-sm text-gray-500 font-medium hidden md:block">
+              Total Offers: {totalCount}
             </div>
 
             {/* Filter Button */}
@@ -345,14 +349,14 @@ const Offers = () => {
               <SheetTrigger asChild>
                 <Button
                   variant={hasActiveFilters() ? "default" : "outline"}
-                  className="w-auto relative shrink-0"
+                  className="w-auto relative shrink-0 cursor-pointer"
                 >
-                  <Filter className="h-4 w-4 mr-0 sm:mr-2" />
-                  <span className="hidden sm:inline">Filters</span>
+                  <Filter className="h-4 w-4 mr-1.5" />
+                  <span>Filters</span>
                   {hasActiveFilters() && (
                     <Badge2
                       variant="secondary"
-                      className="ml-2 bg-white text-primary px-1.5 py-0 text-xs h-5 min-w-[20px]"
+                      className="ml-2 bg-white text-primary px-1.5 py-0 text-xs h-5 min-w-[20px] font-semibold"
                     >
                       {getActiveFilterCount()}
                     </Badge2>
@@ -481,7 +485,7 @@ const Offers = () => {
             {offers.map((offer) => (
               <Card
                 key={offer.id}
-                className="p-4 sm:p-6 hover:shadow-lg transition-all cursor-pointer bg-white"
+                className="p-4 shadow-none sm:p-6 hover:shadow-lg transition-all cursor-pointer bg-white"
                 onClick={() => navigate(`/offers/${offer.id}/edit`)}
               >
                 <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">

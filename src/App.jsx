@@ -210,7 +210,7 @@ function App() {
           <Route
             path="/partners"
             element={
-              <ProtectedRoute allowedRoles={['admin', 'sales_executive']}>
+              <ProtectedRoute allowedRoles={['admin']}>
                 <Layout>
                   <Partners />
                 </Layout>
@@ -221,7 +221,7 @@ function App() {
           <Route
             path="/campaigns"
             element={
-              <ProtectedRoute allowedRoles={['admin', 'sales_executive']}>
+              <ProtectedRoute allowedRoles={['admin']}>
                 <Layout>
                   <Campaigns />
                 </Layout>
@@ -232,7 +232,7 @@ function App() {
           <Route
             path="/campaigns/analytics"
             element={
-              <ProtectedRoute allowedRoles={['admin', 'sales_executive']}>
+              <ProtectedRoute allowedRoles={['admin']}>
                 <Layout>
                   <CampaignDashboard />
                 </Layout>
@@ -254,7 +254,7 @@ function App() {
           <Route
             path="/campaigns/:id"
             element={
-              <ProtectedRoute allowedRoles={['admin', 'sales_executive']}>
+              <ProtectedRoute allowedRoles={['admin']}>
                 <Layout>
                   <CampaignDetail />
                 </Layout>
@@ -301,7 +301,7 @@ function App() {
           <Route
             path="/packages"
             element={
-              <ProtectedRoute allowedRoles={['admin']}>
+              <ProtectedRoute allowedRoles={['admin', 'sales_executive']}>
                 <Layout>
                   <Packages />
                 </Layout>
@@ -312,7 +312,7 @@ function App() {
           <Route
             path="/addons"
             element={
-              <ProtectedRoute allowedRoles={['admin']}>
+              <ProtectedRoute allowedRoles={['admin', 'sales_executive']}>
                 <Layout>
                   <Addons />
                 </Layout>

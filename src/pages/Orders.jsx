@@ -525,88 +525,92 @@ const Orders = () => {
         <p className="text-muted-foreground text-sm">Manage customer orders and bookings</p>
       </div>
 
-      {/* Search and Filters - Sticky on Mobile */}
-      <div className="sticky top-0 z-30 bg-background/95 backdrop-blur-xs py-2 -mx-4 px-4 border-b md:relative md:top-0 md:z-0 md:bg-transparent md:backdrop-blur-none md:p-0 md:border-0 md:mb-6">
-        <div className="flex flex-row items-center gap-2 w-full">
-          {/* Single Search Field */}
-          <div className="relative flex-1 flex gap-2">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search orders..."
-                value={searchInput}
-                onChange={(e) => setSearchInput(e.target.value)}
-                onKeyPress={handleSearchKeyPress}
-                className="pl-10 pr-10 bg-white border-gray-200 shadow-xs"
-              />
-              {searchInput && (
-                <button
-                  onClick={clearSearch}
-                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                  type="button"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              )}
-            </div>
-            <Button onClick={handleSearch} variant="default" className="shrink-0 hidden sm:flex">
-              <Search className="h-4 w-4 mr-2" />
-              Search
-            </Button>
+      {/* Search and Filters - Partners Page Style */}
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 bg-white p-4 rounded-xl shadow-xs border border-gray-100 mb-6">
+        {/* Single Search Field */}
+        <div className="relative flex-1 max-w-md flex gap-2">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <Input
+              placeholder="Search orders by number, customer, phone..."
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              onKeyPress={handleSearchKeyPress}
+              className="pl-10 pr-10"
+            />
+            {searchInput && (
+              <button
+                onClick={clearSearch}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
+                type="button"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
+          </div>
+          <Button onClick={handleSearch} variant="default" className="shrink-0 hidden sm:flex cursor-pointer">
+            <Search className="h-4 w-4 mr-2" />
+            Search
+          </Button>
+        </div>
+
+        <div className="flex items-center gap-4 justify-between sm:justify-end">
+          <div className="text-sm text-gray-500 font-medium hidden md:block">
+            Total Orders: {totalCount}
           </div>
 
           {/* Filter Button */}
           <Button
             variant={hasActiveFilters() ? "default" : "outline"}
-            className="w-auto relative shrink-0"
+            className="w-auto relative shrink-0 cursor-pointer"
             onClick={() => handleFilterOpen(true)}
           >
-            <Filter className="h-4 w-4 mr-0 sm:mr-2" />
-            <span className="hidden sm:inline">Filters</span>
+            <Filter className="h-4 w-4 mr-1.5" />
+            <span>Filters</span>
             {hasActiveFilters() && (
               <Badge2
                 variant="secondary"
-                className="ml-2 bg-white text-primary px-1.5 py-0 text-xs h-5 min-w-[20px]"
+                className="ml-2 bg-white text-primary px-1.5 py-0 text-xs h-5 min-w-[20px] font-semibold"
               >
                 {getActiveFilterCount()}
               </Badge2>
             )}
           </Button>
-
-          {isMobile ? (
-            <Drawer open={isFilterOpen} onOpenChange={handleFilterOpen}>
-              <DrawerContent className="max-h-[85vh] px-4 pb-6 overflow-y-auto">
-                <DrawerHeader className="text-left px-0">
-                  <DrawerTitle>Filter Orders</DrawerTitle>
-                  <DrawerDescription>
-                    Apply filters to narrow down your order list
-                  </DrawerDescription>
-                </DrawerHeader>
-                {renderFilterContent()}
-              </DrawerContent>
-            </Drawer>
-          ) : (
-            <Sheet open={isFilterOpen} onOpenChange={handleFilterOpen}>
-              <SheetContent side="right">
-                <SheetHeader>
-                  <SheetTitle>Filter Orders</SheetTitle>
-                  <SheetDescription>
-                    Apply filters to narrow down your order list
-                  </SheetDescription>
-                </SheetHeader>
-                {renderFilterContent()}
-              </SheetContent>
-            </Sheet>
-          )}
         </div>
+
+        {isMobile ? (
+          <Drawer open={isFilterOpen} onOpenChange={handleFilterOpen}>
+            <DrawerContent className="max-h-[85vh] px-4 pb-6 overflow-y-auto">
+              <DrawerHeader className="text-left px-0">
+                <DrawerTitle>Filter Orders</DrawerTitle>
+                <DrawerDescription>
+                  Apply filters to narrow down your order list
+                </DrawerDescription>
+              </DrawerHeader>
+              {renderFilterContent()}
+            </DrawerContent>
+          </Drawer>
+        ) : (
+          <Sheet open={isFilterOpen} onOpenChange={handleFilterOpen}>
+            <SheetContent side="right">
+              <SheetHeader>
+                <SheetTitle>Filter Orders</SheetTitle>
+                <SheetDescription>
+                  Apply filters to narrow down your order list
+                </SheetDescription>
+              </SheetHeader>
+              {renderFilterContent()}
+            </SheetContent>
+          </Sheet>
+        )}
       </div>
 
       {/* Active Filters Summary */}
       {hasActiveFilters() && (
-        <div className="mt-4 flex flex-wrap items-center gap-2">
-          <span className="text-sm text-muted-foreground">Active filters:</span>
+        <div className="flex flex-wrap items-center gap-2 mb-4">
+          <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Active filters:</span>
           {getFilterSummary().map((filter, index) => (
-            <Badge2 key={index} variant="secondary" className="gap-1">
+            <Badge2 key={index} variant="secondary" className="gap-1 text-xs px-2.5 py-1 bg-gray-100 text-gray-700 font-medium">
               {filter}
             </Badge2>
           ))}
@@ -614,7 +618,7 @@ const Orders = () => {
             variant="ghost"
             size="sm"
             onClick={clearFilters}
-            className="h-6 px-2 text-xs"
+            className="h-7 text-xs text-red-600 hover:text-red-700 hover:bg-red-50 cursor-pointer"
           >
             <X className="h-3 w-3 mr-1" />
             Clear all
@@ -783,94 +787,96 @@ const Orders = () => {
             </div>
 
             {/* Desktop View - Table */}
-            <div className="hidden md:block overflow-x-auto text-sm">
-              <table className="w-full">
-                <thead className="border-b">
-                  <tr className="text-left text-sm">
-                    <th className="px-4 py-3 font-semibold">Order #</th>
-                    <th className="px-4 py-3 font-semibold">Customer</th>
-                    <th className="px-4 py-3 font-semibold">Area</th>
-                    <th className="px-4 py-3 font-semibold">Booking Date</th>
-                    <th className="px-4 py-3 font-semibold">Status</th>
-                    <th className="px-4 py-3 font-semibold">Payment</th>
-                    <th className="px-4 py-3 font-semibold">Amount</th>
-                    <th className="px-4 py-3 font-semibold">Agent</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {getGroupedOrders().map((group) => (
-                    <Fragment key={group.dateKey}>
-                      <tr className="bg-gray-50 border-b border-gray-200/60">
-                        <td colSpan={8} className="px-4 py-2 font-bold text-xs text-blue-500 uppercase tracking-wider">
-                          {group.displayTitle}
-                        </td>
-                      </tr>
-                      {group.items.map((order) => (
-                        <tr
-                          key={order.id}
-                          className="border-b last:border-0 hover:bg-muted/50 cursor-pointer"
-                          onClick={() => handleOpenOrderDetail(order.id)}
-                        >
-                          <td className="px-4 py-3">
-                            <div className="font-medium hover:underline text-primary">
-                              #{order.order_number}
-                            </div>
-                          </td>
-                          <td className="px-4 py-3">
-                            <div className="flex items-center gap-2">
-                              <LetterAvatar name={order.customer?.name} size="xs" />
-                              <div className="font-medium capitalize">{order.customer?.name}</div>
-                            </div>
-                          </td>
-                          <td className="px-4 py-3">
-                            <div className="font-medium capitalize">{order.area}</div>
-                          </td>
-                          <td className="px-4 py-3">{formatDate(order.booking_date)}</td>
-                          <td className="px-4 py-3">
-                            <Badge2 variant={getBadgeVariant(order.status, 'order')}>
-                              {getStatusLabel(order.status, ORDER_STATUSES)}
-                            </Badge2>
-                          </td>
-                          <td className="px-4 py-3">
-                            <Badge2 variant={getBadgeVariant(order.payment_status, 'payment')}>
-                              {getStatusLabel(order.payment_status, PAYMENT_STATUSES)}
-                            </Badge2>
-                          </td>
-                          <td className="px-4 py-3">
-                            <div className="font-medium flex items-center gap-2">
-                              {formatCurrency(order.total_amount)}
-                              {order.subscription_id && (
-                                <Badge2
-                                  variant="info"
-                                  className="w-fit text-[10px] px-1.5 h-5 flex items-center gap-1 cursor-pointer hover:bg-secondary/80"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    navigate(`/subscriptions/${order.subscription_id}`);
-                                  }}
-                                >
-                                  <Repeat className="h-3 w-3" />
-                                  Sub
-                                </Badge2>
-                              )}
-                            </div>
-                          </td>
-                          <td className="px-4 py-3">
-                            {order.assigned_agent_name ? (
-                              <div className="flex items-center gap-2">
-                                <LetterAvatar name={order.assigned_agent_name} size="xs" />
-                                <div className="font-medium">{order.assigned_agent_name}</div>
-                                <AssigneeResponseTick status={order.assignee_response} size="sm" />
-                              </div>
-                            ) : (
-                              <Badge2 variant="danger">Unassigned</Badge2>
-                            )}
+            <div className="hidden md:block bg-white rounded-xl border-gray-200 overflow-hidden shadow-xs">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm text-left border-collapse">
+                  <thead className="bg-gray-50 border-b border-gray-200 text-xs text-gray-500 font-semibold uppercase tracking-wider">
+                    <tr>
+                      <th className="px-6 py-4">Order #</th>
+                      <th className="px-6 py-4">Customer</th>
+                      <th className="px-6 py-4">Area</th>
+                      <th className="px-6 py-4">Booking</th>
+                      <th className="px-6 py-4">Status</th>
+                      <th className="px-6 py-4">Payment</th>
+                      <th className="px-6 py-4">Amount</th>
+                      <th className="px-6 py-4">Agent</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-150">
+                    {getGroupedOrders().map((group) => (
+                      <Fragment key={group.dateKey}>
+                        <tr className="bg-blue-50/60 border-b border-blue-100">
+                          <td colSpan={8} className="px-6 py-2.5 font-bold text-xs text-blue-600 uppercase tracking-wider">
+                            {group.displayTitle}
                           </td>
                         </tr>
-                      ))}
-                    </Fragment>
-                  ))}
-                </tbody>
-              </table>
+                        {group.items.map((order) => (
+                          <tr
+                            key={order.id}
+                            className="hover:bg-gray-50/70 transition-colors cursor-pointer"
+                            onClick={() => handleOpenOrderDetail(order.id)}
+                          >
+                            <td className="px-6 py-4">
+                              <div className="font-semibold hover:underline text-primary">
+                                #{order.order_number}
+                              </div>
+                            </td>
+                            <td className="px-6 py-4">
+                              <div className="flex items-center gap-2">
+                                <LetterAvatar name={order.customer?.name} size="xs" />
+                                <div className="font-semibold text-gray-900 capitalize">{order.customer?.name}</div>
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 text-xs text-gray-700 capitalize">
+                              {order.area}
+                            </td>
+                            <td className="px-6 py-4 text-gray-600 font-medium">{formatDate(order.booking_date)}</td>
+                            <td className="px-6 py-4">
+                              <Badge2 variant={getBadgeVariant(order.status, 'order')}>
+                                {getStatusLabel(order.status, ORDER_STATUSES)}
+                              </Badge2>
+                            </td>
+                            <td className="px-6 py-4">
+                              <Badge2 variant={getBadgeVariant(order.payment_status, 'payment')}>
+                                {getStatusLabel(order.payment_status, PAYMENT_STATUSES)}
+                              </Badge2>
+                            </td>
+                            <td className="px-6 py-4 font-bold text-gray-900">
+                              <div className="flex items-center gap-2">
+                                {formatCurrency(order.total_amount)}
+                                {order.subscription_id && (
+                                  <Badge2
+                                    variant="info"
+                                    className="w-fit text-[10px] px-1.5 h-5 flex items-center gap-1 cursor-pointer hover:bg-secondary/80"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      navigate(`/subscriptions/${order.subscription_id}`);
+                                    }}
+                                  >
+                                    <Repeat className="h-3 w-3" />
+                                    Sub
+                                  </Badge2>
+                                )}
+                              </div>
+                            </td>
+                            <td className="px-6 py-4">
+                              {order.assigned_agent_name ? (
+                                <div className="flex items-center gap-2">
+                                  <LetterAvatar name={order.assigned_agent_name} size="xs" />
+                                  <div className="font-medium text-gray-700">{order.assigned_agent_name}</div>
+                                  <AssigneeResponseTick status={order.assignee_response} size="sm" />
+                                </div>
+                              ) : (
+                                <Badge2 variant="danger">Unassigned</Badge2>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </Fragment>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </>
         )}

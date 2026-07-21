@@ -342,15 +342,17 @@ const useOrderStore = create((set, get) => ({
    * Initialize real-time updates via Ably
    */
   initializeRealtime: async () => {
+    // Avoid double initialization
+    if (get().realtimeConnected || get().realtimeStatus === 'connecting') {
+      return;
+    }
+    set({ realtimeStatus: 'connecting' });
 
     try {
-
       await ablyClient.initialize();
-
 
       // Subscribe to connection state changes
       ablyClient.onConnectionStateChange((state) => {
-
         const stateMap = {
           initialized: 'connecting',
           connecting: 'connecting',
@@ -370,7 +372,6 @@ const useOrderStore = create((set, get) => ({
         });
       });
 
-
       // Subscribe to all orders channel
       ablyClient.subscribeToOrders((eventName, data) => {
         get().handleRealtimeEvent(eventName, data);
@@ -385,25 +386,47 @@ const useOrderStore = create((set, get) => ({
    * Handle real-time events from Ably
    */
   handleRealtimeEvent: async (eventName, eventData) => {
+    if (!eventData) return;
 
-    const { order_id, data } = eventData;
+    // Normalize event payload: Ably events can send { order_id, data: { ... } } or { order_id, ... } directly
+    const order_id = eventData.order_id || eventData.id || eventData.data?.id || eventData.data?.order_id;
+    const payload = eventData.data || eventData;
+
+    if (!order_id) return;
+
+    // Deduplicate rapid repeated socket events (within 3 seconds window)
+    const eventKey = `${eventName}:${order_id}:${payload.new_status || payload.status || payload.cancel_reason || ''}`;
+    const now = Date.now();
+    const recentEvents = get()._recentEvents || {};
+    if (recentEvents[eventKey] && (now - recentEvents[eventKey] < 3000)) {
+      return;
+    }
+    set({
+      _recentEvents: {
+        ...recentEvents,
+        [eventKey]: now,
+      }
+    });
 
     // Get current user to filter out self-triggered events
     const currentUser = useAuthStore.getState().user;
     const currentUserId = currentUser?.id;
 
     // Skip if this event was triggered by the current user
-    if (data?.changed_by_id && currentUserId && data.changed_by_id === currentUserId) {
+    if (payload?.changed_by_id && currentUserId && Number(payload.changed_by_id) === Number(currentUserId)) {
       return;
     }
 
     switch (eventName) {
       case 'order.created':
-        // Fetch the new order and add to store
         try {
-          const order = await orderService.getOrderById(order_id);
-          get().addOrder(order);
-          toast.success(`New order created: ${data.order_number || order_id}`);
+          const res = await orderService.getOrderById(order_id);
+          const order = res?.order || res;
+          if (order && order.id) {
+            get().addOrder(order);
+            const orderNum = order.order_number || payload.order_number || order_id;
+            toast.success(`New order created: #${orderNum}`);
+          }
         } catch (error) {
         }
         break;
@@ -414,43 +437,56 @@ const useOrderStore = create((set, get) => ({
       case 'order.reassigned':
       case 'order.feedback_added':
       case 'order.assignee_response_updated':
-        // Fetch updated order and update in store
         try {
-          const order = await orderService.getOrderById(order_id);
-          get().updateOrder(order);
+          const res = await orderService.getOrderById(order_id);
+          const order = res?.order || res;
+          if (order && order.id) {
+            get().updateOrder(order);
+            const orderNum = order.order_number || payload.order_number || order_id;
 
-          // Show toast notification for status changes
-          if (eventName === 'order.status_changed') {
-            toast.info(`Order ${order.order_number} status: ${data.new_status}`);
-          } else if (eventName === 'order.assigned' || eventName === 'order.reassigned') {
-            toast.info(`Order ${order.order_number} ${eventName === 'order.assigned' ? 'assigned' : 'reassigned'}`);
-          } else if (eventName === 'order.assignee_response_updated' && data.assignee_response !== 'accepted') {
-            toast.info(`Order ${order.order_number} response: ${data.assignee_response}`);
+            if (eventName === 'order.status_changed') {
+              const statusLabel = payload.new_status || order.status;
+              toast.info(`Order #${orderNum} status: ${statusLabel}`);
+            } else if (eventName === 'order.assigned' || eventName === 'order.reassigned') {
+              toast.info(`Order #${orderNum} ${eventName === 'order.assigned' ? 'assigned' : 'reassigned'}`);
+            } else if (eventName === 'order.assignee_response_updated' && payload.assignee_response !== 'accepted') {
+              toast.info(`Order #${orderNum} response: ${payload.assignee_response}`);
+            }
           }
         } catch (error) {
         }
         break;
 
       case 'order.cancelled':
-        // Remove from upcoming/completed, update in orders list
         try {
-          const order = await orderService.getOrderById(order_id);
-          get().updateOrder(order);
-          toast.warning(`Order ${order.order_number} cancelled: ${data.cancel_reason || ''}`);
+          const res = await orderService.getOrderById(order_id);
+          const order = res?.order || res;
+          const orderNum = order?.order_number || payload.order_number || order_id;
+          if (order && order.id) {
+            get().updateOrder(order);
+          }
+          const reason = payload.cancel_reason || order?.cancel_reason || '';
+          toast.warning(`Order #${orderNum} cancelled${reason ? `: ${reason}` : ''}`);
         } catch (error) {
+          const orderNum = payload.order_number || order_id;
+          const reason = payload.cancel_reason || '';
+          toast.warning(`Order #${orderNum} cancelled${reason ? `: ${reason}` : ''}`);
         }
         break;
 
       case 'order.journey_tracked':
-        // Fetch updated order (journey info updated)
         try {
-          const order = await orderService.getOrderById(order_id);
-          get().updateOrder(order);
+          const res = await orderService.getOrderById(order_id);
+          const order = res?.order || res;
+          if (order && order.id) {
+            get().updateOrder(order);
+          }
         } catch (error) {
         }
         break;
 
       default:
+        break;
     }
   },
 

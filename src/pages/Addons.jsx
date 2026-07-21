@@ -15,6 +15,7 @@ import {
 } from '../components/ui/sheet';
 import { toast } from 'sonner';
 import addonService from '../services/addonService';
+import useAuthStore from '../store/authStore';
 import {
   Plus,
   Search,
@@ -23,9 +24,13 @@ import {
   Trash2,
   Layers,
   Info,
+  Eye,
 } from 'lucide-react';
 
 const Addons = () => {
+  const { user } = useAuthStore();
+  const canManage = user?.role === 'admin';
+
   // State
   const [addons, setAddons] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -96,6 +101,11 @@ const Addons = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!canManage) {
+      setIsSheetOpen(false);
+      return;
+    }
+
     if (!formData.name || !formData.price) {
       toast.error('Please enter name and price');
       return;
@@ -162,10 +172,12 @@ const Addons = () => {
           </h1>
           <p className="text-gray-500 mt-1">Manage extra services, treatments, and options offered alongside wash packages.</p>
         </div>
-        <Button onClick={handleOpenCreate} className="w-full md:w-auto flex items-center gap-2 cursor-pointer shadow-sm">
-          <Plus className="h-4 w-4" />
-          Create Addon
-        </Button>
+        {canManage && (
+          <Button onClick={handleOpenCreate} className="w-full md:w-auto flex items-center gap-2 cursor-pointer shadow-sm">
+            <Plus className="h-4 w-4" />
+            Create Addon
+          </Button>
+        )}
       </div>
 
       {/* Filters and Search */}
@@ -226,88 +238,183 @@ const Addons = () => {
           <p className="text-gray-500 max-w-sm mt-1">
             {searchQuery ? 'No addons match your search criteria.' : 'Create an addon to offer extra cleaning treatments.'}
           </p>
-          {!searchQuery && (
+          {!searchQuery && canManage && (
             <Button onClick={handleOpenCreate} className="mt-4 cursor-pointer">
               Create First Addon
             </Button>
           )}
         </Card>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredAddons.map((addon) => (
-            <Card key={addon.id} className="bg-white overflow-hidden flex flex-col hover:shadow-md transition-shadow border border-gray-150">
-              <div className="p-6 flex-1">
-                {/* Header */}
-                <div className="flex justify-between items-start gap-2 mb-3">
-                  <div>
-                    <h3 className="font-bold text-lg text-gray-900 line-clamp-1">{addon.name}</h3>
-                    <div className="flex items-center gap-2 mt-1">
-                      {!addon.active && (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-red-50 text-red-700 border border-red-100 uppercase">
-                          Inactive
-                        </span>
-                      )}
-                      {addon.active && (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-100 uppercase">
-                          Active
-                        </span>
-                      )}
+        <>
+          {/* Desktop Table View */}
+          <div className="hidden md:block bg-white rounded-xl border border-gray-200 overflow-hidden shadow-xs">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm text-left border-collapse">
+                <thead className="bg-gray-50 border-b border-gray-200 text-xs text-gray-500 font-semibold uppercase tracking-wider">
+                  <tr>
+                    <th className="px-6 py-4">Addon Name</th>
+                    <th className="px-6 py-4">Price</th>
+                    <th className="px-6 py-4">Cost Price</th>
+                    <th className="px-6 py-4">Profit Margin</th>
+                    <th className="px-6 py-4">Status</th>
+                    <th className="px-6 py-4 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-150">
+                  {filteredAddons.map((addon) => (
+                    <tr key={addon.id} className="hover:bg-gray-50/70 transition-colors">
+                      <td className="px-6 py-4 font-bold text-gray-900">
+                        {addon.name}
+                      </td>
+                      <td className="px-6 py-4 font-bold text-primary">
+                        ₹{addon.price}
+                      </td>
+                      <td className="px-6 py-4 text-gray-700 font-medium">
+                        ₹{addon.cost_price || '0.00'}
+                      </td>
+                      <td className="px-6 py-4 font-semibold text-emerald-600">
+                        {addon.price && addon.price > 0
+                          ? `${Math.round(((addon.price - (addon.cost_price || 0)) / addon.price) * 100)}%`
+                          : '0%'}
+                      </td>
+                      <td className="px-6 py-4">
+                        {addon.active ? (
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-100">
+                            Active
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-red-50 text-red-700 border border-red-100">
+                            Inactive
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <div className="flex justify-end gap-2">
+                          {canManage ? (
+                            <>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleOpenEdit(addon)}
+                                className="h-8 text-xs gap-1 cursor-pointer"
+                              >
+                                <Edit className="h-3.5 w-3.5" />
+                                Edit
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleDeleteClick(addon)}
+                                className="h-8 text-xs gap-1 hover:bg-red-50 hover:text-red-600 text-gray-500 cursor-pointer"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                                Delete
+                              </Button>
+                            </>
+                          ) : (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleOpenEdit(addon)}
+                              className="h-8 text-xs gap-1 cursor-pointer"
+                            >
+                              <Eye className="h-3.5 w-3.5" />
+                              View Details
+                            </Button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Mobile Card Grid View */}
+          <div className="grid grid-cols-1 gap-6 md:hidden">
+            {filteredAddons.map((addon) => (
+              <Card key={addon.id} className="bg-white overflow-hidden flex flex-col hover:shadow-md transition-shadow border border-gray-150">
+                <div className="p-6 flex-1">
+                  {/* Header */}
+                  <div className="flex justify-between items-start gap-2 mb-3">
+                    <div>
+                      <h3 className="font-bold text-lg text-gray-900 line-clamp-1">{addon.name}</h3>
+                      <div className="flex items-center gap-2 mt-1">
+                        {!addon.active && (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-red-50 text-red-700 border border-red-100 uppercase">
+                            Inactive
+                          </span>
+                        )}
+                        {addon.active && (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-100 uppercase">
+                            Active
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-2xl font-extrabold text-primary">₹{addon.price}</span>
+                      <span className="text-[10px] text-gray-400 block mt-0.5">Price</span>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <span className="text-2xl font-extrabold text-primary">₹{addon.price}</span>
-                    <span className="text-[10px] text-gray-400 block mt-0.5">Price</span>
+
+                  {/* Cost tracking info */}
+                  <div className="p-3 bg-gray-50 dark:bg-gray-900/10 rounded-lg text-xs flex justify-between">
+                    <div>
+                      <span className="text-gray-400 block">Cost Price</span>
+                      <span className="font-semibold text-gray-700">₹{addon.cost_price || '0.00'}</span>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-gray-400 block">Profit Margin</span>
+                      <span className="font-semibold text-emerald-600">
+                        {addon.price && addon.price > 0
+                          ? `${Math.round(((addon.price - (addon.cost_price || 0)) / addon.price) * 100)}%`
+                          : '0%'}
+                      </span>
+                    </div>
                   </div>
                 </div>
 
-                {/* Description */}
-                {addon.description ? (
-                  <p className="text-gray-500 text-sm mb-4 line-clamp-2">{addon.description}</p>
-                ) : (
-                  <p className="text-gray-400 text-sm italic mb-4">No description provided</p>
-                )}
-
-                {/* Cost tracking info */}
-                <div className="p-3 bg-gray-50 dark:bg-gray-900/10 rounded-lg text-xs flex justify-between">
-                  <div>
-                    <span className="text-gray-400 block">Cost Price</span>
-                    <span className="font-semibold text-gray-700">${addon.cost_price || '0.00'}</span>
-                  </div>
-                  <div className="text-right">
-                    <span className="text-gray-400 block">Profit Margin</span>
-                    <span className="font-semibold text-emerald-600">
-                      {addon.price && addon.price > 0
-                        ? `${Math.round(((addon.price - (addon.cost_price || 0)) / addon.price) * 100)}%`
-                        : '0%'}
-                    </span>
-                  </div>
+                {/* Actions */}
+                <div className="bg-gray-50 border-t border-gray-100 px-6 py-3 flex justify-end gap-2">
+                  {canManage ? (
+                    <>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleOpenEdit(addon)}
+                        className="flex items-center gap-1.5 text-xs h-8 cursor-pointer"
+                      >
+                        <Edit className="h-3.5 w-3.5" />
+                        Edit
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleDeleteClick(addon)}
+                        className="flex items-center gap-1.5 text-xs h-8 hover:bg-red-50 hover:text-red-600 text-gray-500 cursor-pointer"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                        Delete
+                      </Button>
+                    </>
+                  ) : (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleOpenEdit(addon)}
+                      className="flex items-center gap-1.5 text-xs h-8 cursor-pointer"
+                    >
+                      <Eye className="h-3.5 w-3.5" />
+                      View Details
+                    </Button>
+                  )}
                 </div>
-              </div>
-
-              {/* Actions */}
-              <div className="bg-gray-50 border-t border-gray-100 px-6 py-3 flex justify-end gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleOpenEdit(addon)}
-                  className="flex items-center gap-1.5 text-xs h-8 cursor-pointer"
-                >
-                  <Edit className="h-3.5 w-3.5" />
-                  Edit
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => handleDeleteClick(addon)}
-                  className="flex items-center gap-1.5 text-xs h-8 hover:bg-red-50 hover:text-red-600 text-gray-500 cursor-pointer"
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                  Delete
-                </Button>
-              </div>
-            </Card>
-          ))}
-        </div>
+              </Card>
+            ))}
+          </div>
+        </>
       )}
 
       {/* Create/Edit Sheet Form */}
@@ -318,12 +425,14 @@ const Addons = () => {
             <div className="p-6 border-b border-gray-100 shrink-0">
               <SheetHeader className="space-y-1">
                 <SheetTitle className="text-2xl font-bold flex items-center gap-2">
-                  {editingAddon ? 'Edit Addon' : 'Create Addon'}
+                  {canManage ? (editingAddon ? 'Edit Addon' : 'Create Addon') : 'Addon Details'}
                 </SheetTitle>
                 <SheetDescription>
-                  {editingAddon
-                    ? 'Update addon metadata, price configuration, and cost tracking settings.'
-                    : 'Define a new addon service, price details, and active status.'}
+                  {canManage
+                    ? (editingAddon
+                      ? 'Update addon metadata, price configuration, and cost tracking settings.'
+                      : 'Define a new addon service, price details, and active status.')
+                    : 'View addon metadata, price configuration, and active status.'}
                 </SheetDescription>
               </SheetHeader>
             </div>
@@ -336,6 +445,7 @@ const Addons = () => {
                 <Input
                   id="name"
                   required
+                  disabled={!canManage}
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   placeholder="e.g. Engine Steam Clean"
@@ -345,12 +455,13 @@ const Addons = () => {
               {/* Pricing */}
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="price" className="text-sm font-semibold">Price ($) *</Label>
+                  <Label htmlFor="price" className="text-sm font-semibold">Price (₹) *</Label>
                   <Input
                     id="price"
                     type="number"
                     step="0.01"
                     required
+                    disabled={!canManage}
                     value={formData.price}
                     onChange={(e) => setFormData({ ...formData, price: e.target.value })}
                     placeholder="0.00"
@@ -358,11 +469,12 @@ const Addons = () => {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="cost_price" className="text-sm font-semibold">Cost Price ($)</Label>
+                  <Label htmlFor="cost_price" className="text-sm font-semibold">Cost Price (₹)</Label>
                   <Input
                     id="cost_price"
                     type="number"
                     step="0.01"
+                    disabled={!canManage}
                     value={formData.cost_price}
                     onChange={(e) => setFormData({ ...formData, cost_price: e.target.value })}
                     placeholder="0.00"
@@ -375,6 +487,7 @@ const Addons = () => {
                 <Label htmlFor="description" className="text-sm font-semibold">Description</Label>
                 <Textarea
                   id="description"
+                  disabled={!canManage}
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                   placeholder="Describe addon details..."
@@ -390,6 +503,7 @@ const Addons = () => {
                 </div>
                 <Switch
                   id="active"
+                  disabled={!canManage}
                   checked={formData.active}
                   onCheckedChange={(checked) => setFormData({ ...formData, active: checked })}
                 />
@@ -398,12 +512,20 @@ const Addons = () => {
 
             {/* Fixed Footer */}
             <div className="p-6 border-t border-gray-150 bg-gray-50 flex gap-3 justify-end shrink-0">
-              <Button type="button" variant="outline" onClick={() => setIsSheetOpen(false)}>
-                Cancel
-              </Button>
-              <Button type="submit">
-                {editingAddon ? 'Save Changes' : 'Create Addon'}
-              </Button>
+              {canManage ? (
+                <>
+                  <Button type="button" variant="outline" onClick={() => setIsSheetOpen(false)}>
+                    Cancel
+                  </Button>
+                  <Button type="submit">
+                    {editingAddon ? 'Save Changes' : 'Create Addon'}
+                  </Button>
+                </>
+              ) : (
+                <Button type="button" variant="outline" onClick={() => setIsSheetOpen(false)}>
+                  Close
+                </Button>
+              )}
             </div>
           </form>
         </SheetContent>

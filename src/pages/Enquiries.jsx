@@ -672,88 +672,92 @@ const Enquiries = () => {
         <p className="text-muted-foreground text-sm">Track and manage customer enquiries</p>
       </div>
 
-      {/* Search and Filters - Sticky on Mobile */}
-      <div className="sticky top-0 z-30 bg-background/95 backdrop-blur-xs py-2 -mx-4 px-4 border-b md:relative md:top-0 md:z-0 md:bg-transparent md:backdrop-blur-none md:p-0 md:border-0 md:mb-6">
-        <div className="flex flex-row items-center gap-2 w-full">
-          {/* Single Search Field */}
-          <div className="relative flex-1 flex gap-2">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search enquiries..."
-                value={searchInput}
-                onChange={(e) => setSearchInput(e.target.value)}
-                onKeyPress={handleSearchKeyPress}
-                className="pl-10 pr-10 bg-white border-gray-200 shadow-xs"
-              />
-              {searchInput && (
-                <button
-                  onClick={clearSearch}
-                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                  type="button"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              )}
-            </div>
-            <Button onClick={handleSearch} variant="default" className="shrink-0 hidden sm:flex">
-              <Search className="h-4 w-4 mr-2" />
-              Search
-            </Button>
+      {/* Search and Filters - Partners Page Style */}
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 bg-white p-4 rounded-xl shadow-xs border border-gray-100 mb-6">
+        {/* Single Search Field */}
+        <div className="relative flex-1 max-w-md flex gap-2">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <Input
+              placeholder="Search enquiries by name, phone, area..."
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              onKeyPress={handleSearchKeyPress}
+              className="pl-10 pr-10"
+            />
+            {searchInput && (
+              <button
+                onClick={clearSearch}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
+                type="button"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
+          </div>
+          <Button onClick={handleSearch} variant="default" className="shrink-0 hidden sm:flex cursor-pointer">
+            <Search className="h-4 w-4 mr-2" />
+            Search
+          </Button>
+        </div>
+
+        <div className="flex items-center gap-4 justify-between sm:justify-end">
+          <div className="text-sm text-gray-500 font-medium hidden md:block">
+            Total Enquiries: {totalCount}
           </div>
 
           {/* Filter Button */}
           <Button
             variant={hasActiveFilters() ? "default" : "outline"}
-            className="w-auto relative shrink-0"
+            className="w-auto relative shrink-0 cursor-pointer"
             onClick={() => handleFilterOpen(true)}
           >
-            <Filter className="h-4 w-4 mr-0 sm:mr-2" />
-            <span className="hidden sm:inline">Filters</span>
+            <Filter className="h-4 w-4 mr-1.5" />
+            <span>Filters</span>
             {hasActiveFilters() && (
               <Badge2
                 variant="secondary"
-                className="ml-2 bg-white text-primary px-1.5 py-0 text-xs h-5 min-w-[20px]"
+                className="ml-2 bg-white text-primary px-1.5 py-0 text-xs h-5 min-w-[20px] font-semibold"
               >
                 {getActiveFilterCount()}
               </Badge2>
             )}
           </Button>
-
-          {isMobile ? (
-            <Drawer open={isFilterOpen} onOpenChange={handleFilterOpen}>
-              <DrawerContent className="max-h-[85vh] px-4 pb-6 overflow-y-auto">
-                <DrawerHeader className="text-left px-0">
-                  <DrawerTitle>Filter Enquiries</DrawerTitle>
-                  <DrawerDescription>
-                    Apply filters to narrow down your enquiry list
-                  </DrawerDescription>
-                </DrawerHeader>
-                {renderFilterContent()}
-              </DrawerContent>
-            </Drawer>
-          ) : (
-            <Sheet open={isFilterOpen} onOpenChange={handleFilterOpen}>
-              <SheetContent side="right">
-                <SheetHeader>
-                  <SheetTitle>Filter Enquiries</SheetTitle>
-                  <SheetDescription>
-                    Apply filters to narrow down your enquiry list
-                  </SheetDescription>
-                </SheetHeader>
-                {renderFilterContent()}
-              </SheetContent>
-            </Sheet>
-          )}
         </div>
+
+        {isMobile ? (
+          <Drawer open={isFilterOpen} onOpenChange={handleFilterOpen}>
+            <DrawerContent className="max-h-[85vh] px-4 pb-6 overflow-y-auto">
+              <DrawerHeader className="text-left px-0">
+                <DrawerTitle>Filter Enquiries</DrawerTitle>
+                <DrawerDescription>
+                  Apply filters to narrow down your enquiry list
+                </DrawerDescription>
+              </DrawerHeader>
+              {renderFilterContent()}
+            </DrawerContent>
+          </Drawer>
+        ) : (
+          <Sheet open={isFilterOpen} onOpenChange={handleFilterOpen}>
+            <SheetContent side="right">
+              <SheetHeader>
+                <SheetTitle>Filter Enquiries</SheetTitle>
+                <SheetDescription>
+                  Apply filters to narrow down your enquiry list
+                </SheetDescription>
+              </SheetHeader>
+              {renderFilterContent()}
+            </SheetContent>
+          </Sheet>
+        )}
       </div>
 
       {/* Active Filters Summary */}
       {hasActiveFilters() && (
-        <div className="mt-4 flex flex-wrap items-center gap-2">
-          <span className="text-sm text-muted-foreground">Active filters:</span>
+        <div className="flex flex-wrap items-center gap-2 mb-4">
+          <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Active filters:</span>
           {getFilterSummary().map((filter, index) => (
-            <Badge2 key={index} variant="secondary" className="gap-1">
+            <Badge2 key={index} variant="secondary" className="gap-1 text-xs px-2.5 py-1 bg-gray-100 text-gray-700 font-medium">
               {filter}
             </Badge2>
           ))}
@@ -761,7 +765,7 @@ const Enquiries = () => {
             variant="ghost"
             size="sm"
             onClick={clearFilters}
-            className="h-6 px-2 text-xs"
+            className="h-7 text-xs text-red-600 hover:text-red-700 hover:bg-red-50 cursor-pointer"
           >
             <X className="h-3 w-3 mr-1" />
             Clear all
@@ -955,87 +959,87 @@ const Enquiries = () => {
             </div>
 
             {/* Desktop View - Table */}
-            <div className="hidden md:block overflow-x-auto text-sm">
-              <table className="w-full">
-                <thead className="border-b">
-                  <tr className="text-left text-sm">
-                    <th className="px-4 py-3 font-semibold">Contact</th>
-                    <th className="px-4 py-3 font-semibold">Phone</th>
-                    <th className="px-4 py-3 font-semibold">Source</th>
-                    <th className="px-4 py-3 font-semibold">Area</th>
-                    <th className="px-4 py-3 font-semibold">Status</th>
-                    <th className="px-4 py-3 font-semibold">Next Follow-up</th>
-                    <th className="px-4 py-3 font-semibold">Updated At</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {getGroupedEnquiries().map((group) => (
-                    <Fragment key={group.dateKey}>
-                      <tr className="bg-gray-50 border-b border-gray-200/60">
-                        <td colSpan={7} className="px-4 py-2 font-bold text-xs text-blue-500 uppercase tracking-wider">
-                          {group.displayTitle}
-                        </td>
-                      </tr>
-                      {group.items.map((enquiry) => (
-                        <tr
-                          key={enquiry.id}
-                          className="border-b last:border-0 hover:bg-muted/50 cursor-pointer"
-                          onClick={() => handleOpenEnquiryDetail(enquiry.id)}
-                        >
-                          <td className="px-4 py-3">
-                            <div className="flex items-center gap-2">
-                              <LetterAvatar
-                                name={enquiry.customer?.name || enquiry.contact_name || 'Unknown'}
-                                size="xs"
-                              />
-                              <div>
-                                <div className="font-medium capitalize">
-                                  {enquiry.customer?.name || enquiry.contact_name || 'Unknown'}
-                                </div>
-                                {enquiry.contact_email && (
-                                  <div className="text-xs text-muted-foreground">
-                                    {enquiry.contact_email}
-                                  </div>
-                                )}
-                              </div>
-                            </div>
+            <div className="hidden md:block bg-white rounded-xl border-gray-200 overflow-hidden shadow-xs">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm text-left border-collapse">
+                  <thead className="bg-gray-50 border-b border-gray-200 text-xs text-gray-500 font-semibold uppercase tracking-wider">
+                    <tr>
+                      <th className="px-6 py-4">Contact</th>
+                      <th className="px-6 py-4">Phone</th>
+                      <th className="px-6 py-4">Source</th>
+                      <th className="px-6 py-4">Area</th>
+                      <th className="px-6 py-4">Status</th>
+                      <th className="px-6 py-4">Next Follow-up</th>
+                      <th className="px-6 py-4">Updated At</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-150">
+                    {getGroupedEnquiries().map((group) => (
+                      <Fragment key={group.dateKey}>
+                        <tr className="bg-blue-50/60 border-b border-blue-100">
+                          <td colSpan={7} className="px-6 py-2.5 font-bold text-xs text-blue-600 uppercase tracking-wider">
+                            {group.displayTitle}
                           </td>
-                          <td className="px-4 py-3">
-                            <div className="flex items-center gap-1">
-                              <Phone className="h-3 w-3 text-muted-foreground" />
-                              <span className="font-medium">{formatPhoneNumber(enquiry.contact_phone)}</span>
-                            </div>
-                          </td>
-                          <td className="px-4 py-3">
-                            <div className="font-medium capitalize">
-                              {ENQUIRY_SOURCE_LABELS[enquiry.source]}
-                            </div>
-                          </td>
-                          <td className="px-4 py-3">
-                            <div className="font-medium capitalize">{enquiry.area || 'N/A'}</div>
-                          </td>
-                          <td className="px-4 py-3">
-                            <Badge2 variant={getBadgeVariant(enquiry.status)}>
-                              {ENQUIRY_STATUS_LABELS[enquiry.status]}
-                            </Badge2>
-                          </td>
-                          <td className="px-4 py-3">
-                            {enquiry.followup_date ? (
-                              <div className={`flex items-center gap-1 ${isFollowUpNeeded(enquiry.followup_date) ? 'text-red-500 font-medium' : ''}`}>
-                                <Bell className="h-3 w-3" />
-                                {formatDate(enquiry.followup_date)}
-                              </div>
-                            ) : (
-                              <span className="text-muted-foreground">N/A</span>
-                            )}
-                          </td>
-                          <td className="px-4 py-3">{formatDateTime(enquiry.updated_at)}</td>
                         </tr>
-                      ))}
-                    </Fragment>
-                  ))}
-                </tbody>
-              </table>
+                        {group.items.map((enquiry) => (
+                          <tr
+                            key={enquiry.id}
+                            className="hover:bg-gray-50/70 transition-colors cursor-pointer"
+                            onClick={() => handleOpenEnquiryDetail(enquiry.id)}
+                          >
+                            <td className="px-6 py-4">
+                              <div className="flex items-center gap-2">
+                                <LetterAvatar
+                                  name={enquiry.customer?.name || enquiry.contact_name || 'Unknown'}
+                                  size="xs"
+                                />
+                                <div>
+                                  <div className="font-semibold text-gray-900 capitalize">
+                                    {enquiry.customer?.name || enquiry.contact_name || 'Unknown'}
+                                  </div>
+                                  {enquiry.contact_email && (
+                                    <div className="text-xs text-gray-500">
+                                      {enquiry.contact_email}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 text-gray-700">
+                              <div className="flex items-center gap-1 font-medium">
+                                <Phone className="h-3.5 w-3.5 text-gray-400" />
+                                <span>{formatPhoneNumber(enquiry.contact_phone)}</span>
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 text-gray-700 font-medium capitalize">
+                              {ENQUIRY_SOURCE_LABELS[enquiry.source]}
+                            </td>
+                            <td className="px-6 py-4 text-gray-700 font-medium capitalize">
+                              {enquiry.area || 'N/A'}
+                            </td>
+                            <td className="px-6 py-4">
+                              <Badge2 variant={getBadgeVariant(enquiry.status)}>
+                                {ENQUIRY_STATUS_LABELS[enquiry.status]}
+                              </Badge2>
+                            </td>
+                            <td className="px-6 py-4">
+                              {enquiry.followup_date ? (
+                                <div className={`flex items-center gap-1 text-xs ${isFollowUpNeeded(enquiry.followup_date) ? 'text-red-600 font-bold' : 'text-gray-700 font-medium'}`}>
+                                  <Bell className="h-3.5 w-3.5" />
+                                  {formatDate(enquiry.followup_date)}
+                                </div>
+                              ) : (
+                                <span className="text-gray-400 italic">N/A</span>
+                              )}
+                            </td>
+                            <td className="px-6 py-4 text-gray-600 text-xs font-medium">{formatDateTime(enquiry.updated_at)}</td>
+                          </tr>
+                        ))}
+                      </Fragment>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </>
         )}

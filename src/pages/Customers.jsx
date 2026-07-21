@@ -248,7 +248,7 @@ const Customers = () => {
                 </SelectContent>
               </Select>
             </div>
-            
+
             {tempCustomUnit === 'days' ? (
               <div className="space-y-2">
                 <label className="text-sm font-medium">Number of Days</label>
@@ -441,80 +441,84 @@ const Customers = () => {
         <p className="text-muted-foreground text-sm">Manage your customer database ({totalCount})</p>
       </div>
 
-      {/* Search and Filters - Sheet-based Implementation */}
-      <div className="sticky top-0 z-30 bg-background/95 backdrop-blur-xs py-2 -mx-4 px-4 border-b md:relative md:top-0 md:z-0 md:bg-transparent md:backdrop-blur-none md:p-0 md:border-0 md:mb-6">
-        <div className="flex flex-row items-center gap-2 w-full">
-          {/* Search Field */}
-          <div className="relative flex-1 flex gap-2">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search by name or phone..."
-                value={searchInput}
-                onChange={(e) => setSearchInput(e.target.value)}
-                onKeyPress={handleSearchKeyPress}
-                className="pl-10 pr-10 bg-white border-gray-200 shadow-xs"
-              />
-              {searchInput && (
-                <button
-                  onClick={clearSearch}
-                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                  type="button"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              )}
-            </div>
-            <Button onClick={handleSearch} variant="default" className="shrink-0 hidden sm:flex">
-              <Search className="h-4 w-4 mr-2" />
-              Search
-            </Button>
+      {/* Search and Filters - Partners Page Style */}
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 bg-white p-4 rounded-xl shadow-xs border border-gray-100 mb-6">
+        {/* Search Field */}
+        <div className="relative flex-1 max-w-md flex gap-2">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <Input
+              placeholder="Search by name or phone..."
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              onKeyPress={handleSearchKeyPress}
+              className="pl-10 pr-10"
+            />
+            {searchInput && (
+              <button
+                onClick={clearSearch}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
+                type="button"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
+          </div>
+          <Button onClick={handleSearch} variant="default" className="shrink-0 hidden sm:flex cursor-pointer">
+            <Search className="h-4 w-4 mr-2" />
+            Search
+          </Button>
+        </div>
+
+        <div className="flex items-center gap-4 justify-between sm:justify-end">
+          <div className="text-sm text-gray-500 font-medium hidden md:block">
+            Total Customers: {totalCount}
           </div>
 
-          {/* Filter Button with Sheet */}
+          {/* Filter Button */}
           <Button
             variant={hasActiveFilters() ? "default" : "outline"}
-            className="w-auto relative shrink-0"
+            className="w-auto relative shrink-0 cursor-pointer"
             onClick={() => handleFilterOpen(true)}
           >
-            <Filter className="h-4 w-4 mr-0 sm:mr-2" />
-            <span className="hidden sm:inline">Filters</span>
+            <Filter className="h-4 w-4 mr-1.5" />
+            <span>Filters</span>
             {hasActiveFilters() && (
               <Badge2
                 variant="secondary"
-                className="ml-2 bg-white text-primary px-1.5 py-0 text-xs h-5 min-w-[20px]"
+                className="ml-2 bg-white text-primary px-1.5 py-0 text-xs h-5 min-w-[20px] font-semibold"
               >
                 {getActiveFilterCount()}
               </Badge2>
             )}
           </Button>
-
-          {isMobile ? (
-            <Drawer open={isFilterOpen} onOpenChange={handleFilterOpen}>
-              <DrawerContent className="max-h-[85vh] px-4 pb-6 overflow-y-auto">
-                <DrawerHeader className="text-left px-0">
-                  <DrawerTitle>Filter Customers</DrawerTitle>
-                  <DrawerDescription>
-                    Filter customers by their last booking date
-                  </DrawerDescription>
-                </DrawerHeader>
-                {renderFilterContent()}
-              </DrawerContent>
-            </Drawer>
-          ) : (
-            <Sheet open={isFilterOpen} onOpenChange={handleFilterOpen}>
-              <SheetContent side="right">
-                <SheetHeader>
-                  <SheetTitle>Filter Customers</SheetTitle>
-                  <SheetDescription>
-                    Filter customers by their last booking date
-                  </SheetDescription>
-                </SheetHeader>
-                {renderFilterContent()}
-              </SheetContent>
-            </Sheet>
-          )}
         </div>
+
+        {isMobile ? (
+          <Drawer open={isFilterOpen} onOpenChange={handleFilterOpen}>
+            <DrawerContent className="max-h-[85vh] px-4 pb-6 overflow-y-auto">
+              <DrawerHeader className="text-left px-0">
+                <DrawerTitle>Filter Customers</DrawerTitle>
+                <DrawerDescription>
+                  Filter customers by their last booking date
+                </DrawerDescription>
+              </DrawerHeader>
+              {renderFilterContent()}
+            </DrawerContent>
+          </Drawer>
+        ) : (
+          <Sheet open={isFilterOpen} onOpenChange={handleFilterOpen}>
+            <SheetContent side="right">
+              <SheetHeader>
+                <SheetTitle>Filter Customers</SheetTitle>
+                <SheetDescription>
+                  Filter customers by their last booking date
+                </SheetDescription>
+              </SheetHeader>
+              {renderFilterContent()}
+            </SheetContent>
+          </Sheet>
+        )}
       </div>
 
       {/* Active Filters Summary */}
@@ -592,18 +596,18 @@ const Customers = () => {
                 <p className="text-muted-foreground font-medium mb-1">No customers found</p>
                 <p className="text-sm text-muted-foreground mb-4">No results for "{searchTerm}"</p>
                 <div className="flex items-center justify-center gap-2">
-                  <Button 
-                    variant="outline" 
+                  <Button
+                    variant="outline"
                     onClick={() => { setSearchTerm(''); setDateFilter('all'); }}
                   >
                     Clear Search
                   </Button>
-                  <Button 
+                  <Button
                     onClick={() => {
                       // Check if search term looks like a phone number
                       const phonePattern = /^[\d\s+\-()]+$/;
                       const isPhone = phonePattern.test(searchTerm.trim());
-                      
+
                       if (isPhone) {
                         handleOpenForm(null, { phone: searchTerm.trim() });
                       } else {
@@ -627,92 +631,93 @@ const Customers = () => {
         ) : (
           <>
             {/* Desktop Table */}
-            <div className="hidden md:block overflow-x-auto">
-              <table className="w-full">
-                <thead className="border-b">
-                  <tr className="text-left text-sm">
-                    <th className="px-4 py-3 font-semibold">Name</th>
-                    {/* <th className="px-4 py-3 font-medium">Phone</th> */}
-                    <th className="px-4 py-3 font-semibold">Location</th>
-                    <th className="px-4 py-3 font-semibold">Last Booked</th>
-                    <th className="px-4 py-3 font-semibold">Points</th>
-                    <th className="px-4 py-3 font-semibold">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {customers.map((customer) => (
-                    <tr key={customer.id} className="border-b last:border-0 hover:bg-muted/50 text-sm" >
-                      <td className="px-4 py-2">
-                        <div className="flex items-center gap-2">
-                          <LetterAvatar name={customer.name} size="xs" />
-                          <button
-                            onClick={() => handleViewDetails(customer)}
-                            className="font-medium capitalize hover:text-primary hover:underline cursor-pointer transition-colors"
-                          >
-                            {customer.name || customer.phone}
-                          </button>
-                        </div>
-                      </td>
-                      <td className="px-4 py-2">
-                        <div className="flex items-center gap-2">
-                          <MapPin className="h-4 w-4 text-muted-foreground" />
-                          <span className="text-sm capitalize">
-                            { [customer.area, customer.city, customer.district].filter(Boolean).join(', ') || 'N/A' }
-                          </span>
-                        </div>
-                      </td>
-                      <td className="px-4 py-2">
-                        <div className="flex items-center gap-2">
-                          <Calendar className="h-4 w-4 text-muted-foreground" />
-                          {formatDate(customer.last_booked_at)}
-                        </div>
-                      </td>
-                      <td className="px-4 py-2">
-                        <div className="flex items-center gap-1">
-                          <span className="font-semibold text-primary">{customer.loyalty_points || 0}</span>
-                          <span className="text-xs text-muted-foreground">pts</span>
-                        </div>
-                      </td>
-                      <td className="px-4 py-2">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-8 w-8">
-                              <MoreVertical className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="w-48">
-                            <DropdownMenuItem onClick={() => handleViewDetails(customer)}>
-                              <Eye className="h-4 w-4 mr-2" />
-                              View Details
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => {
-                              setSelectedCustomerForOrder(customer.id);
-                              setIsOrderWizardOpen(true);
-                            }}>
-                              <ShoppingCart className="h-4 w-4 mr-2" />
-                              Create Order
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleOpenForm(customer)}>
-                              <Edit2 className="h-4 w-4 mr-2" />
-                              Edit Customer
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={() => {
-                                setSelectedCustomer(customer);
-                                setIsDeleteOpen(true);
-                              }}
-                              className="text-destructive focus:text-destructive"
-                            >
-                              <Trash2 className="h-4 w-4 mr-2" />
-                              Delete Customer
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </td>
+            <div className="hidden md:block bg-white rounded-xl border-gray-200 overflow-hidden shadow-xs">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm text-left border-collapse">
+                  <thead className="bg-gray-50 border-b border-gray-200 text-xs text-gray-500 font-semibold uppercase tracking-wider">
+                    <tr>
+                      <th className="px-6 py-4">Customer Name</th>
+                      <th className="px-6 py-4">Location</th>
+                      <th className="px-6 py-4">Last Booked</th>
+                      <th className="px-6 py-4">Loyalty Points</th>
+                      <th className="px-6 py-4 text-right">Actions</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="divide-y divide-gray-150">
+                    {customers.map((customer) => (
+                      <tr key={customer.id} className="hover:bg-gray-50/70 transition-colors">
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-2.5">
+                            <LetterAvatar name={customer.name} size="xs" />
+                            <button
+                              onClick={() => handleViewDetails(customer)}
+                              className="font-bold text-gray-900 capitalize hover:text-primary hover:underline cursor-pointer transition-colors text-left"
+                            >
+                              {customer.name || customer.phone}
+                            </button>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-2 text-gray-700">
+                            <MapPin className="h-4 w-4 text-gray-400 shrink-0" />
+                            <span className="capitalize">
+                              {[customer.area, customer.city, customer.district].filter(Boolean).join(', ') || <span className="text-gray-400 italic">N/A</span>}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 text-gray-600 font-medium">
+                          <div className="flex items-center gap-2">
+                            <Calendar className="h-4 w-4 text-gray-400 shrink-0" />
+                            {formatDate(customer.last_booked_at)}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-1">
+                            <span className="font-bold text-primary">{customer.loyalty_points || 0}</span>
+                            <span className="text-xs text-gray-400">pts</span>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-8 w-8 cursor-pointer">
+                                <MoreVertical className="h-4 w-4 text-gray-500" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-48">
+                              <DropdownMenuItem onClick={() => handleViewDetails(customer)}>
+                                <Eye className="h-4 w-4 mr-2" />
+                                View Details
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => {
+                                setSelectedCustomerForOrder(customer.id);
+                                setIsOrderWizardOpen(true);
+                              }}>
+                                <ShoppingCart className="h-4 w-4 mr-2" />
+                                Create Order
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleOpenForm(customer)}>
+                                <Edit2 className="h-4 w-4 mr-2" />
+                                Edit Customer
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() => {
+                                  setSelectedCustomer(customer);
+                                  setIsDeleteOpen(true);
+                                }}
+                                className="text-destructive focus:text-destructive"
+                              >
+                                <Trash2 className="h-4 w-4 mr-2" />
+                                Delete Customer
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
 
             {/* Mobile Cards - App Style */}

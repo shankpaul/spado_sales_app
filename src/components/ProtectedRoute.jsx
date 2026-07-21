@@ -1,5 +1,7 @@
 import { Navigate } from 'react-router-dom';
 import useAuthStore from '../store/authStore';
+import AccessNotGranted from '../pages/AccessNotGranted';
+import { USER_ROLES } from '../lib/constants';
 
 /**
  * ProtectedRoute Component
@@ -16,6 +18,11 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
   // Check if user is authenticated
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
+  }
+
+  // Users with 'agent' role do not have access to sales dashboard pages or menus
+  if (user?.role === USER_ROLES.AGENT || user?.role === 'agent') {
+    return <AccessNotGranted />;
   }
 
   // Check if user has required role (if specified)

@@ -474,43 +474,47 @@ const Subscriptions = () => {
         <p className="text-muted-foreground text-sm">Manage recurring service subscriptions</p>
       </div>
 
-      {/* Search and Filters - Sticky on Mobile */}
-      <div className="sticky top-0 z-30 bg-background/95 backdrop-blur-xs py-2 -mx-4 px-4 border-b md:relative md:top-0 md:z-0 md:bg-transparent md:backdrop-blur-none md:p-0 md:border-0 md:mb-6">
-        <div className="flex flex-row items-center gap-2 w-full">
-          {/* Search */}
-          <div className="relative flex-1 flex gap-2">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search by name or phone..."
-                value={searchTerm}
-                onChange={handleSearch}
-                className="pl-10 pr-10 bg-white border-gray-200 shadow-xs"
-              />
-              {searchTerm && (
-                <button
-                  onClick={() => setSearchTerm('')}
-                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                  type="button"
-                >
-                  <XIcon className="h-4 w-4" />
-                </button>
-              )}
-            </div>
+      {/* Search and Filters - Partners Page Style */}
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 bg-white p-4 rounded-xl shadow-xs border border-gray-100 mb-6">
+        {/* Search */}
+        <div className="relative flex-1 max-w-md flex gap-2">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <Input
+              placeholder="Search subscriptions by name, phone..."
+              value={searchTerm}
+              onChange={handleSearch}
+              className="pl-10 pr-10"
+            />
+            {searchTerm && (
+              <button
+                onClick={() => setSearchTerm('')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
+                type="button"
+              >
+                <XIcon className="h-4 w-4" />
+              </button>
+            )}
+          </div>
+        </div>
+
+        <div className="flex items-center gap-4 justify-between sm:justify-end">
+          <div className="text-sm text-gray-500 font-medium hidden md:block">
+            Total Subscriptions: {totalCount}
           </div>
 
           {/* Filter Button */}
           <Button
             variant={activeFilterCount > 0 ? "default" : "outline"}
             onClick={() => setIsFilterOpen(true)}
-            className="w-auto relative shrink-0"
+            className="w-auto relative shrink-0 cursor-pointer"
           >
-            <Filter className="h-4 w-4 mr-0 sm:mr-2" />
-            <span className="hidden sm:inline">Filters</span>
+            <Filter className="h-4 w-4 mr-1.5" />
+            <span>Filters</span>
             {activeFilterCount > 0 && (
               <Badge2
                 variant="secondary"
-                className="ml-2 bg-white text-primary px-1.5 py-0 text-xs h-5 min-w-[20px]"
+                className="ml-2 bg-white text-primary px-1.5 py-0 text-xs h-5 min-w-[20px] font-semibold"
               >
                 {activeFilterCount}
               </Badge2>
@@ -521,10 +525,10 @@ const Subscriptions = () => {
 
       {/* Active Filters */}
       {activeFilterCount > 0 && (
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-sm text-muted-foreground">Active filters:</span>
+        <div className="flex flex-wrap items-center gap-2 mb-4">
+          <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Active filters:</span>
           {statusFilter && (
-            <Badge2 variant="secondary" className="gap-1">
+            <Badge2 variant="secondary" className="gap-1 text-xs px-2.5 py-1 bg-gray-100 text-gray-700 font-medium">
               Status: {getStatusLabel(statusFilter, SUBSCRIPTION_STATUSES)}
               <button
                 onClick={() => setStatusFilter('')}
@@ -535,7 +539,7 @@ const Subscriptions = () => {
             </Badge2>
           )}
           {paymentStatusFilter && (
-            <Badge2 variant="secondary" className="gap-1">
+            <Badge2 variant="secondary" className="gap-1 text-xs px-2.5 py-1 bg-gray-100 text-gray-700 font-medium">
               Payment: {getStatusLabel(paymentStatusFilter, SUBSCRIPTION_PAYMENT_STATUSES)}
               <button
                 onClick={() => setPaymentStatusFilter('')}
@@ -546,7 +550,7 @@ const Subscriptions = () => {
             </Badge2>
           )}
           {vehicleTypeFilter && (
-            <Badge2 variant="secondary" className="gap-1">
+            <Badge2 variant="secondary" className="gap-1 text-xs px-2.5 py-1 bg-gray-100 text-gray-700 font-medium">
               Vehicle: {vehicleTypeFilter.charAt(0).toUpperCase() + vehicleTypeFilter.slice(1)}
               <button
                 onClick={() => setVehicleTypeFilter('')}
@@ -557,7 +561,7 @@ const Subscriptions = () => {
             </Badge2>
           )}
           {(startDateFrom || startDateTo) && (
-            <Badge2 variant="secondary" className="gap-1">
+            <Badge2 variant="secondary" className="gap-1 text-xs px-2.5 py-1 bg-gray-100 text-gray-700 font-medium">
               Date: {startDateFrom && formatDate(startDateFrom)}
               {startDateFrom && startDateTo && ' - '}
               {startDateTo && formatDate(startDateTo)}
@@ -572,7 +576,12 @@ const Subscriptions = () => {
               </button>
             </Badge2>
           )}
-          <Button variant="ghost" size="sm" onClick={clearFilters}>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={clearFilters}
+            className="h-7 text-xs text-red-600 hover:text-red-700 hover:bg-red-50 cursor-pointer"
+          >
             Clear all
           </Button>
         </div>
@@ -633,100 +642,101 @@ const Subscriptions = () => {
         ) : (
           <>
             {/* Desktop Table */}
-            <div className="hidden md:block overflow-x-auto">
-              <table className="w-full">
-                <thead className="border-b">
-                  <tr className="text-left text-sm">
-                    <th className="px-4 py-3 font-semibold">Customer</th>
-                    <th className="px-4 py-3 font-semibold">Package</th>
-                    <th className="px-4 py-3 font-semibold">Duration</th>
-                    <th className="px-4 py-3 font-semibold">Washes</th>
-                    <th className="px-4 py-3 font-semibold">Status</th>
-                    <th className="px-4 py-3 font-semibold">Payment</th>
-                    <th className="px-4 py-3 font-semibold">Next Wash</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {subscriptions.map((subscription) => (
-                    <tr
-                      key={subscription.id}
-                      className="border-b last:border-0 hover:bg-muted/50 cursor-pointer"
-                      onClick={() => handleViewDetails(subscription.id)}
-                    >
-                      <td className="px-4 py-3">
-                        <div className="font-normal flex gap-2">
-                          <LetterAvatar name={subscription.customer?.name} size="xs" />
-                          {subscription.customer?.name}
-                        </div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-2">
-                          <Package className="h-4 w-4 text-muted-foreground" />
-                          <div className="flex items-center gap-1">
-                            <span className="capitalize text-sm">
-                              {subscription.selected_packages?.[0]?.name || 'N/A'}
-                            </span>
-                            {subscription.selected_packages?.length > 1 && (
-                              <Popover>
-                                <PopoverTrigger asChild>
-                                  <Badge2
-                                    variant="secondary"
-                                    className="h-5 px-1.5 text-[10px] cursor-pointer hover:bg-secondary/80"
-                                    onClick={(e) => e.stopPropagation()}
-                                  >
-                                    +{subscription.subscription_packages.length - 1}
-                                  </Badge2>
-                                </PopoverTrigger>
-                                <PopoverContent className="w-auto p-3" align="start">
-                                  <div className="space-y-2">
-                                    <h4 className="font-medium text-xs text-muted-foreground">All Packages</h4>
-                                    <ul className="space-y-1">
-                                      {subscription.subscription_packages.map((pkg, idx) => (
-                                        <li key={idx} className="text-sm capitalize list-disc ml-4">
-                                          {pkg.name}
-                                        </li>
-                                      ))}
-                                    </ul>
-                                  </div>
-                                </PopoverContent>
-                              </Popover>
-                            )}
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="text-sm">
-                          {subscription.months_duration} month(s)
-                        </div>
-                        <div className="text-xs text-muted-foreground">
-                          {formatDate(subscription.start_date)}
-                        </div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="text-sm">
-                          {subscription.washing_schedules?.length || 0} scheduled
-                        </div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <Badge2 variant={getBadgeVariant(subscription.status)}>
-                          {getStatusLabel(subscription.status, SUBSCRIPTION_STATUSES)}
-                        </Badge2>
-                      </td>
-                      <td className="px-4 py-3">
-                        <Badge2 variant={getBadgeVariant(subscription.payment_status, 'payment')}>
-                          {getStatusLabel(subscription.payment_status, SUBSCRIPTION_PAYMENT_STATUSES)}
-                        </Badge2>
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="text-sm">
-                          {subscription.next_wash_date ? formatDate(subscription.next_wash_date) : 'N/A'}
-                        </div>
-                      </td>
-                      
+            <div className="hidden md:block bg-white rounded-xl border-gray-200 overflow-hidden shadow-xs">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm text-left border-collapse">
+                  <thead className="bg-gray-50 border-b border-gray-200 text-xs text-gray-500 font-semibold uppercase tracking-wider">
+                    <tr>
+                      <th className="px-6 py-4">Customer</th>
+                      <th className="px-6 py-4">Package</th>
+                      <th className="px-6 py-4">Duration</th>
+                      <th className="px-6 py-4">Washes</th>
+                      <th className="px-6 py-4">Status</th>
+                      <th className="px-6 py-4">Payment</th>
+                      <th className="px-6 py-4">Next Wash</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="divide-y divide-gray-150">
+                    {subscriptions.map((subscription) => (
+                      <tr
+                        key={subscription.id}
+                        className="hover:bg-gray-50/70 transition-colors cursor-pointer"
+                        onClick={() => handleViewDetails(subscription.id)}
+                      >
+                        <td className="px-6 py-4">
+                          <div className="font-semibold text-gray-900 flex items-center gap-2 capitalize">
+                            <LetterAvatar name={subscription.customer?.name} size="xs" />
+                            {subscription.customer?.name}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-2">
+                            <Package className="h-4 w-4 text-gray-400" />
+                            <div className="flex items-center gap-1">
+                              <span className="capitalize text-sm font-semibold text-gray-800">
+                                {subscription.selected_packages?.[0]?.name || 'N/A'}
+                              </span>
+                              {subscription.selected_packages?.length > 1 && (
+                                <Popover>
+                                  <PopoverTrigger asChild>
+                                    <Badge2
+                                      variant="secondary"
+                                      className="h-5 px-1.5 text-[10px] cursor-pointer hover:bg-secondary/80"
+                                      onClick={(e) => e.stopPropagation()}
+                                    >
+                                      +{subscription.subscription_packages.length - 1}
+                                    </Badge2>
+                                  </PopoverTrigger>
+                                  <PopoverContent className="w-auto p-3" align="start">
+                                    <div className="space-y-2">
+                                      <h4 className="font-medium text-xs text-muted-foreground">All Packages</h4>
+                                      <ul className="space-y-1">
+                                        {subscription.subscription_packages.map((pkg, idx) => (
+                                          <li key={idx} className="text-sm capitalize list-disc ml-4">
+                                            {pkg.name}
+                                          </li>
+                                        ))}
+                                      </ul>
+                                    </div>
+                                  </PopoverContent>
+                                </Popover>
+                              )}
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="text-sm font-medium text-gray-800">
+                            {subscription.months_duration} month(s)
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            {formatDate(subscription.start_date)}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="text-sm font-medium text-gray-700">
+                            {subscription.washing_schedules?.length || 0} scheduled
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <Badge2 variant={getBadgeVariant(subscription.status)}>
+                            {getStatusLabel(subscription.status, SUBSCRIPTION_STATUSES)}
+                          </Badge2>
+                        </td>
+                        <td className="px-6 py-4">
+                          <Badge2 variant={getBadgeVariant(subscription.payment_status, 'payment')}>
+                            {getStatusLabel(subscription.payment_status, SUBSCRIPTION_PAYMENT_STATUSES)}
+                          </Badge2>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="text-sm font-medium text-gray-700">
+                            {subscription.next_wash_date ? formatDate(subscription.next_wash_date) : 'N/A'}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
 
             {/* Mobile Cards */}

@@ -5,6 +5,8 @@ import { Button } from './ui/button';
 import useAuthStore from '../store/authStore';
 import useOrderStore from '../store/orderStore';
 import authService from '../services/authService';
+import AccessNotGranted from '../pages/AccessNotGranted';
+import { USER_ROLES } from '../lib/constants';
 import { toast } from 'sonner';
 import {
   LayoutDashboard,
@@ -69,9 +71,15 @@ import {
  * Adapts to mobile, tablet, and desktop screens
  */
 const Layout = ({ children }) => {
+  const { user } = useAuthStore();
+
+  // If user role is agent, do not render layout or menus
+  if (user?.role === USER_ROLES.AGENT || user?.role === 'agent') {
+    return <AccessNotGranted />;
+  }
+
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const { user } = useAuthStore();
   const { initializeRealtime } = useOrderStore();
   const location = useLocation();
   const navigate = useNavigate();
@@ -169,10 +177,10 @@ const Layout = ({ children }) => {
           ]
         },
         {
-          title: 'Marketing',
+          title: 'Catalog & Config',
           items: [
-            { name: 'Campaigns', href: '/campaigns', icon: Gift },
-            { name: 'Partners', href: '/partners', icon: Building }
+            { name: 'Packages', href: '/packages', icon: Package },
+            { name: 'Addons', href: '/addons', icon: Layers }
           ]
         }
       ],
