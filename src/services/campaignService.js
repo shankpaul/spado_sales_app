@@ -37,6 +37,35 @@ const campaignService = {
     return response.data;
   },
 
+  regenerateUnusedCoupons: async (campaignId) => {
+    try {
+      const response = await apiClient.post(`/campaigns/${campaignId}/regenerate-unused-coupons`);
+      return response.data;
+    } catch (err) {
+      if (err.response?.status === 404) {
+        try {
+          // Fallback to generate-coupons endpoint with regenerate flags
+          const response = await apiClient.post(`/campaigns/${campaignId}/generate-coupons`, {
+            regenerate_unused_coupons: true,
+            regenerate: true,
+            mode: 'regenerate',
+          });
+          return response.data;
+        } catch (err2) {
+          if (err2.response?.status === 404) {
+            // Fallback to campaign update PUT endpoint with regenerate flag
+            const response = await apiClient.put(`/campaigns/${campaignId}`, {
+              regenerate_unused_coupons: true,
+            });
+            return response.data;
+          }
+          throw err2;
+        }
+      }
+      throw err;
+    }
+  },
+
   getCampaignAnalytics: async (id) => {
     const response = await apiClient.get(`/campaigns/${id}/analytics`);
     return response.data;

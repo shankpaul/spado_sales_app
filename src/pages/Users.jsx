@@ -3,6 +3,14 @@ import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Card } from '../components/ui/card';
 import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '../components/ui/table';
+import {
   Sheet,
   SheetContent,
   SheetHeader,
@@ -38,6 +46,7 @@ import {
   MoreVertical,
   User2,
   UsersRound,
+  X,
 } from 'lucide-react';
 import LetterAvatar from '../components/LetterAvatar';
 import {
@@ -231,16 +240,29 @@ const Users = () => {
         </Button>
       </div>
 
-      {/* Search */}
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-        <Input
-          type="text"
-          placeholder="Search users by name, email, or role..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="pl-10 pr-10 bg-white border-gray-200 shadow-xs"
-        />
+      {/* Search & Stats Bar */}
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 bg-white p-4 rounded-xl shadow-xs border border-gray-100">
+        <div className="relative flex-1 max-w-md">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+          <Input
+            type="text"
+            placeholder="Search users by name, email, or role..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-9 pr-8 bg-gray-50/50 border-gray-200 focus:bg-white"
+          />
+          {searchTerm && (
+            <button
+              onClick={() => setSearchTerm('')}
+              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
+        </div>
+        <div className="text-xs text-gray-500 font-medium">
+          Total Users: {filteredUsers.length}
+        </div>
       </div>
 
       {/* Users List */}
@@ -284,111 +306,250 @@ const Users = () => {
           )}
         </Card>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {filteredUsers.map((user) => (
-            <Card key={user.id} className="p-6 shadow-xs hover:shadow-lg transition-shadow bg-white">
-              <div className="flex items-start justify-between mb-4">
-                <div className="flex items-start gap-3">
-                  {user.avatar_url ? (
-                    <img
-                      src={user.avatar_url}
-                      alt={user.name}
-                      className="h-10 w-10 rounded-full object-cover border-2 border-gray-200"
-                    />
-                  ) : (
-                    <LetterAvatar name={user.name} size="md" />
-                  )}
-                  <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold text-gray-900 truncate capitalize">
-                      {user.name}
-                    </h3>
-                    <p className="text-sm text-gray-600 truncate">{user.email}</p>
-                  </div>
-                </div>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                      <MoreVertical className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => handleEdit(user)}>
-                      <Edit2 className="h-4 w-4 mr-2" />
-                      Edit
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => handleChangePassword(user)}>
-                      <KeyRound className="h-4 w-4 mr-2" />
-                      Change Password
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => handleToggleLock(user)}>
-                      {user.locked ? (
-                        <>
-                          <Unlock className="h-4 w-4 mr-2" />
-                          Unlock
-                        </>
+        <>
+          {/* Desktop Table View */}
+          <div className="hidden md:block bg-white rounded-xl shadow-xs border border-gray-100 overflow-hidden">
+            <Table>
+              <TableHeader className="bg-gray-50/80">
+                <TableRow>
+                  <TableHead className="font-semibold text-gray-700">User</TableHead>
+                  <TableHead className="font-semibold text-gray-700">Role</TableHead>
+                  <TableHead className="font-semibold text-gray-700">Contact</TableHead>
+                  <TableHead className="font-semibold text-gray-700">Location / Office</TableHead>
+                  <TableHead className="font-semibold text-gray-700">Status</TableHead>
+                  <TableHead className="font-semibold text-gray-700">Last Active</TableHead>
+                  <TableHead className="text-right font-semibold text-gray-700">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredUsers.map((user) => (
+                  <TableRow key={user.id} className="hover:bg-gray-50/60 transition-colors">
+                    <TableCell className="py-3">
+                      <div className="flex items-center gap-3">
+                        {user.avatar_url ? (
+                          <img
+                            src={user.avatar_url}
+                            alt={user.name}
+                            className="h-9 w-9 rounded-full object-cover border border-gray-200"
+                          />
+                        ) : (
+                          <LetterAvatar name={user.name} size="sm" />
+                        )}
+                        <div>
+                          <div className="font-semibold text-gray-900 capitalize">{user.name}</div>
+                          <div className="text-xs text-gray-500">{user.email}</div>
+                        </div>
+                      </div>
+                    </TableCell>
+
+                    <TableCell className="py-3">
+                      <Badge2 variant={getRoleBadgeColor(user.role)}>
+                        <Shield className="h-3 w-3 mr-1" />
+                        {getRoleLabel(user.role)}
+                      </Badge2>
+                    </TableCell>
+
+                    <TableCell className="py-3 text-xs text-gray-600 font-medium">
+                      {user.phone ? (
+                        <div className="flex items-center gap-1.5">
+                          <Phone className="h-3.5 w-3.5 text-gray-400" />
+                          {user.phone}
+                        </div>
                       ) : (
-                        <>
-                          <Lock className="h-4 w-4 mr-2" />
-                          Lock
-                        </>
+                        <span className="text-gray-400 font-normal">-</span>
                       )}
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onClick={() => handleDeleteClick(user)}
-                      className="text-red-600"
-                    >
-                      <Trash2 className="h-4 w-4 mr-2" />
-                      Delete
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
+                    </TableCell>
 
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <Badge2 variant={getRoleBadgeColor(user.role)}>
-                    <Shield className="h-3 w-3 mr-1" />
-                    {getRoleLabel(user.role)}
-                  </Badge2>
-                  {user.locked && (
-                    <Badge2 className="bg-red-100 text-red-800">
-                      <Lock className="h-3 w-3 mr-1" />
-                      Locked
+                    <TableCell className="py-3 text-xs text-gray-600">
+                      {user.office ? (
+                        <div className="flex items-center gap-1.5 font-medium text-gray-800">
+                          <MapPin className="h-3.5 w-3.5 text-gray-400" />
+                          {user.office.name}
+                        </div>
+                      ) : (user.home_latitude && user.home_longitude) ? (
+                        <div className="flex items-center gap-1.5 text-gray-500">
+                          <MapPin className="h-3.5 w-3.5 text-gray-400" />
+                          Home location set
+                        </div>
+                      ) : (
+                        <span className="text-gray-400">-</span>
+                      )}
+                    </TableCell>
+
+                    <TableCell className="py-3">
+                      <div className="flex items-center gap-1.5">
+                        {user.locked ? (
+                          <Badge2 className="bg-red-100 text-red-800">
+                            <Lock className="h-3 w-3 mr-1" />
+                            Locked
+                          </Badge2>
+                        ) : (
+                          <Badge2 className="bg-emerald-100 text-emerald-800">
+                            Active
+                          </Badge2>
+                        )}
+                        {user.expired && (
+                          <Badge2 className="bg-orange-100 text-orange-800">Expired</Badge2>
+                        )}
+                      </div>
+                    </TableCell>
+
+                    <TableCell className="py-3 text-xs text-gray-500">
+                      {user.last_activity_at ? new Date(user.last_activity_at).toLocaleDateString() : 'Never'}
+                    </TableCell>
+
+                    <TableCell className="py-3 text-right">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                            <MoreVertical className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => handleEdit(user)}>
+                            <Edit2 className="h-4 w-4 mr-2" />
+                            Edit
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleChangePassword(user)}>
+                            <KeyRound className="h-4 w-4 mr-2" />
+                            Change Password
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleToggleLock(user)}>
+                            {user.locked ? (
+                              <>
+                                <Unlock className="h-4 w-4 mr-2" />
+                                Unlock
+                              </>
+                            ) : (
+                              <>
+                                <Lock className="h-4 w-4 mr-2" />
+                                Lock
+                              </>
+                            )}
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => handleDeleteClick(user)}
+                            className="text-red-600"
+                          >
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            Delete
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+
+          {/* Mobile Grid View */}
+          <div className="grid gap-4 sm:grid-cols-2 md:hidden">
+            {filteredUsers.map((user) => (
+              <Card key={user.id} className="p-6 shadow-xs hover:shadow-lg transition-shadow bg-white">
+                <div className="flex items-start justify-between mb-4">
+                  <div className="flex items-start gap-3">
+                    {user.avatar_url ? (
+                      <img
+                        src={user.avatar_url}
+                        alt={user.name}
+                        className="h-10 w-10 rounded-full object-cover border-2 border-gray-200"
+                      />
+                    ) : (
+                      <LetterAvatar name={user.name} size="md" />
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-semibold text-gray-900 truncate capitalize">
+                        {user.name}
+                      </h3>
+                      <p className="text-sm text-gray-600 truncate">{user.email}</p>
+                    </div>
+                  </div>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                        <MoreVertical className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => handleEdit(user)}>
+                        <Edit2 className="h-4 w-4 mr-2" />
+                        Edit
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleChangePassword(user)}>
+                        <KeyRound className="h-4 w-4 mr-2" />
+                        Change Password
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleToggleLock(user)}>
+                        {user.locked ? (
+                          <>
+                            <Unlock className="h-4 w-4 mr-2" />
+                            Unlock
+                          </>
+                        ) : (
+                          <>
+                            <Lock className="h-4 w-4 mr-2" />
+                            Lock
+                          </>
+                        )}
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => handleDeleteClick(user)}
+                        className="text-red-600"
+                      >
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        Delete
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Badge2 variant={getRoleBadgeColor(user.role)}>
+                      <Shield className="h-3 w-3 mr-1" />
+                      {getRoleLabel(user.role)}
                     </Badge2>
+                    {user.locked && (
+                      <Badge2 className="bg-red-100 text-red-800">
+                        <Lock className="h-3 w-3 mr-1" />
+                        Locked
+                      </Badge2>
+                    )}
+                    {user.expired && (
+                      <Badge2 className="bg-orange-100 text-orange-800">Expired</Badge2>
+                    )}
+                  </div>
+
+                  {user.phone && (
+                    <div className="flex items-center text-sm text-gray-600">
+                      <Phone className="h-3 w-3 mr-2" />
+                      {user.phone}
+                    </div>
                   )}
-                  {user.expired && (
-                    <Badge2 className="bg-orange-100 text-orange-800">Expired</Badge2>
+
+                  {user.office && (
+                    <div className="flex items-center text-sm text-gray-600">
+                      <MapPin className="h-3 w-3 mr-2" />
+                      {user.office.name}
+                    </div>
                   )}
+
+                  {(user.home_latitude && user.home_longitude) && !user.office && (
+                    <div className="flex items-center text-sm text-gray-600">
+                      <MapPin className="h-3 w-3 mr-2" />
+                      Home location set
+                    </div>
+                  )}
+
+                  <div className="text-xs text-gray-500 pt-2 border-t">
+                    Last active: {user.last_activity_at ? new Date(user.last_activity_at).toLocaleDateString() : 'Never'}
+                  </div>
                 </div>
-
-                {user.phone && (
-                  <div className="flex items-center text-sm text-gray-600">
-                    <Phone className="h-3 w-3 mr-2" />
-                    {user.phone}
-                  </div>
-                )}
-
-                {user.office && (
-                  <div className="flex items-center text-sm text-gray-600">
-                    <MapPin className="h-3 w-3 mr-2" />
-                    {user.office.name}
-                  </div>
-                )}
-
-                {(user.home_latitude && user.home_longitude) && !user.office && (
-                  <div className="flex items-center text-sm text-gray-600">
-                    <MapPin className="h-3 w-3 mr-2" />
-                    Home location set
-                  </div>
-                )}
-
-                <div className="text-xs text-gray-500 pt-2 border-t">
-                  Last active: {user.last_activity_at ? new Date(user.last_activity_at).toLocaleDateString() : 'Never'}
-                </div>
-              </div>
-            </Card>
-          ))}
-        </div>
+              </Card>
+            ))}
+          </div>
+        </>
       )}
 
       {/* User Form Sheet */}

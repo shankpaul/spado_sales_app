@@ -32,6 +32,7 @@ const Campaigns = lazy(() => import('./pages/Campaigns'));
 const CampaignForm = lazy(() => import('./pages/CampaignForm'));
 const CampaignDetail = lazy(() => import('./pages/CampaignDetail'));
 const CampaignDashboard = lazy(() => import('./pages/CampaignDashboard'));
+const ValidateCoupon = lazy(() => import('./pages/ValidateCoupon'));
 
 // Loading fallback component
 const LoadingFallback = () => (
@@ -213,6 +214,17 @@ function App() {
               <ProtectedRoute allowedRoles={['admin']}>
                 <Layout>
                   <Partners />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/validate-coupon"
+            element={
+              <ProtectedRoute allowedRoles={['admin', 'sales_executive']}>
+                <Layout>
+                  <ValidateCoupon />
                 </Layout>
               </ProtectedRoute>
             }

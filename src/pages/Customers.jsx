@@ -651,7 +651,7 @@ const Customers = () => {
                             <LetterAvatar name={customer.name} size="xs" />
                             <button
                               onClick={() => handleViewDetails(customer)}
-                              className="font-bold text-gray-900 capitalize hover:text-primary hover:underline cursor-pointer transition-colors text-left"
+                              className="font-semibold text-gray-900 capitalize hover:text-primary hover:underline cursor-pointer transition-colors text-left"
                             >
                               {customer.name || customer.phone}
                             </button>

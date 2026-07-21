@@ -12,6 +12,7 @@ import {
   DialogFooter
 } from '../components/ui/dialog';
 import { Badge2 } from '../components/ui/badge2';
+import { ConfirmDialog } from '../components/ui/confirm-dialog';
 import {
   AreaChart,
   Area,
@@ -45,7 +46,8 @@ import {
   TrendingUp,
   Percent,
   CheckCircle2,
-  Trash2
+  Trash2,
+  RefreshCw
 } from 'lucide-react';
 import campaignService from '../services/campaignService';
 import useAuthStore from '../store/authStore';
@@ -71,6 +73,63 @@ export default function CampaignDetail() {
   const [isBatchDialogOpen, setIsBatchDialogOpen] = useState(false);
   const [batchData, setBatchData] = useState({ quantity: 100, batch_number: 2 });
   const [generatingBatch, setGeneratingBatch] = useState(false);
+  const [regenerating, setRegenerating] = useState(false);
+
+  // Custom Confirm Dialog State
+  const [confirmConfig, setConfirmConfig] = useState({
+    open: false,
+    title: '',
+    description: '',
+    confirmText: 'Confirm',
+    variant: 'default',
+    onConfirm: null,
+  });
+
+  // Check if coupons are present and all are unused (created or cancelled)
+  const canRegenerateUnused = coupons && coupons.length > 0 && coupons.every(c => c.status === 'created' || c.status === 'cancelled');
+
+  const triggerRegenerateUnused = () => {
+    setConfirmConfig({
+      open: true,
+      title: '⚠️ CRITICAL WARNING: Regenerate Unused Coupon Codes',
+      description: 'ATTENTION: This action will permanently overwrite and replace ALL unused coupon codes (status: created or cancelled) with new codes generated according to the current campaign pattern. Existing printed or distributed codes that are unused will be invalidated.',
+      confirmText: 'Yes, Regenerate Unused Codes',
+      variant: 'destructive',
+      onConfirm: async () => {
+        setRegenerating(true);
+        try {
+          await campaignService.regenerateUnusedCoupons(id);
+          toast.success('Unused coupon codes regenerated successfully');
+          fetchCampaignDetails();
+          fetchCoupons();
+        } catch (error) {
+          toast.error(error.response?.data?.message || 'Failed to regenerate unused coupon codes');
+        } finally {
+          setRegenerating(false);
+        }
+      },
+    });
+  };
+
+  const triggerCancelCoupon = (coupon) => {
+    setConfirmConfig({
+      open: true,
+      title: 'Cancel Coupon Code',
+      description: `Are you sure you want to cancel coupon code "${coupon.code}"? This action is permanent and cannot be undone.`,
+      confirmText: 'Yes, Cancel Coupon',
+      variant: 'destructive',
+      onConfirm: async () => {
+        try {
+          await campaignService.updateCoupon(coupon.id, { status: 'cancelled' });
+          toast.success(`Coupon ${coupon.code} cancelled`);
+          fetchCoupons();
+          fetchCampaignDetails();
+        } catch (error) {
+          toast.error('Failed to cancel coupon');
+        }
+      },
+    });
+  };
 
   // Pre-assignment mobile edit states
   const [editingCouponId, setEditingCouponId] = useState(null);
@@ -78,13 +137,44 @@ export default function CampaignDetail() {
 
   useEffect(() => {
     fetchCampaignDetails();
+    fetchCoupons();
   }, [id]);
 
   useEffect(() => {
-    if (activeTab === 'coupons') {
+    if (activeTab === 'coupons' || activeTab === 'batches') {
       fetchCoupons();
     }
   }, [id, activeTab, couponSearch, couponStatusFilter, couponPage]);
+
+  // Helper to extract or derive batches list safely
+  const getBatchesList = () => {
+    if (campaign?.batches && campaign.batches.length > 0) return campaign.batches;
+    if (campaign?.coupon_batches && campaign.coupon_batches.length > 0) return campaign.coupon_batches;
+    if (analytics?.batches && analytics.batches.length > 0) return analytics.batches;
+    if (analytics?.coupon_batches && analytics.coupon_batches.length > 0) return analytics.coupon_batches;
+
+    // Fallback: Derive batches from loaded coupons list
+    if (coupons && coupons.length > 0) {
+      const batchMap = {};
+      coupons.forEach(c => {
+        const batchNum = c.batch_number || 1;
+        if (!batchMap[batchNum]) {
+          batchMap[batchNum] = {
+            id: `batch-${batchNum}`,
+            batch_number: batchNum,
+            quantity: 0,
+            created_at: c.created_at || campaign?.created_at,
+          };
+        }
+        batchMap[batchNum].quantity += 1;
+      });
+      return Object.values(batchMap).sort((a, b) => a.batch_number - b.batch_number);
+    }
+
+    return [];
+  };
+
+  const derivedBatches = getBatchesList();
 
   const fetchCampaignDetails = async () => {
     setLoading(true);
@@ -95,9 +185,16 @@ export default function CampaignDetail() {
       const analRes = await campaignService.getCampaignAnalytics(id);
       setAnalytics(analRes.data);
 
-      // Auto-suggest next batch number
-      const nextBatch = (campRes.data.batches?.length || 0) + 1;
-      setBatchData({ quantity: 100, batch_number: nextBatch });
+      // Auto-suggest next batch number and continuation sequence start
+      const nextBatch = (derivedBatches?.length || campRes.data.batches?.length || 0) + 1;
+      const codeLen = campRes.data.random_code_length || 7;
+      const baseOffset = Math.pow(10, Math.max(0, codeLen - 1));
+      const totalGen = analRes.data?.total_coupons_generated || 0;
+      setBatchData({
+        quantity: 100,
+        batch_number: nextBatch,
+        start_sequence_number: baseOffset + totalGen + 1,
+      });
     } catch (error) {
       toast.error('Failed to load campaign details');
       navigate('/campaigns');
@@ -133,6 +230,7 @@ export default function CampaignDetail() {
       await campaignService.generateCoupons(id, {
         quantity: parseInt(batchData.quantity, 10),
         batch_number: parseInt(batchData.batch_number, 10),
+        start_sequence_number: batchData.start_sequence_number ? parseInt(batchData.start_sequence_number, 10) : undefined,
       });
       toast.success('Additional coupon batch generated successfully');
       setIsBatchDialogOpen(false);
@@ -246,6 +344,17 @@ export default function CampaignDetail() {
         </div>
         {user?.role === 'admin' && (
           <div className="flex gap-2">
+            {canRegenerateUnused && (
+              <Button
+                variant="outline"
+                onClick={triggerRegenerateUnused}
+                disabled={regenerating}
+                className="border-red-300 text-red-700 bg-red-50/90 hover:bg-red-100 hover:text-red-800 flex items-center gap-1.5 text-xs font-bold shadow-2xs"
+              >
+                <RefreshCw className={`h-3.5 w-3.5 text-red-600 ${regenerating ? 'animate-spin' : ''}`} />
+                Regenerate Unused Codes
+              </Button>
+            )}
             <Button
               variant="outline"
               onClick={() => navigate(`/campaigns/${campaign.id}/edit`)}
@@ -336,7 +445,7 @@ export default function CampaignDetail() {
           className={`pb-3 font-semibold text-sm transition-all border-b-2 px-1 ${activeTab === 'batches' ? 'border-primary text-primary' : 'border-transparent text-gray-500 hover:text-gray-800'
             }`}
         >
-          Generation Batches ({campaign.batches?.length || 0})
+          Generation Batches ({derivedBatches.length})
         </button>
       </div>
 
@@ -606,18 +715,7 @@ export default function CampaignDetail() {
                             <Button
                               variant="ghost"
                               size="xs"
-                              onClick={async () => {
-                                if (window.confirm('Cancel this coupon? This is permanent.')) {
-                                  try {
-                                    await campaignService.updateCoupon(c.id, { status: 'cancelled' });
-                                    toast.success('Coupon cancelled');
-                                    fetchCoupons();
-                                    fetchCampaignDetails();
-                                  } catch (error) {
-                                    toast.error('Failed to cancel coupon');
-                                  }
-                                }
-                              }}
+                              onClick={() => triggerCancelCoupon(c)}
                               className="text-red-500 hover:text-red-700 p-1"
                             >
                               Cancel Code
@@ -645,11 +743,14 @@ export default function CampaignDetail() {
 
       {activeTab === 'batches' && (
         <Card className="bg-white border border-gray-100 shadow-xs">
-          <CardHeader className="pb-3 border-b border-gray-50">
+          <CardHeader className="pb-3 border-b border-gray-50 flex flex-row items-center justify-between">
             <CardTitle className="text-base font-bold text-gray-800">Coupon Generation Batches</CardTitle>
+            <Badge2 variant="secondary" className="font-semibold">
+              Total Batches: {derivedBatches.length}
+            </Badge2>
           </CardHeader>
           <CardContent className="p-0">
-            {(!campaign.batches || campaign.batches.length === 0) ? (
+            {derivedBatches.length === 0 ? (
               <div className="py-20 text-center text-gray-400 text-sm">No batches generated yet.</div>
             ) : (
               <table className="w-full text-left border-collapse text-sm">
@@ -661,11 +762,11 @@ export default function CampaignDetail() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50 text-gray-600">
-                  {campaign.batches.map((b) => (
-                    <tr key={b.id}>
+                  {derivedBatches.map((b, idx) => (
+                    <tr key={b.id || idx}>
                       <td className="p-4 font-bold text-gray-800">Batch #{b.batch_number}</td>
-                      <td className="p-4 font-semibold">{b.quantity} coupons</td>
-                      <td className="p-4">{new Date(b.created_at).toLocaleString()}</td>
+                      <td className="p-4 font-semibold">{b.quantity || b.total_coupons || b.count} coupons</td>
+                      <td className="p-4">{b.created_at ? new Date(b.created_at).toLocaleString() : 'N/A'}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -710,6 +811,20 @@ export default function CampaignDetail() {
               </p>
             </div>
 
+            <div className="space-y-1">
+              <Label htmlFor="start_sequence_number">Start Sequence Number</Label>
+              <Input
+                id="start_sequence_number"
+                type="number"
+                min="1"
+                value={batchData.start_sequence_number || ''}
+                onChange={(e) => setBatchData(prev => ({ ...prev, start_sequence_number: parseInt(e.target.value) || '' }))}
+              />
+              <p className="text-[10px] text-gray-400">
+                Sequence continuation number (e.g. 101, 1001, 1101...). Auto-calculated to continue from where previous batches ended.
+              </p>
+            </div>
+
             <DialogFooter className="pt-4 border-t border-gray-50">
               <Button type="button" variant="outline" onClick={() => setIsBatchDialogOpen(false)} disabled={generatingBatch}>
                 Cancel
@@ -722,6 +837,17 @@ export default function CampaignDetail() {
           </form>
         </DialogContent>
       </Dialog>
+
+      {/* Custom Reusable Confirmation Dialog */}
+      <ConfirmDialog
+        open={confirmConfig.open}
+        onOpenChange={(open) => setConfirmConfig(prev => ({ ...prev, open }))}
+        onConfirm={confirmConfig.onConfirm}
+        title={confirmConfig.title}
+        description={confirmConfig.description}
+        confirmText={confirmConfig.confirmText}
+        variant={confirmConfig.variant}
+      />
     </div>
   );
 }

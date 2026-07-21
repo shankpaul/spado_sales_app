@@ -38,6 +38,7 @@ import {
   Building,
   Package,
   Layers,
+  ShieldCheck,
 } from 'lucide-react';
 import usePWAInstall from '../hooks/usePWAInstall';
 import Logo from './Logo';
@@ -139,7 +140,8 @@ const Layout = ({ children }) => {
           items: [
             { name: 'Offers', href: '/offers', icon: Tag },
             { name: 'Campaigns', href: '/campaigns', icon: Gift },
-            { name: 'Partners', href: '/partners', icon: Building }
+            { name: 'Partners', href: '/partners', icon: Building },
+            { name: 'Validate Coupon', href: '/validate-coupon', icon: ShieldCheck }
           ]
         },
         {
@@ -173,7 +175,8 @@ const Layout = ({ children }) => {
             { name: 'Customers', href: '/customers', icon: Users },
             { name: 'Enquiries', href: '/enquiries', icon: PackageOpen },
             { name: 'Orders', href: '/orders', icon: Calendar },
-            { name: 'Subscriptions', href: '/subscriptions', icon: Calendar }
+            { name: 'Subscriptions', href: '/subscriptions', icon: Calendar },
+            { name: 'Validate Coupon', href: '/validate-coupon', icon: ShieldCheck }
           ]
         },
         {

@@ -13,7 +13,8 @@ import {
   ArrowLeft,
   Loader2,
   FileText,
-  Edit
+  Edit,
+  RefreshCw
 } from 'lucide-react';
 import {
   Dialog,
@@ -25,6 +26,7 @@ import {
 import campaignService from '../services/campaignService';
 import officeService from '../services/officeService';
 import offerService from '../services/offerService';
+import { ConfirmDialog } from '../components/ui/confirm-dialog';
 import { toast } from 'sonner';
 
 export default function CampaignForm() {
@@ -53,6 +55,8 @@ export default function CampaignForm() {
     partner_ids: [],
     coupons_to_generate: 100,
     coupon_code_format: '{LocationCode}{PartnerCode}{CampaignCode}-{Random}',
+    code_type: 'alphanumeric', // 'alphanumeric', 'numeric', 'alphabetic'
+    generation_mode: 'random', // 'random', 'series'
     random_code_length: 7,
     allowed_uses_per_coupon: 1,
     coupon_expiry_date: '',
@@ -63,6 +67,18 @@ export default function CampaignForm() {
   const [errors, setErrors] = useState({});
   const [qtyMode, setQtyMode] = useState('per_combination');
   const [totalQtyInput, setTotalQtyInput] = useState(100);
+
+  // Calculate maximum capacity for series generation
+  const getMaxSeriesCapacity = (codeType, length) => {
+    const len = parseInt(length, 10) || 5;
+    if (codeType === 'numeric') {
+      return Math.pow(10, len);
+    } else if (codeType === 'alphabetic') {
+      return Math.pow(26, len);
+    } else {
+      return Math.pow(36, len);
+    }
+  };
 
   useEffect(() => {
     if (qtyMode === 'total_global') {
@@ -196,30 +212,59 @@ export default function CampaignForm() {
     }
   };
 
+  const [canEditConfig, setCanEditConfig] = useState(true);
+  const [initialConfig, setInitialConfig] = useState(null);
+
   const loadCampaign = async () => {
     setLoading(true);
     try {
       const response = await campaignService.getCampaignById(id);
-      const camp = response.data;
+      // Deep unwrap API response structure (handles { data: { data: ... } }, { data: { campaign: ... } }, { data: ... }, or direct object)
+      const camp = response?.data?.data || response?.data?.campaign || response?.data || response?.campaign || response || {};
+      const configObj = camp.coupon_config || camp.config || camp.configuration || camp;
+
+      const loadedFormat = camp.coupon_code_format || configObj.coupon_code_format || configObj.format || '';
+      const loadedCodeType = camp.code_type || camp.coupon_code_type || configObj.code_type || configObj.coupon_code_type || 'alphanumeric';
+      const loadedGenMode = camp.generation_mode || camp.generation_strategy || camp.strategy || configObj.generation_mode || configObj.generation_strategy || configObj.strategy || 'random';
+      const loadedCodeLength = parseInt(camp.random_code_length || camp.code_length || camp.length || configObj.random_code_length || configObj.code_length || configObj.length || 7, 10);
+
+      setInitialConfig({
+        coupon_code_format: loadedFormat,
+        code_type: loadedCodeType,
+        generation_mode: loadedGenMode,
+        random_code_length: loadedCodeLength,
+      });
+
+      // Check if all generated coupons are unused (status: created or cancelled)
+      try {
+        const couponsRes = await campaignService.getAllCoupons({ campaign_id: id, per_page: 100 });
+        const couponsList = couponsRes?.data?.data || couponsRes?.data || couponsRes || [];
+        const hasUsed = Array.isArray(couponsList) && couponsList.some(c => c.status !== 'created' && c.status !== 'cancelled');
+        setCanEditConfig(!hasUsed);
+      } catch (err) {
+        setCanEditConfig(true);
+      }
       
       setFormData({
-        name: camp.name,
-        code: camp.code,
+        name: camp.name || '',
+        code: camp.code || '',
         description: camp.description || '',
-        offer_id: camp.offer_id,
-        campaign_type: camp.campaign_type,
-        start_date: camp.start_date ? camp.start_date.split('T')[0] : '',
-        end_date: camp.end_date ? camp.end_date.split('T')[0] : '',
-        status: camp.status,
+        offer_id: camp.offer_id || '',
+        campaign_type: camp.campaign_type || 'general',
+        start_date: camp.start_date ? String(camp.start_date).split('T')[0] : '',
+        end_date: camp.end_date ? String(camp.end_date).split('T')[0] : '',
+        status: camp.status || 'draft',
         notes: camp.notes || '',
-        service_location_ids: camp.service_locations?.map(o => o.id) || [],
-        partner_ids: camp.partners?.map(p => p.id) || [],
-        coupons_to_generate: camp.coupons_to_generate,
-        coupon_code_format: camp.coupon_code_format,
-        random_code_length: camp.random_code_length,
-        allowed_uses_per_coupon: camp.allowed_uses_per_coupon,
-        coupon_expiry_date: camp.coupon_expiry_date ? camp.coupon_expiry_date.split('T')[0] : '',
-        coupons_per_customer: camp.coupons_per_customer,
+        service_location_ids: camp.service_locations?.map(o => o.id) || camp.service_location_ids || [],
+        partner_ids: camp.partners?.map(p => p.id) || camp.partner_ids || [],
+        coupons_to_generate: camp.coupons_to_generate || camp.total_coupons || 0,
+        coupon_code_format: loadedFormat,
+        code_type: loadedCodeType,
+        generation_mode: loadedGenMode,
+        random_code_length: loadedCodeLength,
+        allowed_uses_per_coupon: camp.allowed_uses_per_coupon || 1,
+        coupon_expiry_date: camp.coupon_expiry_date ? String(camp.coupon_expiry_date).split('T')[0] : '',
+        coupons_per_customer: camp.coupons_per_customer || 1,
         max_redemptions: camp.max_redemptions || '',
       });
     } catch (error) {
@@ -230,8 +275,24 @@ export default function CampaignForm() {
     }
   };
 
+  const hasConfigChanged = () => {
+    if (!initialConfig) return false;
+    return (
+      String(formData.coupon_code_format || '') !== String(initialConfig.coupon_code_format || '') ||
+      String(formData.code_type || '') !== String(initialConfig.code_type || '') ||
+      String(formData.generation_mode || '') !== String(initialConfig.generation_mode || '') ||
+      parseInt(formData.random_code_length, 10) !== parseInt(initialConfig.random_code_length, 10)
+    );
+  };
+
   const handleInputChange = (field, value) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+    setFormData(prev => {
+      const next = { ...prev, [field]: value };
+      if (field === 'code_type' && value !== 'numeric' && next.generation_mode === 'series') {
+        next.generation_mode = 'random';
+      }
+      return next;
+    });
   };
 
   const handleToggleSelect = (field, itemID) => {
@@ -263,6 +324,14 @@ export default function CampaignForm() {
     if (!isEditMode && (!formData.coupons_to_generate || formData.coupons_to_generate <= 0)) {
       errs.coupons_to_generate = 'Must generate at least 1 coupon';
     }
+
+    // Series capacity validation check
+    const maxCap = getMaxSeriesCapacity(formData.code_type, formData.random_code_length);
+    if (!isEditMode && formData.generation_mode === 'series' && formData.coupons_to_generate > maxCap) {
+      errs.coupons_to_generate = `Exceeds max series capacity. For ${formData.code_type} series of length ${formData.random_code_length}, max capacity is ${maxCap.toLocaleString()} codes.`;
+      errs.random_code_length = `Max capacity for length ${formData.random_code_length} is ${maxCap.toLocaleString()}. Increase length or switch to Random mode.`;
+    }
+
     if (!formData.coupon_code_format) {
       errs.coupon_code_format = 'Format template is required';
     } else if (!isEditMode && !formData.coupon_code_format.includes('{Random}')) {
@@ -273,6 +342,60 @@ export default function CampaignForm() {
     return Object.keys(errs).length === 0;
   };
 
+  const [isRegenerateConfirmOpen, setIsRegenerateConfirmOpen] = useState(false);
+  const [pendingSavePayload, setPendingSavePayload] = useState(null);
+
+  const formatSafeDate = (d, isEnd = false) => {
+    if (!d) return null;
+    const cleanStr = String(d).split('T')[0];
+    return isEnd ? `${cleanStr}T23:59:59+05:30` : `${cleanStr}T00:00:00+05:30`;
+  };
+
+  const executeSaveCampaign = async (payloadToSave = pendingSavePayload, shouldRegenerate = false) => {
+    const targetPayload = payloadToSave || pendingSavePayload;
+    if (!targetPayload) {
+      toast.error('No campaign data to save');
+      return;
+    }
+    setSaving(true);
+    try {
+      if (isEditMode) {
+        if (!canEditConfig) {
+          const { coupons_to_generate, coupon_code_format, random_code_length, code_length, code_type, coupon_code_type, generation_mode, generation_strategy, ...updatePayload } = targetPayload;
+          await campaignService.updateCampaign(id, updatePayload);
+        } else {
+          const { coupons_to_generate, ...updatePayload } = targetPayload;
+          await campaignService.updateCampaign(id, {
+            ...updatePayload,
+            code_type: targetPayload.code_type,
+            coupon_code_type: targetPayload.code_type,
+            generation_mode: targetPayload.generation_mode,
+            generation_strategy: targetPayload.generation_mode,
+            random_code_length: parseInt(targetPayload.random_code_length, 10),
+            code_length: parseInt(targetPayload.random_code_length, 10),
+            regenerate_unused_coupons: shouldRegenerate,
+          });
+        }
+        toast.success(shouldRegenerate ? 'Campaign and unused coupons updated successfully' : 'Campaign updated successfully');
+      } else {
+        await campaignService.createCampaign({
+          ...targetPayload,
+          coupon_code_type: targetPayload.code_type,
+          generation_strategy: targetPayload.generation_mode,
+          code_length: parseInt(targetPayload.random_code_length, 10),
+        });
+        toast.success('Campaign created and coupons generated successfully');
+      }
+      setIsRegenerateConfirmOpen(false);
+      navigate('/campaigns');
+    } catch (error) {
+      const msg = error.response?.data?.errors?.[0] || error.response?.data?.message || 'Failed to save campaign';
+      toast.error(msg);
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!validateForm()) {
@@ -280,9 +403,7 @@ export default function CampaignForm() {
       return;
     }
 
-    setSaving(true);
-
-    // Format start/end dates
+    // Format start/end dates safely
     const payload = {
       ...formData,
       offer_id: parseInt(formData.offer_id, 10),
@@ -291,27 +412,16 @@ export default function CampaignForm() {
       allowed_uses_per_coupon: parseInt(formData.allowed_uses_per_coupon, 10),
       coupons_per_customer: parseInt(formData.coupons_per_customer, 10),
       max_redemptions: formData.max_redemptions ? parseInt(formData.max_redemptions, 10) : null,
-      start_date: `${formData.start_date}T00:00:00+05:30`,
-      end_date: `${formData.end_date}T23:59:59+05:30`,
-      coupon_expiry_date: formData.coupon_expiry_date ? `${formData.coupon_expiry_date}T23:59:59+05:30` : null,
+      start_date: formatSafeDate(formData.start_date, false),
+      end_date: formatSafeDate(formData.end_date, true),
+      coupon_expiry_date: formatSafeDate(formData.coupon_expiry_date, true),
     };
 
-    try {
-      if (isEditMode) {
-        // Exclude coupon generation configuration that cannot be updated
-        const { coupons_to_generate, coupon_code_format, random_code_length, ...updatePayload } = payload;
-        await campaignService.updateCampaign(id, updatePayload);
-        toast.success('Campaign updated successfully');
-      } else {
-        await campaignService.createCampaign(payload);
-        toast.success('Campaign created and coupons generated successfully');
-      }
-      navigate('/campaigns');
-    } catch (error) {
-      const msg = error.response?.data?.errors?.[0] || 'Failed to save campaign';
-      toast.error(msg);
-    } finally {
-      setSaving(false);
+    if (isEditMode && canEditConfig && hasConfigChanged()) {
+      setPendingSavePayload(payload);
+      setIsRegenerateConfirmOpen(true);
+    } else {
+      await executeSaveCampaign(payload, false);
     }
   };
 
@@ -319,13 +429,28 @@ export default function CampaignForm() {
   const getPreviewCode = () => {
     const loc = offices.find(o => formData.service_location_ids.includes(o.id))?.code || 'T';
     const part = partners.find(p => formData.partner_ids.includes(p.id))?.code || 'C';
+
+    let sampleVal = '';
+    const len = formData.random_code_length || 7;
+    if (formData.generation_mode === 'series') {
+      const startNum = Math.pow(10, Math.max(1, len - 1)) + 1;
+      sampleVal = String(startNum);
+    } else {
+      if (formData.code_type === 'numeric') {
+        sampleVal = '8392014567'.slice(0, len).padEnd(len, '9');
+      } else if (formData.code_type === 'alphabetic') {
+        sampleVal = 'KWMXPTQABZ'.slice(0, len).padEnd(len, 'X');
+      } else {
+        sampleVal = 'A9F37B2C8D'.slice(0, len).padEnd(len, 'X');
+      }
+    }
     
-    let format = formData.coupon_code_format;
+    let format = formData.coupon_code_format || '{LocationCode}{PartnerCode}{CampaignCode}-{Random}';
     format = format.replace('{LocationCode}', loc);
     format = format.replace('{PartnerCode}', part);
     format = format.replace('{CampaignCode}', formData.code || '01');
     format = format.replace('{BatchNumber}', '1');
-    format = format.replace('{Random}', 'X'.repeat(formData.random_code_length));
+    format = format.replace('{Random}', sampleVal);
     
     return format;
   };
@@ -548,7 +673,12 @@ export default function CampaignForm() {
             </CardTitle>
           </CardHeader>
           <CardContent className="pt-4 space-y-4">
-            {!isEditMode && (
+            {isEditMode && !canEditConfig && (
+              <div className="p-3.5 bg-amber-50 border border-amber-200/80 rounded-xl text-xs text-amber-900 font-medium">
+                🔒 Coupon Configuration parameters (Format, Type, Strategy, Length) are locked because some coupons in this campaign have already been distributed, activated, or redeemed.
+              </div>
+            )}
+            {(!isEditMode || canEditConfig) && (
               <div className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="space-y-1">
@@ -584,7 +714,7 @@ export default function CampaignForm() {
                         value={formData.coupons_to_generate}
                         onChange={(e) => handleInputChange('coupons_to_generate', parseInt(e.target.value) || 0)}
                       />
-                      {errors.coupons_to_generate && <p className="text-xs text-red-500">{errors.coupons_to_generate}</p>}
+                      {errors.coupons_to_generate && <p className="text-xs text-red-500 font-semibold">{errors.coupons_to_generate}</p>}
                       <p className="text-[10px] text-gray-400">Number of codes generated per Location-Partner combination.</p>
                     </div>
                   ) : (
@@ -603,25 +733,75 @@ export default function CampaignForm() {
                           handleInputChange('coupons_to_generate', calculatedQty);
                         }}
                       />
+                      {errors.coupons_to_generate && <p className="text-xs text-red-500 font-semibold">{errors.coupons_to_generate}</p>}
                       <p className="text-[10px] text-gray-400">Total target codes. Each combination gets {Math.max(1, Math.floor(totalQtyInput / ((formData.service_location_ids.length || 1) * (formData.partner_ids.length || 1))))} codes.</p>
                     </div>
                   )}
 
                   <div className="space-y-1">
-                    <Label htmlFor="random_code_length">Random Value Length</Label>
+                    <Label htmlFor="code_type">Coupon Code Type</Label>
+                    <select
+                      id="code_type"
+                      value={formData.code_type}
+                      onChange={(e) => handleInputChange('code_type', e.target.value)}
+                      className="w-full text-sm border border-gray-200 rounded-md p-2 bg-white h-10"
+                    >
+                      <option value="alphanumeric">Alphanumeric (Letters & Numbers)</option>
+                      <option value="numeric">Numeric (Numbers Only: 0-9)</option>
+                      <option value="alphabetic">Alphabetic (Letters Only: A-Z)</option>
+                    </select>
+                    <p className="text-[10px] text-gray-400">Allowed character set for generated token.</p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <Label htmlFor="generation_mode">Generation Strategy</Label>
+                    <select
+                      id="generation_mode"
+                      value={formData.generation_mode}
+                      onChange={(e) => handleInputChange('generation_mode', e.target.value)}
+                      className="w-full text-sm border border-gray-200 rounded-md p-2 bg-white h-10"
+                    >
+                      <option value="random">Random (Unique Random Characters)</option>
+                      <option value="series" disabled={formData.code_type !== 'numeric'}>
+                        Sequential Series {formData.code_type !== 'numeric' ? '(Numeric Code Type Only)' : '(Starts at 101, 1001...)'}
+                      </option>
+                    </select>
+                    <p className="text-[10px] text-gray-400">
+                      {formData.code_type !== 'numeric'
+                        ? 'Sequential series is only available for Numeric code type. Random mode enabled.'
+                        : formData.generation_mode === 'series'
+                          ? 'Series numbers start with 1 on the left (e.g. 101, 1001, 10001). Re-generating batches continues the sequence.'
+                          : 'Choose between random codes or sequential series numbering.'
+                      }
+                    </p>
+                  </div>
+
+                  <div className="space-y-1">
+                    <Label htmlFor="random_code_length">Value Length (Characters)</Label>
                     <select
                       id="random_code_length"
                       value={formData.random_code_length}
                       onChange={(e) => handleInputChange('random_code_length', parseInt(e.target.value) || 7)}
                       className="w-full text-sm border border-gray-200 rounded-md p-2 bg-white h-10"
                     >
+                      <option value="3">3 Characters</option>
+                      <option value="4">4 Characters</option>
                       <option value="5">5 Characters</option>
                       <option value="6">6 Characters</option>
                       <option value="7">7 Characters</option>
                       <option value="8">8 Characters</option>
                       <option value="9">9 Characters</option>
+                      <option value="10">10 Characters</option>
                     </select>
-                    <p className="text-[10px] text-gray-400">Length of random characters appended to the coupon.</p>
+                    {errors.random_code_length ? (
+                      <p className="text-xs text-red-500 font-semibold">{errors.random_code_length}</p>
+                    ) : (
+                      <p className="text-[10px] text-gray-400">
+                        Max Series Capacity ({formData.code_type}): <span className="font-semibold text-gray-700">{getMaxSeriesCapacity(formData.code_type, formData.random_code_length).toLocaleString()}</span> codes.
+                      </p>
+                    )}
                   </div>
                 </div>
 
@@ -855,6 +1035,53 @@ export default function CampaignForm() {
               Apply Format
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Confirmation Dialog when updating modified coupon configuration */}
+      <Dialog open={isRegenerateConfirmOpen} onOpenChange={(open) => { if (!saving) setIsRegenerateConfirmOpen(open); }}>
+        <DialogContent className="max-w-lg rounded-xl p-5 sm:p-6 overflow-hidden">
+          <DialogHeader>
+            <DialogTitle className="text-base sm:text-lg font-bold flex items-center gap-2 text-gray-800">
+              <RefreshCw className="h-5 w-5 text-red-500 shrink-0" /> Modify Coupon Configuration
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-2 text-xs sm:text-sm text-gray-600">
+            <p>
+              You modified the coupon code configuration (format template, code type, strategy, or value length).
+            </p>
+            <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-xs text-red-900 font-medium leading-relaxed">
+              Would you like to reformat and regenerate all unused coupon codes (status: created or cancelled) based on the new configuration, or just save the updated campaign details?
+            </div>
+          </div>
+          <div className="pt-3 mt-2 border-t border-gray-100 flex flex-col sm:flex-row items-stretch sm:items-center justify-end gap-2 shrink-0">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setIsRegenerateConfirmOpen(false)}
+              disabled={saving}
+              className="text-xs h-9 px-3.5 font-medium shrink-0 whitespace-nowrap"
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              onClick={() => executeSaveCampaign(pendingSavePayload, true)}
+              disabled={saving}
+              className="text-xs h-9 px-3.5 bg-red-600 hover:bg-red-700 text-white font-semibold shadow-xs shrink-0 whitespace-nowrap"
+            >
+              {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5 shrink-0" /> : null}
+              Update & Regenerate Codes
+            </Button>
+            <Button
+              type="button"
+              onClick={() => executeSaveCampaign(pendingSavePayload, false)}
+              disabled={saving}
+              className="text-xs h-9 px-3.5 bg-primary hover:bg-primary/95 text-white font-semibold shadow-xs shrink-0 whitespace-nowrap"
+            >
+              Just Update Campaign
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
     </div>
