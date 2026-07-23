@@ -51,7 +51,11 @@ export const formatDateTime = (dateString) => {
 export const formatTime = (dateTimeString) => {
   if (!dateTimeString) return 'N/A';
   try {
-    const date = new Date(dateTimeString);
+    let date = new Date(dateTimeString);
+    if (isNaN(date.getTime())) {
+      date = new Date(`1970-01-01T${dateTimeString}`);
+    }
+    if (isNaN(date.getTime())) return 'N/A';
     return date.toLocaleTimeString('en-US', {
       hour: 'numeric',
       minute: '2-digit',
@@ -61,6 +65,29 @@ export const formatTime = (dateTimeString) => {
   } catch {
     return 'N/A';
   }
+};
+
+/**
+ * Format booking time range from booking_time_from and booking_time_to
+ * @param {string} from - Booking time from string
+ * @param {string} to - Booking time to string
+ * @returns {string|null} Formatted time range or null if not available
+ */
+export const formatBookingTime = (from, to) => {
+  if (!from && !to) return null;
+  const timeFromStr = from ? formatTime(from) : null;
+  const timeToStr = to ? formatTime(to) : null;
+
+  const validFrom = timeFromStr && timeFromStr !== 'N/A';
+  const validTo = timeToStr && timeToStr !== 'N/A';
+
+  if (validFrom && validTo) {
+    if (timeFromStr === timeToStr) return timeFromStr;
+    return `${timeFromStr} - ${timeToStr}`;
+  }
+  if (validFrom) return timeFromStr;
+  if (validTo) return timeToStr;
+  return null;
 };
 
 /**

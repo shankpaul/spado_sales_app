@@ -30,6 +30,7 @@ import {
   Phone,
   MapPin,
   Calendar,
+  Clock,
   Loader2,
   MessageCircle,
   ShoppingCart,
@@ -40,6 +41,7 @@ import {
   ArrowDownCircle,
 } from 'lucide-react';
 import { format } from 'date-fns';
+import { formatBookingTime } from '../lib/utilities';
 import CustomerContact from './CustomerContact';
 
 /**
@@ -268,9 +270,17 @@ const CustomerDetails = ({ customer, open, onOpenChange }) => {
                           <span className="text-primary">#{order.order_number}</span>
                         </TableCell>
                         <TableCell>
-                          <div className="flex items-center gap-1 text-sm">
-                            <Calendar className="h-3 w-3 text-muted-foreground" />
-                            {formatDate(order.booking_date)}
+                          <div className="flex flex-col text-sm">
+                            <div className="flex items-center gap-1">
+                              <Calendar className="h-3 w-3 text-muted-foreground" />
+                              {formatDate(order.booking_date)}
+                            </div>
+                            {formatBookingTime(order.booking_time_from, order.booking_time_to) && (
+                              <div className="flex items-center gap-1 text-xs text-muted-foreground mt-0.5">
+                                <Clock className="h-3 w-3 text-muted-foreground" />
+                                {formatBookingTime(order.booking_time_from, order.booking_time_to)}
+                              </div>
+                            )}
                           </div>
                         </TableCell>
                         <TableCell className="font-semibold">

@@ -73,6 +73,7 @@ import {
   MoreVertical,
   Repeat,
 } from 'lucide-react';
+import { formatBookingTime } from '../lib/utilities';
 import { format, parseISO } from 'date-fns';
 import CustomerContact from '@/components/CustomerContact';
 import { Badge2 } from '@/components/ui/badge2';
@@ -486,13 +487,23 @@ const SubscriptionDetail = () => {
                           >
                             #{order.order_number}
                           </TableCell>
-                          <TableCell>{formatDate(order.booking_date)}</TableCell>
+                          <TableCell className="whitespace-nowrap">
+                            <div className="flex items-center gap-2">
+                              <span>{formatDate(order.booking_date)}</span>
+                              {formatBookingTime(order.booking_time_from, order.booking_time_to) && (
+                                <span className="text-xs text-muted-foreground font-normal flex items-center gap-1">
+                                  <Clock className="h-3 w-3 text-muted-foreground" />
+                                  {formatBookingTime(order.booking_time_from, order.booking_time_to)}
+                                </span>
+                              )}
+                            </div>
+                          </TableCell>
                           <TableCell>
                             <Badge2 variant={getBadgeVariant(order.status, 'order')}>
                               {getStatusLabel(order.status, ORDER_STATUSES)}
                             </Badge2>
                           </TableCell>
-                          <TableCell>{order.assigned_agent_name || <Badge2 variant="destructive">Unassigned</Badge2>}</TableCell>
+                          <TableCell className="whitespace-nowrap">{order.assigned_agent_name || <Badge2 variant="destructive">Unassigned</Badge2>}</TableCell>
                         </TableRow>
                       ))}
                     </TableBody>

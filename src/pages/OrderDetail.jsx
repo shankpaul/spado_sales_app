@@ -934,8 +934,34 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
         </div>
       </div>
 
+      {/* Cancelled Alert */}
+      {order.status === 'cancelled' && (
+        <div className="mx-4 sm:mx-6 mt-4 p-4 bg-red-50 border border-red-200 rounded-xl">
+          <div className="flex items-start gap-3">
+            <div className="p-2 bg-red-100 text-red-600 rounded-full flex-shrink-0">
+              <Ban className="h-4 w-4" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <h3 className="text-sm font-bold text-red-900">Order Cancelled</h3>
+                {order.cancelled_at && (
+                  <span className="text-xs text-red-700/80">
+                    Cancelled on {formatDateTime(order.cancelled_at)}
+                    {order.cancelled_by?.name ? ` by ${order.cancelled_by.name}` : ''}
+                  </span>
+                )}
+              </div>
+              <div className="mt-1 text-sm text-red-800">
+                <span className="font-semibold">Cancellation Reason: </span>
+                <span>{order.cancel_reason || order.cancellation_reason || 'No reason specified'}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Unassigned Alert */}
-      {!order.assigned_to && (
+      {!order.assigned_to && order.status !== 'cancelled' && (
         <div className="mx-4 sm:mx-6 mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
           <div className="flex items-start gap-3">
             <AlertTriangle className="h-5 w-5 text-yellow-600 flex-shrink-0 mt-0.5" />

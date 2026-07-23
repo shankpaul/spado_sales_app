@@ -30,6 +30,7 @@ import {
   Loader2,
   FileText,
   Calendar,
+  Clock,
   User,
   DollarSign,
   Eye,
@@ -39,6 +40,7 @@ import {
   Blocks,
 } from 'lucide-react';
 import { format } from 'date-fns';
+import { formatBookingTime } from '../lib/utilities';
 import {
   Sheet,
   SheetContent,
@@ -107,12 +109,14 @@ const Orders = () => {
       .sort((a, b) => b.localeCompare(a))
       .map(dateKey => {
         let displayTitle = dateKey;
+        let isToday = false;
         try {
           const dateObj = new Date(dateKey);
           const today = format(new Date(), 'yyyy-MM-dd');
           const yesterday = format(new Date(Date.now() - 86400000), 'yyyy-MM-dd');
           if (dateKey === today) {
             displayTitle = 'Today';
+            isToday = true;
           } else if (dateKey === yesterday) {
             displayTitle = 'Yesterday';
           } else {
@@ -123,6 +127,7 @@ const Orders = () => {
         return {
           dateKey,
           displayTitle,
+          isToday,
           items: groups[dateKey]
         };
       });
@@ -705,7 +710,7 @@ const Orders = () => {
             <div className="block md:hidden space-y-4">
               {getGroupedOrders().map((group) => (
                 <div key={group.dateKey} className="space-y-2">
-                  <div className="text-[11px] font-bold text-blue-500 uppercase tracking-wider pl-1 pt-2 sticky top-0 bg-gray-50/90 backdrop-blur-xs py-1 z-10">
+                  <div className={`text-[11px] font-bold uppercase tracking-wider pl-1 pt-2 sticky top-0 bg-gray-50/90 backdrop-blur-xs py-1 z-10 ${group.isToday ? 'text-emerald-600' : 'text-blue-500'}`}>
                     {group.displayTitle}
                   </div>
                   {group.items.map((order) => (
@@ -745,22 +750,30 @@ const Orders = () => {
                               Payment {getStatusLabel(order.payment_status, PAYMENT_STATUSES)}
                             </Badge2>
                           </div>
+
+                          {/* Booking Date & Time under Order Number */}
+                          <div className="flex items-center gap-3 text-xs text-muted-foreground mt-1.5 flex-wrap">
+                            <div className="flex items-center gap-1">
+                              <Calendar className="h-3 w-3 text-gray-400" />
+                              <span>{formatDate(order.booking_date)}</span>
+                            </div>
+                            {formatBookingTime(order.booking_time_from, order.booking_time_to) && (
+                              <div className="flex items-center gap-1 text-gray-700 font-medium">
+                                <Clock className="h-3 w-3 text-gray-400" />
+                                <span>{formatBookingTime(order.booking_time_from, order.booking_time_to)}</span>
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </div>
 
-                      <div className="flex items-center justify-between mt-4 pt-3 border-t border-gray-50">
-                        <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                          <div className="flex items-center gap-1">
-                            <Calendar className="h-3 w-3" />
-                            {formatDate(order.booking_date)}
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <User className="h-3 w-3" />
-                            {order.assigned_agent_name?.split(' ')[0] || 'Unassigned'}
-                            {order.assigned_agent_name && (
-                              <AssigneeResponseTick status={order.assignee_response} size="xs" />
-                            )}
-                          </div>
+                      <div className="flex items-center justify-between mt-3 pt-2.5 border-t border-gray-50">
+                        <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                          <User className="h-3 w-3" />
+                          {order.assigned_agent_name?.split(' ')[0] || 'Unassigned'}
+                          {order.assigned_agent_name && (
+                            <AssigneeResponseTick status={order.assignee_response} size="xs" />
+                          )}
                         </div>
                         <Badge2 variant={getBadgeVariant(order.status, 'order')} className="px-2">
                           {getStatusLabel(order.status, ORDER_STATUSES)}
@@ -805,8 +818,8 @@ const Orders = () => {
                   <tbody className="divide-y divide-gray-150">
                     {getGroupedOrders().map((group) => (
                       <Fragment key={group.dateKey}>
-                        <tr className="bg-blue-50/60 border-b border-blue-100">
-                          <td colSpan={8} className="px-6 py-2.5 font-bold text-xs text-blue-600 uppercase tracking-wider">
+                        <tr className={group.isToday ? "bg-emerald-50/60 border-b border-emerald-100" : "bg-blue-50/60 border-b border-blue-100"}>
+                          <td colSpan={8} className={`px-6 py-2.5 font-bold text-xs uppercase tracking-wider ${group.isToday ? "text-emerald-600" : "text-blue-600"}`}>
                             {group.displayTitle}
                           </td>
                         </tr>
@@ -830,7 +843,17 @@ const Orders = () => {
                             <td className="px-6 py-4 text-xs text-gray-700 capitalize">
                               {order.area}
                             </td>
-                            <td className="px-6 py-4 text-gray-600 font-medium">{formatDate(order.booking_date)}</td>
+                            <td className="px-6 py-4 text-gray-600 font-medium whitespace-nowrap">
+                              <div className="flex items-center gap-2">
+                                <span>{formatDate(order.booking_date)}</span>
+                                {formatBookingTime(order.booking_time_from, order.booking_time_to) && (
+                                  <span className="text-xs text-gray-500 font-normal flex items-center gap-1">
+                                    <Clock className="h-3 w-3 text-gray-400" />
+                                    {formatBookingTime(order.booking_time_from, order.booking_time_to)}
+                                  </span>
+                                )}
+                              </div>
+                            </td>
                             <td className="px-6 py-4">
                               <Badge2 variant={getBadgeVariant(order.status, 'order')}>
                                 {getStatusLabel(order.status, ORDER_STATUSES)}
@@ -859,11 +882,11 @@ const Orders = () => {
                                 )}
                               </div>
                             </td>
-                            <td className="px-6 py-4">
+                            <td className="px-6 py-4 whitespace-nowrap">
                               {order.assigned_agent_name ? (
                                 <div className="flex items-center gap-2">
                                   <LetterAvatar name={order.assigned_agent_name} size="xs" />
-                                  <div className="font-medium text-gray-700">{order.assigned_agent_name}</div>
+                                  <div className="font-medium text-gray-700 whitespace-nowrap">{order.assigned_agent_name}</div>
                                   <AssigneeResponseTick status={order.assignee_response} size="sm" />
                                 </div>
                               ) : (
