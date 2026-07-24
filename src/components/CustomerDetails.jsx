@@ -166,7 +166,7 @@ const CustomerDetails = ({ customer, open, onOpenChange }) => {
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <Card className="p-4">
                 <div className="text-sm text-muted-foreground mb-1">Total Orders</div>
-                <div className="text-2xl font-bold text-primary">{customerOrders.length}</div>
+                <div className="text-2xl font-semibold text-primary">{customerOrders.length}</div>
               </Card>
               <Card className="p-4">
                 <div className="text-sm text-muted-foreground mb-1">Last Booked</div>
@@ -286,12 +286,12 @@ const CustomerDetails = ({ customer, open, onOpenChange }) => {
                         <TableCell className="font-semibold">
                           {formatCurrency(order.total_amount)}
                         </TableCell>
-                        <TableCell>
+                        <TableCell className="whitespace-nowrap">
                           <Badge variant={getBadgeVariant(order.status, 'order')}>
                             {getStatusLabel(order.status, ORDER_STATUSES)}
                           </Badge>
                         </TableCell>
-                        <TableCell>
+                        <TableCell className="whitespace-nowrap">
                           <Badge variant={getBadgeVariant(order.payment_status, 'payment')}>
                             {getStatusLabel(order.payment_status, PAYMENT_STATUSES)}
                           </Badge>

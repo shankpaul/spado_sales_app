@@ -6,7 +6,7 @@ import {
 } from './ui/sheet';
 import { Button } from './ui/button';
 import { Checkbox } from './ui/checkbox';
-import { calculateBookingDuration, reverseGeocode } from '../lib/utilities';
+import { calculateBookingDuration, reverseGeocode, formatDate } from '../lib/utilities';
 import CustomerForm from './CustomerForm';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
@@ -44,6 +44,7 @@ import VehicleIcon from './VehicleIcon';
 import { toast } from 'sonner';
 import orderService from '../services/orderService';
 import customerService from '../services/customerService';
+import LetterAvatar from './LetterAvatar';
 import offerService from '../services/offerService';
 import loyaltyService from '../services/loyaltyService';
 import enquiryService from '../services/enquiryService';
@@ -142,6 +143,7 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
   // Form refs
   const customerFormRef = useRef(null);
   const appliedOfferRef = useRef(null); // Track which offer has been applied to prevent duplicates
+  const skipMapLinkDecodeRef = useRef(false); // Flag to bypass reverse geocoding when last order location is selected
 
   // Data states
   const [customers, setCustomers] = useState([]);
@@ -176,6 +178,16 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
   const [customerPhone, setCustomerPhone] = useState(''); // Order-specific customer phone
   const [notes, setNotes] = useState('');
   const [orderStatus, setOrderStatus] = useState('');
+  const [customerHistoryLoading, setCustomerHistoryLoading] = useState(false);
+  const [customerStats, setCustomerStats] = useState({
+    totalBookings: 0,
+    lastBookedAt: null,
+    lastArea: '',
+    lastMapLink: '',
+    lastCity: '',
+    lastLatitude: 0,
+    lastLongitude: 0,
+  });
 
   // Validation errors
   const [errors, setErrors] = useState({});
@@ -262,9 +274,114 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
     };
   }, [showCustomerSuggestions]);
 
+  // Fetch customer booking history and stats when customer is selected
+  useEffect(() => {
+    if (!selectedCustomer?.id) {
+      setCustomerStats({
+        totalBookings: 0,
+        lastBookedAt: null,
+        lastArea: '',
+        lastMapLink: '',
+        lastCity: '',
+        lastLatitude: 0,
+        lastLongitude: 0,
+      });
+      return;
+    }
+
+    setCustomerHistoryLoading(true);
+    orderService.getAllOrders({ customer_id: selectedCustomer.id, limit: 50 })
+      .then((response) => {
+        const orders = response.orders || response.data || [];
+        const totalBookings = response.meta?.total !== undefined ? response.meta.total : orders.length;
+
+        // Find latest order by booking_date / created_at
+        let lastOrder = null;
+        if (orders.length > 0) {
+          lastOrder = [...orders].sort((a, b) => new Date(b.booking_date || b.created_at) - new Date(a.booking_date || a.created_at))[0];
+        }
+
+        const lastArea = lastOrder?.area || lastOrder?.address?.area || selectedCustomer.area || '';
+        const lastMapLink = lastOrder?.map_link || lastOrder?.address?.map_link || selectedCustomer.map_link || '';
+        const lastCity = lastOrder?.city || lastOrder?.address?.city || selectedCustomer.city || '';
+        const lastDistrict = lastOrder?.district || lastOrder?.address?.district || selectedCustomer.district || '';
+        const lastState = lastOrder?.state || lastOrder?.address?.state || selectedCustomer.state || '';
+        const lastLatitude = lastOrder?.latitude !== undefined && lastOrder?.latitude !== 0 ? lastOrder.latitude : (lastOrder?.address?.latitude !== undefined ? lastOrder.address.latitude : (selectedCustomer.latitude || 0));
+        const lastLongitude = lastOrder?.longitude !== undefined && lastOrder?.longitude !== 0 ? lastOrder.longitude : (lastOrder?.address?.longitude !== undefined ? lastOrder.address.longitude : (selectedCustomer.longitude || 0));
+        const lastBookedAt = lastOrder?.booking_date || lastOrder?.created_at || selectedCustomer.last_booked_at || null;
+
+        setCustomerStats({
+          totalBookings,
+          lastBookedAt,
+          lastArea,
+          lastMapLink,
+          lastCity,
+          lastDistrict,
+          lastState,
+          lastLatitude,
+          lastLongitude,
+        });
+      })
+      .catch((err) => {
+        setCustomerStats({
+          totalBookings: selectedCustomer.orders_count || 0,
+          lastBookedAt: selectedCustomer.last_booked_at || null,
+          lastArea: selectedCustomer.area || '',
+          lastMapLink: selectedCustomer.map_link || '',
+          lastCity: selectedCustomer.city || '',
+          lastDistrict: selectedCustomer.district || '',
+          lastState: selectedCustomer.state || '',
+          lastLatitude: selectedCustomer.latitude || 0,
+          lastLongitude: selectedCustomer.longitude || 0,
+        });
+      })
+      .finally(() => {
+        setCustomerHistoryLoading(false);
+      });
+  }, [selectedCustomer?.id]);
+
+  // Handle using last booked area in order location (uses last order's coordinates & map link directly without re-decoding)
+  const handleUseLastArea = () => {
+    const areaToUse = customerStats.lastArea || selectedCustomer?.area || '';
+    const mapLinkToUse = customerStats.lastMapLink || selectedCustomer?.map_link || '';
+    const cityToUse = customerStats.lastCity || selectedCustomer?.city || '';
+    const districtToUse = customerStats.lastDistrict || selectedCustomer?.district || '';
+    const stateToUse = customerStats.lastState || selectedCustomer?.state || '';
+    const latToUse = customerStats.lastLatitude !== undefined ? customerStats.lastLatitude : (selectedCustomer?.latitude || 0);
+    const lngToUse = customerStats.lastLongitude !== undefined ? customerStats.lastLongitude : (selectedCustomer?.longitude || 0);
+
+    if (!areaToUse && !mapLinkToUse) {
+      toast.error('No previous location recorded for this customer');
+      return;
+    }
+
+    // Set flag to skip reverse geocoding map link when state updates
+    skipMapLinkDecodeRef.current = true;
+
+    setAddress({
+      area: areaToUse,
+      map_link: mapLinkToUse,
+      city: cityToUse,
+      district: districtToUse,
+      state: stateToUse,
+      latitude: latToUse,
+      longitude: lngToUse,
+    });
+    setMapLinkError(false);
+    setMapLinkLoading(false);
+    saveDraft();
+    toast.success(areaToUse ? `Applied last order's location (${areaToUse})` : 'Applied last order\'s location');
+  };
+
   // Handle map link changes with reverse geocoding
   useEffect(() => {
     if (!address.map_link || address.map_link.trim() === '') {
+      return;
+    }
+
+    // Skip decoding if populated directly from last order's coordinates & link
+    if (skipMapLinkDecodeRef.current) {
+      skipMapLinkDecodeRef.current = false;
       return;
     }
 
@@ -636,9 +753,9 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
       const response = await campaignService.getAllCoupons({ search: phone });
       const coupons = response.data || [];
       // Filter usable coupons: status !== 'cancelled', 'completed', 'expired' and has remaining uses
-      const activeCoupons = coupons.filter(coupon => 
-        coupon.status !== 'cancelled' && 
-        coupon.status !== 'completed' && 
+      const activeCoupons = coupons.filter(coupon =>
+        coupon.status !== 'cancelled' &&
+        coupon.status !== 'completed' &&
         coupon.status !== 'expired' &&
         coupon.remaining_uses > 0
       );
@@ -1578,7 +1695,7 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
                         <button
                           key={customer.id}
                           type="button"
-                          className="w-full px-4 py-3 text-left hover:bg-secondary active:bg-secondary/80 transition-all flex flex-col border-b last:border-b-0 border-gray-50"
+                          className="w-full px-4 py-2.5 text-left hover:bg-secondary active:bg-secondary/80 transition-all flex items-center gap-3 border-b last:border-b-0 border-gray-50 cursor-pointer"
                           onClick={() => {
                             setSelectedCustomer(customer);
                             setCustomerPhone(customer.phone || '');
@@ -1588,11 +1705,14 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
                             saveDraft();
                           }}
                         >
-                          <div className="font-semibold text-gray-900 text-sm">{customer.name}</div>
-                          <div className="text-xs text-muted-foreground flex items-center gap-1.5 mt-0.5">
-                            <Phone className="h-3 w-3 text-gray-400" />
-                            {customer.phone}
-                            {customer.area && <><span>•</span><MapPin className="h-3 w-3 text-gray-400" />{customer.area}</>}
+                          <LetterAvatar name={customer.name} size="sm" className="shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <div className="font-semibold text-gray-900 text-sm truncate capitalize">{customer.name}</div>
+                            <div className="text-xs text-muted-foreground flex items-center gap-1.5 mt-0.5">
+                              <Phone className="h-3 w-3 text-gray-400 shrink-0" />
+                              <span>{customer.phone}</span>
+                              {customer.area && <><span>•</span><MapPin className="h-3 w-3 text-gray-400 shrink-0" /><span className="truncate">{customer.area}</span></>}
+                            </div>
                           </div>
                         </button>
                       );
@@ -1640,53 +1760,123 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
 
           {/* Selected Customer Inline display */}
           {selectedCustomer && (
-            <div className="flex items-center gap-3 p-3 bg-secondary/30 rounded-xl border border-dashed mt-2">
-              <div className="flex items-center justify-center w-10 h-10 rounded-full bg-primary/10 text-primary font-bold text-base uppercase shrink-0">
-                {selectedCustomer.name.charAt(0)}
-              </div>
-              <div className="flex-1 min-w-0">
-                {editingCustomer ? (
-                  <div className="space-y-2">
-                    <Label className="text-[10px] text-muted-foreground font-medium">Phone (Order-specific)</Label>
-                    <div className="flex gap-1.5 items-center">
-                      <Input
-                        value={editCustomerData.phone}
-                        onChange={(e) => setEditCustomerData({ ...editCustomerData, phone: e.target.value })}
-                        placeholder="Phone number"
-                        className="h-8 text-xs flex-1"
-                      />
-                      <Button type="button" size="sm" className="h-8 text-xs px-2" onClick={() => { setCustomerPhone(editCustomerData.phone); setAddress({ ...address, area: editCustomerData.area || address.area, city: editCustomerData.city || address.city }); setEditingCustomer(false); saveDraft(); toast.success('Updated'); }}>
-                        <Check className="h-3 w-3" />
-                      </Button>
-                      <Button type="button" variant="outline" size="sm" className="h-8 text-xs px-2" onClick={() => { setEditingCustomer(false); setEditCustomerData({ phone: '', area: '', city: '' }); }}>
-                        <X className="h-3 w-3" />
-                      </Button>
-                    </div>
+            <div className="bg-gradient-to-br from-blue-50/90 via-indigo-50/40 to-slate-50/90 rounded-2xl border border-blue-100/80 shadow-xs mt-3 overflow-hidden transition-all duration-200">
+              {/* Main Customer Info Header */}
+              <div className="p-3.5 sm:p-4 flex items-start justify-between gap-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  <LetterAvatar name={selectedCustomer.name} size="md" className="shrink-0 font-bold shadow-xs" />
+                  <div className="min-w-0 flex-1">
+                    {editingCustomer ? (
+                      <div className="space-y-2">
+                        <Label className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider">Phone (Order-specific)</Label>
+                        <div className="flex gap-1.5 items-center">
+                          <Input
+                            value={editCustomerData.phone}
+                            onChange={(e) => setEditCustomerData({ ...editCustomerData, phone: e.target.value })}
+                            placeholder="Phone number"
+                            className="h-8 text-xs flex-1 bg-white"
+                          />
+                          <Button type="button" size="sm" className="h-8 text-xs px-2.5" onClick={() => { setCustomerPhone(editCustomerData.phone); setAddress({ ...address, area: editCustomerData.area || address.area, city: editCustomerData.city || address.city }); setEditingCustomer(false); saveDraft(); toast.success('Updated'); }}>
+                            <Check className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button type="button" variant="outline" size="sm" className="h-8 text-xs px-2.5 bg-white" onClick={() => { setEditingCustomer(false); setEditCustomerData({ phone: '', area: '', city: '' }); }}>
+                            <X className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h4 className="font-extrabold text-base text-gray-900 truncate tracking-tight capitalize">{selectedCustomer.name}</h4>
+                        </div>
+                        <div className="flex items-center gap-2 text-xs text-gray-600 mt-1 flex-wrap">
+                          <span className="inline-flex items-center gap-1 font-medium bg-white/80 px-2 py-0.5 rounded-md border border-gray-200/60 shadow-2xs">
+                            <Phone className="h-3 w-3 text-blue-600 shrink-0" />
+                            {customerPhone || selectedCustomer.phone}
+                          </span>
+                          {customerPhone && customerPhone !== selectedCustomer.phone && (
+                            <span className="text-[10px] bg-amber-100 text-amber-800 px-2 py-0.5 rounded-md font-semibold border border-amber-200 shrink-0">
+                              Order-specific
+                            </span>
+                          )}
+                        </div>
+                      </>
+                    )}
                   </div>
-                ) : (
-                  <>
-                    <p className="font-bold text-sm text-gray-900 truncate">{selectedCustomer.name}</p>
-                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-0.5">
-                      <Phone className="h-3.5 w-3.5 shrink-0" />
-                      <span>{customerPhone || selectedCustomer.phone}</span>
-                      {customerPhone && customerPhone !== selectedCustomer.phone && (
-                        <span className="text-[9px] bg-amber-100 text-amber-700 px-1.5 py-0.2 rounded font-medium shrink-0">Order-specific</span>
-                      )}
-                    </div>
-                  </>
+                </div>
+
+                {!editingCustomer && (
+                  <div className="flex items-center gap-1 shrink-0">
+                    <Button type="button" variant="ghost" size="sm" className="h-8 w-8 p-0 rounded-lg hover:bg-white/80 text-gray-500 hover:text-gray-900 transition-colors cursor-pointer"
+                      onClick={() => { setEditCustomerData({ phone: customerPhone || selectedCustomer.phone || '', area: address.area || selectedCustomer.area || '', city: address.city || selectedCustomer.city || '' }); setEditingCustomer(true); }}
+                      title="Edit phone number">
+                      <PenIcon className="h-3.5 w-3.5" />
+                    </Button>
+                    {!orderId && (
+                      <Button type="button" variant="ghost" size="sm" className="h-8 w-8 p-0 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-600 transition-colors cursor-pointer"
+                        onClick={() => { setSelectedCustomer(null); setCustomerSearchTerm(''); setEditingCustomer(false); }}
+                        title="Remove customer">
+                        <X className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
                 )}
               </div>
+
+              {/* Customer Booking History Stat Chips & Location Quick-Fill */}
               {!editingCustomer && (
-                <div className="flex gap-1">
-                  <Button type="button" variant="ghost" size="sm" className="h-8 w-8 p-0 shrink-0 cursor-pointer"
-                    onClick={() => { setEditCustomerData({ phone: customerPhone || selectedCustomer.phone || '', area: address.area || selectedCustomer.area || '', city: address.city || selectedCustomer.city || '' }); setEditingCustomer(true); }}
-                    title="Edit details">
-                    <PenIcon className="h-3.5 w-3.5 text-gray-500" />
-                  </Button>
-                  {!orderId && (
-                    <Button type="button" variant="ghost" size="sm" className="h-8 w-8 p-0 shrink-0 cursor-pointer"
-                      onClick={() => { setSelectedCustomer(null); setCustomerSearchTerm(''); setEditingCustomer(false); }}>
-                      <X className="h-4 w-4 text-gray-500" />
+                <div className="bg-white/70 backdrop-blur-xs px-3.5 py-3 border-t border-blue-100/60 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2 text-xs">
+                    {/* Total Bookings Chip */}
+                    <div className="flex items-center gap-2 bg-white px-2.5 py-1.5 rounded-lg border border-gray-200/70 shadow-2xs">
+                      <div className="w-6 h-6 rounded-md bg-blue-50 flex items-center justify-center shrink-0">
+                        <ShoppingCart className="h-3.5 w-3.5 text-blue-600" />
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-[10px] text-gray-500 font-medium leading-none">Total Orders</span>
+                        <span className="font-semibold text-gray-900 text-xs mt-0.5">
+                          {customerHistoryLoading ? '...' : `${customerStats.totalBookings} ${customerStats.totalBookings === 1 ? 'booking' : 'bookings'}`}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Last Booked Date Chip */}
+                    <div className="flex items-center gap-2 bg-white px-2.5 py-1.5 rounded-lg border border-gray-200/70 shadow-2xs">
+                      <div className="w-6 h-6 rounded-md bg-purple-50 flex items-center justify-center shrink-0">
+                        <Calendar className="h-3.5 w-3.5 text-purple-600" />
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-[10px] text-gray-500 font-medium leading-none">Last Booked</span>
+                        <span className="font-semibold text-gray-800 text-xs mt-0.5">
+                          {customerHistoryLoading ? 'Loading...' : formatDate(customerStats.lastBookedAt)}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Last Area Chip */}
+                    <div className="col-span-2 sm:col-auto flex items-center gap-2 bg-white px-2.5 py-1.5 rounded-lg border border-gray-200/70 shadow-2xs max-w-full">
+                      <div className="w-6 h-6 rounded-md bg-orange-50 flex items-center justify-center shrink-0">
+                        <MapPin className="h-3.5 w-3.5 text-orange-600" />
+                      </div>
+                      <div className="flex flex-col truncate">
+                        <span className="text-[10px] text-gray-500 font-medium leading-none">Last Area</span>
+                        <span className="font-semibold text-gray-800 text-xs mt-0.5 truncate max-w-[160px]">
+                          {customerHistoryLoading ? '...' : (customerStats.lastArea || selectedCustomer.area || 'N/A')}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {(customerStats.lastArea || customerStats.lastMapLink || selectedCustomer.area || selectedCustomer.map_link) && (
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={handleUseLastArea}
+                      className="h-8 text-xs px-3 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-semibold rounded-lg shadow-2xs hover:shadow-xs gap-1.5 transition-all shrink-0 cursor-pointer border-0 w-full sm:w-auto"
+                      title="Use last booked area for service address"
+                    >
+                      <MapPin className="h-3.5 w-3.5 shrink-0" />
+                      <span>Use Last Booked Area</span>
                     </Button>
                   )}
                 </div>
@@ -1843,11 +2033,10 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
                               type="button"
                               onClick={() => updatePackageItem(index, 'vehicle_type', type)}
                               disabled={item.is_reward}
-                              className={`flex flex-col items-center justify-center gap-1 p-2 rounded-xl border-2 transition-all active:scale-95 ${
-                                item.vehicle_type === type
-                                  ? 'border-primary bg-primary text-white shadow-md'
-                                  : 'border-muted-foreground/20 bg-background hover:border-primary/40'
-                              }`}
+                              className={`flex flex-col items-center justify-center gap-1 p-2 rounded-xl border-2 transition-all active:scale-95 ${item.vehicle_type === type
+                                ? 'border-primary bg-primary text-white shadow-md'
+                                : 'border-muted-foreground/20 bg-background hover:border-primary/40'
+                                }`}
                             >
                               <VehicleIcon vehicleType={type} size={28} className={item.vehicle_type === type ? 'text-white' : 'text-foreground'} />
                               <span className="text-[10px] font-bold capitalize leading-none">{type}</span>

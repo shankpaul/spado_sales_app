@@ -947,7 +947,9 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
                 {order.cancelled_at && (
                   <span className="text-xs text-red-700/80">
                     Cancelled on {formatDateTime(order.cancelled_at)}
-                    {order.cancelled_by?.name ? ` by ${order.cancelled_by.name}` : ''}
+                    {order.cancelled_by?.name && (
+                      <> by <span className="font-bold text-red-900">{order.cancelled_by.name}</span></>
+                    )}
                   </span>
                 )}
               </div>

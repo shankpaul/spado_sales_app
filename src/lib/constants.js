@@ -116,7 +116,7 @@ export const ORDER_STATUSES = [
 
 // Payment Status Constants
 export const PAYMENT_STATUSES = [
-  { value: 'pending', label: 'Pending', color: 'yellow' },
+  { value: 'pending', label: 'Unpaid', color: 'yellow' },
   { value: 'paid', label: 'Paid', color: 'green' },
   { value: 'failed', label: 'Failed', color: 'red' },
   { value: 'refunded', label: 'Refunded', color: 'purple' },
@@ -210,7 +210,7 @@ export const PAYMENT_METHODS = [
 
 // Subscription Payment Status Constants
 export const SUBSCRIPTION_PAYMENT_STATUSES = [
-  { value: 'pending', label: 'Pending', variant: 'secondary', color: 'yellow' },
+  { value: 'pending', label: 'Unpaid', variant: 'secondary', color: 'yellow' },
   { value: 'partial', label: 'Partial', variant: 'outline', color: 'orange' },
   { value: 'paid', label: 'Paid', variant: 'default', color: 'green' },
 ];

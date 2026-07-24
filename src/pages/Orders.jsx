@@ -32,8 +32,6 @@ import {
   Calendar,
   Clock,
   User,
-  DollarSign,
-  Eye,
   Filter,
   X,
   Repeat,
@@ -747,7 +745,7 @@ const Orders = () => {
                               variant={getBadgeVariant(order.payment_status, 'payment')}
                               className="h-5 text-[10px] px-1.5"
                             >
-                              Payment {getStatusLabel(order.payment_status, PAYMENT_STATUSES)}
+                              {getStatusLabel(order.payment_status, PAYMENT_STATUSES)}
                             </Badge2>
                           </div>
 
@@ -808,7 +806,7 @@ const Orders = () => {
                       <th className="px-6 py-4">Order #</th>
                       <th className="px-6 py-4">Customer</th>
                       <th className="px-6 py-4">Area</th>
-                      <th className="px-6 py-4">Booking</th>
+                      <th className="px-6 py-4">Booking Date</th>
                       <th className="px-6 py-4">Status</th>
                       <th className="px-6 py-4">Payment</th>
                       <th className="px-6 py-4">Amount</th>
@@ -844,22 +842,21 @@ const Orders = () => {
                               {order.area}
                             </td>
                             <td className="px-6 py-4 text-gray-600 font-medium whitespace-nowrap">
-                              <div className="flex items-center gap-2">
+                              <div className="flex flex-col items-start">
                                 <span>{formatDate(order.booking_date)}</span>
                                 {formatBookingTime(order.booking_time_from, order.booking_time_to) && (
                                   <span className="text-xs text-gray-500 font-normal flex items-center gap-1">
-                                    <Clock className="h-3 w-3 text-gray-400" />
                                     {formatBookingTime(order.booking_time_from, order.booking_time_to)}
                                   </span>
                                 )}
                               </div>
                             </td>
-                            <td className="px-6 py-4">
+                            <td className="px-6 py-4 whitespace-nowrap">
                               <Badge2 variant={getBadgeVariant(order.status, 'order')}>
                                 {getStatusLabel(order.status, ORDER_STATUSES)}
                               </Badge2>
                             </td>
-                            <td className="px-6 py-4">
+                            <td className="px-6 py-4 whitespace-nowrap">
                               <Badge2 variant={getBadgeVariant(order.payment_status, 'payment')}>
                                 {getStatusLabel(order.payment_status, PAYMENT_STATUSES)}
                               </Badge2>

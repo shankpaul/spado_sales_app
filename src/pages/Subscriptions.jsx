@@ -717,12 +717,12 @@ const Subscriptions = () => {
                             {subscription.washing_schedules?.length || 0} scheduled
                           </div>
                         </td>
-                        <td className="px-6 py-4">
+                        <td className="px-6 py-4 whitespace-nowrap">
                           <Badge2 variant={getBadgeVariant(subscription.status)}>
                             {getStatusLabel(subscription.status, SUBSCRIPTION_STATUSES)}
                           </Badge2>
                         </td>
-                        <td className="px-6 py-4">
+                        <td className="px-6 py-4 whitespace-nowrap">
                           <Badge2 variant={getBadgeVariant(subscription.payment_status, 'payment')}>
                             {getStatusLabel(subscription.payment_status, SUBSCRIPTION_PAYMENT_STATUSES)}
                           </Badge2>

@@ -498,7 +498,7 @@ const SubscriptionDetail = () => {
                               )}
                             </div>
                           </TableCell>
-                          <TableCell>
+                          <TableCell className="whitespace-nowrap">
                             <Badge2 variant={getBadgeVariant(order.status, 'order')}>
                               {getStatusLabel(order.status, ORDER_STATUSES)}
                             </Badge2>
