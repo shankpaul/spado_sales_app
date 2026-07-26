@@ -25,6 +25,15 @@ import {
   TabsTrigger,
 } from '../components/ui/tabs';
 import {
+  Table,
+  TableHeader,
+  TableBody,
+  TableRow,
+  TableCell,
+  TableHead,
+  TableFooter,
+} from '../components/ui/table';
+import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -75,6 +84,7 @@ import {
   Loader2,
   User,
   Phone,
+  PhoneCall,
   MapPin,
   Calendar,
   Clock,
@@ -104,6 +114,9 @@ import {
   BadgePlus,
   BadgePercent,
   Plus,
+  Navigation,
+  Route,
+  Home,
 } from 'lucide-react';
 import MapPreview from '@/components/MapPreview';
 import VehicleIcon from '../components/VehicleIcon';
@@ -129,7 +142,7 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
 
   // Tabs state
   const [activeTab, setActiveTab] = useState('packages');
-  const tabsList = ['packages', 'images', 'timeline', 'reassignments'];
+  const tabsList = ['packages', 'images', 'timeline', 'reassignments', 'journeys'];
 
   // Add Location states
   const [isAddLocationOpen, setIsAddLocationOpen] = useState(false);
@@ -1246,6 +1259,15 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
                         {reassignments?.length || 0}
                       </Badge2>
                     </TabsTrigger>
+                    <TabsTrigger
+                      value="journeys"
+                      className="rounded-md py-1 px-3 text-sm font-semibold capitalize transition-all cursor-pointer data-[state=active]:bg-white data-[state=active]:text-foreground data-[state=active]:shadow-sm flex items-center justify-center gap-1.5 flex-shrink-0 whitespace-nowrap"
+                    >
+                      <span>Journeys</span>
+                      <Badge2 variant="secondary" className="px-1.5 py-0.5 text-[9px] sm:text-[10px] leading-none rounded-full flex-shrink-0">
+                        {order.journeys?.length || 0}
+                      </Badge2>
+                    </TabsTrigger>
                   </TabsList>
                 </div>
 
@@ -1422,31 +1444,38 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
                 <TabsContent value="timeline" className="mt-6 px-2 data-[state=active]:animate-in data-[state=active]:fade-in-50 data-[state=active]:slide-in-from-right-4 data-[state=active]:duration-300 data-[state=active]:ease-out">
                   <div className="space-y-2">
                     {timeline.length > 0 ? (
-                      timeline.map((event, index) => (
-                        <div key={index} className="flex gap-4">
-                          <div className="flex flex-col items-center">
-                            <div className="w-5 h-5 text-muted-foreground rounded-full flex items-center justify-center flex-shrink-0 ">
-                              {event.type === 'status_changed' ? (
-                                <CheckCircle2 size={14} />
-                              ) : event.type === 'cancelled' ? (
-                                <XCircle size={14} />
-                              ) : (
-                                <Clock size={14} />
-                              )}
+                      [...timeline]
+                        .sort((a, b) => new Date(b.changed_at || b.created_at || b.timestamp || 0) - new Date(a.changed_at || a.created_at || a.timestamp || 0))
+                        .map((event, index, array) => {
+                          const userName = event.changed_by || event.assigned_by || (typeof event.user === 'string' ? event.user : event.user?.name);
+                          const isValidUser = userName && String(userName).trim() !== '' && String(userName).toLowerCase() !== 'undefined' && String(userName).toLowerCase() !== 'null';
+
+                          return (
+                            <div key={index} className="flex gap-4">
+                              <div className="flex flex-col items-center">
+                                <div className="w-5 h-5 text-muted-foreground rounded-full flex items-center justify-center flex-shrink-0 ">
+                                  {event.type === 'status_changed' ? (
+                                    <CheckCircle2 size={14} />
+                                  ) : event.type === 'cancelled' ? (
+                                    <XCircle size={14} />
+                                  ) : (
+                                    <Clock size={14} />
+                                  )}
+                                </div>
+                                {index < array.length - 1 && (
+                                  <div className="w-0.5 flex-1 bg-gray-200 mt-2" style={{ minHeight: '1rem' }} />
+                                )}
+                              </div>
+                              <div className="flex-1 pb-4">
+                                <div className="text-sm mb-1">{event.description}</div>
+                                <div className="text-xs text-muted-foreground">
+                                  {formatDateTime(event.changed_at || event.created_at || event.timestamp)}
+                                  {isValidUser && ` • by ${userName}`}
+                                </div>
+                              </div>
                             </div>
-                            {index < timeline.length - 1 && (
-                              <div className="w-0.5 flex-1 bg-gray-200 mt-2" style={{ minHeight: '1rem' }} />
-                            )}
-                          </div>
-                          <div className="flex-1 pb-4">
-                            <div className="text-sm mb-1">{event.description}</div>
-                            <div className="text-xs text-muted-foreground">
-                              {formatDateTime(event.changed_at)}
-                              {` • by ${event.changed_by || event.assigned_by}`}
-                            </div>
-                          </div>
-                        </div>
-                      ))
+                          );
+                        })
                     ) : (
                       <div className="py-12 text-center text-muted-foreground">
                         <Clock className="h-12 w-12 mx-auto mb-3 opacity-50" />
@@ -1493,6 +1522,304 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
                       </div>
                     )}
                   </div>
+                </TabsContent>
+
+                {/* Journeys Tab */}
+                <TabsContent value="journeys" className="mt-6 px-2 space-y-6 data-[state=active]:animate-in data-[state=active]:fade-in-50 data-[state=active]:slide-in-from-right-4 data-[state=active]:duration-300 data-[state=active]:ease-out">
+                  {(() => {
+                    const journeys = order.journeys || [];
+                    const toCustomerJourneys = journeys.filter(j => j.trip_type === 'to_customer');
+                    const toHomeJourneys = journeys.filter(j => j.trip_type === 'to_home');
+                    const toCustomerDist = toCustomerJourneys.reduce((sum, j) => sum + (parseFloat(j.distance_km) || 0), 0);
+                    const toHomeDist = toHomeJourneys.reduce((sum, j) => sum + (parseFloat(j.distance_km) || 0), 0);
+                    const totalDist = toCustomerDist + toHomeDist;
+                    const totalAllowance = journeys.reduce((sum, j) => sum + (parseFloat(j.amount) || 0), 0);
+
+                    const hasToCustomer = toCustomerJourneys.length > 0;
+                    const hasToHome = toHomeJourneys.length > 0;
+
+                    // Helper to find travel start time & duration for a journey
+                    const getTravelTimeInfo = (journey) => {
+                      let startedAt = null;
+                      if (timeline && timeline.length > 0) {
+                        if (journey.trip_type === 'to_customer') {
+                          const enRouteEvent = timeline.find(e =>
+                            e.status === 'en_route' ||
+                            e.event_type === 'en_route' ||
+                            String(e.title || '').toLowerCase().includes('en route') ||
+                            String(e.description || '').toLowerCase().includes('en route') ||
+                            String(e.description || '').toLowerCase().includes('travel')
+                          );
+                          if (enRouteEvent) {
+                            startedAt = enRouteEvent.created_at || enRouteEvent.timestamp;
+                          }
+                        } else if (journey.trip_type === 'to_home') {
+                          const completedEvent = timeline.find(e =>
+                            e.status === 'completed' ||
+                            e.event_type === 'completed' ||
+                            String(e.title || '').toLowerCase().includes('completed')
+                          );
+                          if (completedEvent) {
+                            startedAt = completedEvent.created_at || completedEvent.timestamp;
+                          }
+                        }
+                      }
+
+                      let durationText = null;
+                      if (startedAt && journey.traveled_at) {
+                        const startMs = new Date(startedAt).getTime();
+                        const endMs = new Date(journey.traveled_at).getTime();
+                        if (!isNaN(startMs) && !isNaN(endMs) && endMs > startMs) {
+                          const diffMins = Math.round((endMs - startMs) / 60000);
+                          if (diffMins < 60) {
+                            durationText = `${diffMins} mins`;
+                          } else {
+                            const hrs = Math.floor(diffMins / 60);
+                            const mins = diffMins % 60;
+                            durationText = mins > 0 ? `${hrs}h ${mins}m` : `${hrs}h`;
+                          }
+                        }
+                      }
+
+                      return { startedAt, durationText };
+                    };
+
+                    return (
+                      <div className="space-y-6">
+                        {journeys.length > 0 ? (
+                          <>
+                            {/* Travel Distance Summary Table */}
+                            <div className="space-y-2">
+                              <div className="text-xs font-bold text-gray-500 uppercase tracking-wider">Distance & Travel Overview</div>
+                              <div className="border border-gray-200 rounded-xl overflow-hidden bg-white shadow-2xs">
+                                <Table>
+                                  <TableHeader className="bg-gray-50/80">
+                                    <TableRow>
+                                      <TableHead className="font-bold text-xs text-gray-700">Trip Category</TableHead>
+                                      <TableHead className="font-bold text-xs text-gray-700">Trips Logged</TableHead>
+                                      <TableHead className="font-bold text-xs text-gray-700">Distance (KM)</TableHead>
+                                      <TableHead className="font-bold text-xs text-gray-700">Allowance (₹)</TableHead>
+                                      <TableHead className="font-bold text-xs text-gray-700 text-right">Status / Notes</TableHead>
+                                    </TableRow>
+                                  </TableHeader>
+                                  <TableBody className="divide-y divide-gray-100 text-xs">
+                                    <TableRow className="hover:bg-gray-50/50">
+                                      <TableCell className="font-medium flex items-center gap-2 py-3">
+                                        <Badge2 className="bg-blue-50 text-blue-700 border-blue-200 font-bold text-xs gap-1.5 py-0.5 px-2">
+                                          <Navigation className="h-3 w-3 text-blue-600" /> To Customer
+                                        </Badge2>
+                                      </TableCell>
+                                      <TableCell className="font-semibold text-gray-800 py-3">
+                                        {toCustomerJourneys.length} trip{toCustomerJourneys.length !== 1 ? 's' : ''}
+                                      </TableCell>
+                                      <TableCell className="font-mono font-extrabold text-gray-900 py-3 text-xs">
+                                        {toCustomerDist.toFixed(2)} KM
+                                      </TableCell>
+                                      <TableCell className="font-mono font-bold text-emerald-700 py-3 text-xs">
+                                        {toCustomerJourneys.length > 0 && toCustomerJourneys.every(j => j.user?.employee_scheme === 'commission' || (j.amount || 0) === 0) ? (
+                                          <span className="text-gray-400 font-sans font-normal">N/A (Commission)</span>
+                                        ) : (
+                                          `₹${toCustomerJourneys.reduce((sum, j) => sum + (parseFloat(j.amount) || 0), 0).toFixed(2)}`
+                                        )}
+                                      </TableCell>
+                                      <TableCell className="text-right text-gray-500 py-3">
+                                        {hasToCustomer ? 'Completed' : 'No trip recorded'}
+                                      </TableCell>
+                                    </TableRow>
+
+                                    <TableRow className="hover:bg-gray-50/50">
+                                      <TableCell className="font-medium flex items-center gap-2 py-3">
+                                        <Badge2 className="bg-purple-50 text-purple-700 border-purple-200 font-bold text-xs gap-1.5 py-0.5 px-2">
+                                          <Home className="h-3 w-3 text-purple-600" /> Return (To Home)
+                                        </Badge2>
+                                      </TableCell>
+                                      <TableCell className="font-semibold text-gray-800 py-3">
+                                        {toHomeJourneys.length} trip{toHomeJourneys.length !== 1 ? 's' : ''}
+                                      </TableCell>
+                                      <TableCell className="font-mono font-extrabold text-gray-900 py-3 text-xs">
+                                        {toHomeDist.toFixed(2)} KM
+                                      </TableCell>
+                                      <TableCell className="font-mono font-bold text-emerald-700 py-3 text-xs">
+                                        {toHomeJourneys.length > 0 && toHomeJourneys.every(j => j.user?.employee_scheme === 'commission' || (j.amount || 0) === 0) ? (
+                                          <span className="text-gray-400 font-sans font-normal">N/A (Commission)</span>
+                                        ) : (
+                                          `₹${toHomeJourneys.reduce((sum, j) => sum + (parseFloat(j.amount) || 0), 0).toFixed(2)}`
+                                        )}
+                                      </TableCell>
+                                      <TableCell className="text-right text-gray-500 py-3">
+                                        {hasToHome ? 'Completed' : (hasToCustomer ? 'Agent travelled to next order' : 'Not recorded')}
+                                      </TableCell>
+                                    </TableRow>
+                                  </TableBody>
+                                  <TableFooter className="bg-primary/5 font-bold border-t border-gray-200">
+                                    <TableRow>
+                                      <TableCell className="py-3 text-xs font-bold text-gray-900">
+                                        <div className="flex items-center gap-1.5">
+                                          <Route className="h-4 w-4 text-primary" /> Total Order Travel
+                                        </div>
+                                      </TableCell>
+                                      <TableCell className="py-3 text-xs font-bold text-gray-800">
+                                        {journeys.length} total trip{journeys.length !== 1 ? 's' : ''}
+                                      </TableCell>
+                                      <TableCell className="py-3 font-mono font-black text-gray-900 text-sm">
+                                        {totalDist.toFixed(2)} KM
+                                      </TableCell>
+                                      <TableCell className="py-3 font-mono font-black text-emerald-800 text-sm">
+                                        {journeys.length > 0 && journeys.every(j => j.user?.employee_scheme === 'commission' || (j.amount || 0) === 0) ? (
+                                          <span className="text-gray-500 font-sans font-medium text-xs">N/A (Commission Scheme)</span>
+                                        ) : (
+                                          `₹${totalAllowance.toFixed(2)}`
+                                        )}
+                                      </TableCell>
+                                      <TableCell className="py-3 text-right text-xs text-primary font-semibold">
+                                        Sum of to_customer + to_home
+                                      </TableCell>
+                                    </TableRow>
+                                  </TableFooter>
+                                </Table>
+                              </div>
+                              <div className="text-[11px] text-gray-500 italic px-1">
+                                * Travel allowance is calculated only for Fixed Salary employees. Commission-based employees do not receive distance travel allowance.
+                              </div>
+                            </div>
+
+                            {/* Notice Banner if To Home trip is missing */}
+                            {hasToCustomer && !hasToHome && (
+                              <div className="p-3.5 bg-amber-50 border border-amber-200/80 rounded-xl flex items-start gap-3 text-amber-900 text-xs font-medium">
+                                <AlertTriangle className="h-4.5 w-4.5 text-amber-600 shrink-0 mt-0.5" />
+                                <div className="space-y-0.5">
+                                  <div className="font-bold text-amber-950">Return Trip (To Home) Not Logged for this Order</div>
+                                  <div className="text-amber-800 leading-relaxed">
+                                    The agent completed the trip to the customer ({toCustomerDist.toFixed(2)} KM), but did not record a return trip to home for this order. This usually occurs when the agent travels directly from this customer to their next assigned order.
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Journey Details Table */}
+                            <div className="space-y-3">
+                              <div className="flex items-center justify-between">
+                                <div className="text-xs font-bold text-gray-500 uppercase tracking-wider">Detailed Journey Logs ({journeys.length})</div>
+                              </div>
+                              <div className="border border-gray-200 rounded-xl overflow-hidden bg-white shadow-2xs">
+                                <Table>
+                                  <TableHeader className="bg-gray-50/80">
+                                    <TableRow>
+                                      <TableHead className="font-bold text-xs text-gray-700">Trip Type</TableHead>
+                                      <TableHead className="font-bold text-xs text-gray-700">Agent</TableHead>
+                                      <TableHead className="font-bold text-xs text-gray-700">Distance (KM)</TableHead>
+                                      <TableHead className="font-bold text-xs text-gray-700">Travel Started</TableHead>
+                                      <TableHead className="font-bold text-xs text-gray-700">Travel Ended</TableHead>
+                                      <TableHead className="font-bold text-xs text-gray-700">Est. Duration</TableHead>
+                                      <TableHead className="font-bold text-xs text-gray-700">Allowance</TableHead>
+                                      <TableHead className="font-bold text-xs text-gray-700 text-right">Route</TableHead>
+                                    </TableRow>
+                                  </TableHeader>
+                                  <TableBody className="divide-y divide-gray-100">
+                                    {journeys.map((journey, idx) => {
+                                      const { startedAt, durationText } = getTravelTimeInfo(journey);
+                                      const agentName = journey.user?.name || order.assigned_to?.name || 'Assigned Agent';
+                                      const isCommissionScheme = journey.user?.employee_scheme === 'commission' || (journey.amount || 0) === 0;
+
+                                      return (
+                                        <TableRow key={journey.id || idx} className="hover:bg-gray-50/50 transition-colors">
+                                          <TableCell className="py-3">
+                                            {journey.trip_type === 'to_customer' ? (
+                                              <Badge2 className="bg-blue-50 text-blue-700 border-blue-200 font-bold text-xs gap-1.5 py-0.5 px-2">
+                                                <Navigation className="h-3 w-3 text-blue-600" /> To Customer
+                                              </Badge2>
+                                            ) : (
+                                              <Badge2 className="bg-purple-50 text-purple-700 border-purple-200 font-bold text-xs gap-1.5 py-0.5 px-2">
+                                                <Home className="h-3 w-3 text-purple-600" /> To Home
+                                              </Badge2>
+                                            )}
+                                          </TableCell>
+
+                                          <TableCell className="py-3">
+                                            <div className="flex items-center gap-2">
+                                              <LetterAvatar name={agentName} size="xs" className="text-white shrink-0" />
+                                              <span className="font-semibold text-gray-800 text-xs truncate max-w-[120px]">{agentName}</span>
+                                            </div>
+                                          </TableCell>
+
+                                          <TableCell className="py-3 font-mono font-extrabold text-gray-900 text-xs">
+                                            {(parseFloat(journey.distance_km) || 0).toFixed(2)} KM
+                                          </TableCell>
+
+                                          <TableCell className="py-3 text-xs text-gray-600">
+                                            {startedAt ? formatDateTime(startedAt) : (journey.traveled_at ? formatDateTime(journey.traveled_at) : 'N/A')}
+                                          </TableCell>
+
+                                          <TableCell className="py-3 text-xs text-gray-600">
+                                            {journey.traveled_at ? formatDateTime(journey.traveled_at) : 'N/A'}
+                                          </TableCell>
+
+                                          <TableCell className="py-3 text-xs font-semibold text-gray-700">
+                                            {durationText ? `⏱️ ${durationText}` : 'Completed'}
+                                          </TableCell>
+
+                                          <TableCell className="py-3 text-xs font-bold font-mono">
+                                            {isCommissionScheme ? (
+                                              <span className="text-gray-400 font-sans font-normal">N/A (Commission)</span>
+                                            ) : (
+                                              <span className="text-emerald-700">₹{(journey.amount || 0).toFixed(2)}</span>
+                                            )}
+                                          </TableCell>
+
+                                          <TableCell className="py-3 text-right">
+                                            {journey.from_location?.latitude > 0 && journey.to_location?.latitude > 0 ? (
+                                              <a
+                                                href={`https://www.google.com/maps/dir/?api=1&origin=${journey.from_location.latitude},${journey.from_location.longitude}&destination=${journey.to_location.latitude},${journey.to_location.longitude}`}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="inline-flex items-center gap-1 text-[11px] font-semibold text-primary hover:underline bg-primary/5 border border-primary/20 px-2 py-1 rounded-md"
+                                              >
+                                                <span>View Route</span>
+                                                <ExternalLink className="h-3 w-3" />
+                                              </a>
+                                            ) : (
+                                              <span className="text-xs text-gray-400">N/A</span>
+                                            )}
+                                          </TableCell>
+                                        </TableRow>
+                                      );
+                                    })}
+                                  </TableBody>
+                                  <TableFooter className="bg-gray-50/90 font-bold border-t border-gray-200">
+                                    <TableRow>
+                                      <TableCell colSpan={2} className="py-3 text-xs font-bold text-gray-800">
+                                        Total ({journeys.length} trips)
+                                      </TableCell>
+                                      <TableCell className="py-3 font-mono font-black text-gray-900 text-sm">
+                                        {totalDist.toFixed(2)} KM
+                                      </TableCell>
+                                      <TableCell colSpan={3} className="py-3"></TableCell>
+                                      <TableCell className="py-3 font-mono font-black text-emerald-800 text-sm">
+                                        {journeys.length > 0 && journeys.every(j => j.user?.employee_scheme === 'commission' || (j.amount || 0) === 0) ? (
+                                          <span className="text-gray-500 font-sans font-medium text-xs">N/A (Commission Scheme)</span>
+                                        ) : (
+                                          `₹${totalAllowance.toFixed(2)}`
+                                        )}
+                                      </TableCell>
+                                      <TableCell className="py-3"></TableCell>
+                                    </TableRow>
+                                  </TableFooter>
+                                </Table>
+                              </div>
+                            </div>
+                          </>
+                        ) : (
+                          <div className="py-16 text-center text-muted-foreground bg-gray-50/50 border border-dashed rounded-xl space-y-2">
+                            <Car className="h-12 w-12 mx-auto opacity-40 text-gray-400" />
+                            <div className="font-semibold text-gray-700">No Journey Travel Details Yet</div>
+                            <p className="text-xs text-gray-500 max-w-sm mx-auto">
+                              Travel records (distance in KM, start time, trip type) will automatically appear here once the agent starts navigation or completes travel for this order.
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
                 </TabsContent>
 
               </Tabs>
@@ -1684,59 +2011,92 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
           <div className="space-y-4">
             {/* Assigned Agent */}
             <div ref={assignedAgentRef} className="rounded-xl border bg-white shadow-xs overflow-hidden">
-              <div className="px-4 py-3 border-b bg-gray-50/60 flex items-center justify-between">
-                <h3 className="font-semibold text-sm">Assigned Agent</h3>
-              </div>
-              <div className="p-4 space-y-3">
-                <div className="flex items-center gap-3">
-                  <LetterAvatar name={order.assigned_to?.name} size="md" className="text-white flex-shrink-0" />
-                  <div className="flex-1 min-w-0">
-                    <div className="font-semibold text-sm">
-                      {
-                        order.assigned_to?.name ? <>
-                          {order.assigned_to?.name}
-                          <Badge2 variant="info" className="mx-2 capitalize">{order.assignee_response}</Badge2></> :
-                          <span className="text-muted-foreground italic">Unassigned</span>
-                      }
+              {(() => {
+                const rawPhone = (order.assigned_to?.phone || agents.find(a => String(a.id) === String(order.assigned_to?.id))?.phone || '').trim();
+                const hasPhone = Boolean(rawPhone && rawPhone.toLowerCase() !== 'undefined' && rawPhone.toLowerCase() !== 'null');
+                const agentPhone = hasPhone ? rawPhone : null;
+                const currentAgentId = order.assigned_to?.id;
+                const availableAgents = agents.filter(agent => agent.id !== currentAgentId && !agent.locked);
+                const canReassign = !['in_progress', 'completed', 'cancelled'].includes(order.status);
+
+                return (
+                  <>
+                    <div className="px-4 py-3 border-b bg-gray-50/60 flex items-center justify-between">
+                      <h3 className="font-semibold text-sm">Assigned Agent</h3>
+                      {order.assigned_to && hasPhone && (
+                        <a
+                          href={`tel:${agentPhone}`}
+                          className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200/80 px-2.5 py-1 rounded-lg transition-colors shadow-2xs cursor-pointer active:scale-95"
+                          title={`Call Agent (${agentPhone})`}
+                        >
+                          <PhoneCall className="h-3.5 w-3.5 text-emerald-600" />
+                          <span>Call Agent</span>
+                        </a>
+                      )}
                     </div>
-                    {order.assigned_to?.email && (
-                      <div className="text-xs text-muted-foreground truncate mt-0.5">
-                        {order.assigned_to.email}
+                    <div className="p-4 space-y-3">
+                      <div className="flex items-center gap-3">
+                        <LetterAvatar name={order.assigned_to?.name} size="md" className="text-white flex-shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <div className="font-semibold text-sm">
+                            {
+                              order.assigned_to?.name ? <>
+                                {order.assigned_to?.name}
+                                <Badge2 variant="info" className="mx-2 capitalize">{order.assignee_response}</Badge2></> :
+                                <span className="text-muted-foreground italic">Unassigned</span>
+                            }
+                          </div>
+                          {order.assigned_to?.email && (
+                            <div className="text-xs text-muted-foreground truncate mt-0.5">
+                              {order.assigned_to.email}
+                            </div>
+                          )}
+                          {hasPhone && (
+                            <div className="text-xs text-muted-foreground truncate mt-0.5 flex items-center gap-1 font-mono">
+                              <Phone className="h-3 w-3 text-gray-400" />
+                              <span>{agentPhone}</span>
+                            </div>
+                          )}
+                        </div>
+
+                        {order.assigned_to && hasPhone && (
+                          <a
+                            href={`tel:${agentPhone}`}
+                            className="inline-flex items-center justify-center h-8.5 w-8.5 rounded-full bg-emerald-500 hover:bg-emerald-600 text-white shadow-xs transition-transform active:scale-95 shrink-0"
+                            title={`Call ${order.assigned_to.name} (${agentPhone})`}
+                          >
+                            <PhoneCall className="h-4 w-4" />
+                          </a>
+                        )}
                       </div>
-                    )}
-                  </div>
-                </div>
 
-                {(() => {
-                  const currentAgentId = order.assigned_to?.id;
-                  const availableAgents = agents.filter(agent => agent.id !== currentAgentId && !agent.locked);
-                  const canReassign = !['in_progress', 'completed', 'cancelled'].includes(order.status);
-
-                  return canReassign && (
-                    <div>
-                      <label className="text-xs font-medium text-muted-foreground mb-2 block">
-                        Reassign to
-                      </label>
-                      <Select
-                        value=""
-                        onValueChange={handleReassignAgent}
-                      >
-                        <SelectTrigger className="w-full">
-                          <SelectValue placeholder="Select agent" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="unassigned">Unassigned</SelectItem>
-                          {availableAgents.map((agent) => (
-                            <SelectItem key={agent.id} value={String(agent.id)}>
-                              {agent.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      {canReassign && (
+                        <div>
+                          <label className="text-xs font-medium text-muted-foreground mb-2 block">
+                            Reassign to
+                          </label>
+                          <Select
+                            value=""
+                            onValueChange={handleReassignAgent}
+                          >
+                            <SelectTrigger className="w-full">
+                              <SelectValue placeholder="Select agent" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="unassigned">Unassigned</SelectItem>
+                              {availableAgents.map((agent) => (
+                                <SelectItem key={agent.id} value={String(agent.id)}>
+                                  {agent.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
                     </div>
-                  );
-                })()}
-              </div>
+                  </>
+                );
+              })()}
             </div>
 
             {/* Customer */}

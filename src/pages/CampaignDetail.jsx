@@ -588,6 +588,8 @@ export default function CampaignDetail() {
                     <div className="font-semibold text-gray-800 mt-0.5">{new Date(campaign.end_date).toLocaleDateString()}</div>
                   </div>
                   <div>
+                    <div className="text-xs font-semibold text-gray-400 uppercase">Starting Number</div>
+                    <div className="font-semibold text-gray-800 mt-0.5">{campaign.code_type === 'numeric' ? (campaign.starting_number || 1001) : 'N/A (Non-numeric)'}</div>
                   </div>
                   <div>
                     <div className="text-xs font-semibold text-gray-400 uppercase">Max Campaign Redemptions</div>

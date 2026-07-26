@@ -58,6 +58,7 @@ export default function CampaignForm() {
     code_type: 'alphanumeric', // 'alphanumeric', 'numeric', 'alphabetic'
     generation_mode: 'random', // 'random', 'series'
     random_code_length: 7,
+    starting_number: 1001,
     allowed_uses_per_coupon: 1,
     coupon_expiry_date: '',
     coupons_per_customer: 1,
@@ -68,11 +69,13 @@ export default function CampaignForm() {
   const [qtyMode, setQtyMode] = useState('per_combination');
   const [totalQtyInput, setTotalQtyInput] = useState(100);
 
-  // Calculate maximum capacity for series generation
-  const getMaxSeriesCapacity = (codeType, length) => {
+  // Calculate maximum capacity for series generation considering starting number
+  const getMaxSeriesCapacity = (codeType, length, startingNumber) => {
     const len = parseInt(length, 10) || 5;
     if (codeType === 'numeric') {
-      return Math.pow(10, len);
+      const maxVal = Math.pow(10, len);
+      const startNum = parseInt(startingNumber, 10) || 0;
+      return Math.max(0, maxVal - startNum);
     } else if (codeType === 'alphabetic') {
       return Math.pow(26, len);
     } else {
@@ -227,12 +230,14 @@ export default function CampaignForm() {
       const loadedCodeType = camp.code_type || camp.coupon_code_type || configObj.code_type || configObj.coupon_code_type || 'alphanumeric';
       const loadedGenMode = camp.generation_mode || camp.generation_strategy || camp.strategy || configObj.generation_mode || configObj.generation_strategy || configObj.strategy || 'random';
       const loadedCodeLength = parseInt(camp.random_code_length || camp.code_length || camp.length || configObj.random_code_length || configObj.code_length || configObj.length || 7, 10);
+      const loadedStartingNumber = parseInt(camp.starting_number || configObj.starting_number || 1001, 10);
 
       setInitialConfig({
         coupon_code_format: loadedFormat,
         code_type: loadedCodeType,
         generation_mode: loadedGenMode,
         random_code_length: loadedCodeLength,
+        starting_number: loadedStartingNumber,
       });
 
       // Check if all generated coupons are unused (status: created or cancelled)
@@ -262,6 +267,7 @@ export default function CampaignForm() {
         code_type: loadedCodeType,
         generation_mode: loadedGenMode,
         random_code_length: loadedCodeLength,
+        starting_number: loadedStartingNumber,
         allowed_uses_per_coupon: camp.allowed_uses_per_coupon || 1,
         coupon_expiry_date: camp.coupon_expiry_date ? String(camp.coupon_expiry_date).split('T')[0] : '',
         coupons_per_customer: camp.coupons_per_customer || 1,
@@ -281,7 +287,8 @@ export default function CampaignForm() {
       String(formData.coupon_code_format || '') !== String(initialConfig.coupon_code_format || '') ||
       String(formData.code_type || '') !== String(initialConfig.code_type || '') ||
       String(formData.generation_mode || '') !== String(initialConfig.generation_mode || '') ||
-      parseInt(formData.random_code_length, 10) !== parseInt(initialConfig.random_code_length, 10)
+      parseInt(formData.random_code_length, 10) !== parseInt(initialConfig.random_code_length, 10) ||
+      parseInt(formData.starting_number, 10) !== parseInt(initialConfig.starting_number, 10)
     );
   };
 
@@ -325,11 +332,29 @@ export default function CampaignForm() {
       errs.coupons_to_generate = 'Must generate at least 1 coupon';
     }
 
+    // Numeric starting number vs Value length validation check
+    if (formData.code_type === 'numeric') {
+      const startNum = parseInt(formData.starting_number, 10);
+      const len = parseInt(formData.random_code_length, 10) || 7;
+      
+      if (!formData.starting_number || isNaN(startNum) || startNum < 1) {
+        errs.starting_number = 'Starting number must be at least 1';
+      } else {
+        const numDigits = String(startNum).length;
+        if (numDigits > len) {
+          errs.starting_number = `Mismatch: Starting number (${startNum.toLocaleString()}) has ${numDigits} digits, which exceeds selected value length of ${len} char${len > 1 ? 's' : ''}.`;
+          errs.random_code_length = `Value length (${len}) is too short for starting number ${startNum.toLocaleString()} (${numDigits} digits).`;
+        }
+      }
+    }
+
     // Series capacity validation check
-    const maxCap = getMaxSeriesCapacity(formData.code_type, formData.random_code_length);
-    if (!isEditMode && formData.generation_mode === 'series' && formData.coupons_to_generate > maxCap) {
-      errs.coupons_to_generate = `Exceeds max series capacity. For ${formData.code_type} series of length ${formData.random_code_length}, max capacity is ${maxCap.toLocaleString()} codes.`;
-      errs.random_code_length = `Max capacity for length ${formData.random_code_length} is ${maxCap.toLocaleString()}. Increase length or switch to Random mode.`;
+    const maxCap = getMaxSeriesCapacity(formData.code_type, formData.random_code_length, formData.starting_number);
+    if (!isEditMode && formData.coupons_to_generate > maxCap) {
+      errs.coupons_to_generate = `Exceeds max capacity (${maxCap.toLocaleString()} codes) for length ${formData.random_code_length}${formData.code_type === 'numeric' && formData.starting_number ? ` starting at ${formData.starting_number}` : ''}.`;
+      if (!errs.random_code_length) {
+        errs.random_code_length = `Max remaining capacity for length ${formData.random_code_length} is ${maxCap.toLocaleString()} codes. Increase length or switch to Random mode.`;
+      }
     }
 
     if (!formData.coupon_code_format) {
@@ -361,7 +386,7 @@ export default function CampaignForm() {
     try {
       if (isEditMode) {
         if (!canEditConfig) {
-          const { coupons_to_generate, coupon_code_format, random_code_length, code_length, code_type, coupon_code_type, generation_mode, generation_strategy, ...updatePayload } = targetPayload;
+          const { coupons_to_generate, coupon_code_format, random_code_length, code_length, code_type, coupon_code_type, generation_mode, generation_strategy, starting_number, ...updatePayload } = targetPayload;
           await campaignService.updateCampaign(id, updatePayload);
         } else {
           const { coupons_to_generate, ...updatePayload } = targetPayload;
@@ -373,6 +398,7 @@ export default function CampaignForm() {
             generation_strategy: targetPayload.generation_mode,
             random_code_length: parseInt(targetPayload.random_code_length, 10),
             code_length: parseInt(targetPayload.random_code_length, 10),
+            starting_number: targetPayload.code_type === 'numeric' && targetPayload.starting_number ? parseInt(targetPayload.starting_number, 10) : null,
             regenerate_unused_coupons: shouldRegenerate,
           });
         }
@@ -383,6 +409,7 @@ export default function CampaignForm() {
           coupon_code_type: targetPayload.code_type,
           generation_strategy: targetPayload.generation_mode,
           code_length: parseInt(targetPayload.random_code_length, 10),
+          starting_number: targetPayload.code_type === 'numeric' && targetPayload.starting_number ? parseInt(targetPayload.starting_number, 10) : null,
         });
         toast.success('Campaign created and coupons generated successfully');
       }
@@ -432,12 +459,12 @@ export default function CampaignForm() {
 
     let sampleVal = '';
     const len = formData.random_code_length || 7;
+    const startNum = parseInt(formData.starting_number, 10) || 1001;
     if (formData.generation_mode === 'series') {
-      const startNum = Math.pow(10, Math.max(1, len - 1)) + 1;
-      sampleVal = String(startNum);
+      sampleVal = String(startNum).padStart(len, '0');
     } else {
       if (formData.code_type === 'numeric') {
-        sampleVal = '8392014567'.slice(0, len).padEnd(len, '9');
+        sampleVal = String(startNum).padStart(len, '0');
       } else if (formData.code_type === 'alphabetic') {
         sampleVal = 'KWMXPTQABZ'.slice(0, len).padEnd(len, 'X');
       } else {
@@ -754,7 +781,7 @@ export default function CampaignForm() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="space-y-1">
                     <Label htmlFor="generation_mode">Generation Strategy</Label>
                     <select
@@ -772,10 +799,35 @@ export default function CampaignForm() {
                       {formData.code_type !== 'numeric'
                         ? 'Sequential series is only available for Numeric code type. Random mode enabled.'
                         : formData.generation_mode === 'series'
-                          ? 'Series numbers start with 1 on the left (e.g. 101, 1001, 10001). Re-generating batches continues the sequence.'
+                          ? 'Series numbers start with starting number. Re-generating batches continues the sequence.'
                           : 'Choose between random codes or sequential series numbering.'
                       }
                     </p>
+                  </div>
+
+                  <div className="space-y-1">
+                    <Label htmlFor="starting_number" className={`text-sm ${formData.code_type !== 'numeric' ? 'text-gray-400' : ''}`}>
+                      Starting Number {formData.code_type === 'numeric' ? '*' : ''}
+                    </Label>
+                    <Input
+                      id="starting_number"
+                      type="number"
+                      min="1"
+                      value={formData.starting_number}
+                      onChange={(e) => handleInputChange('starting_number', e.target.value ? parseInt(e.target.value, 10) : '')}
+                      placeholder={formData.code_type === 'numeric' ? 'e.g. 1001' : 'Numeric type only'}
+                      disabled={formData.code_type !== 'numeric' || (isEditMode && !canEditConfig)}
+                      className={formData.code_type !== 'numeric' ? 'bg-gray-100 text-gray-400 cursor-not-allowed border-gray-200' : ''}
+                    />
+                    {errors.starting_number && formData.code_type === 'numeric' ? (
+                      <p className="text-xs text-red-500 font-semibold">{errors.starting_number}</p>
+                    ) : (
+                      <p className="text-[10px] text-gray-400">
+                        {formData.code_type === 'numeric'
+                          ? `Initial number. Remaining capacity for length ${formData.random_code_length}: ${getMaxSeriesCapacity('numeric', formData.random_code_length, formData.starting_number).toLocaleString()} codes.`
+                          : 'Only enabled when Coupon Code Type is set to Numeric.'}
+                      </p>
+                    )}
                   </div>
 
                   <div className="space-y-1">
@@ -799,7 +851,7 @@ export default function CampaignForm() {
                       <p className="text-xs text-red-500 font-semibold">{errors.random_code_length}</p>
                     ) : (
                       <p className="text-[10px] text-gray-400">
-                        Max Series Capacity ({formData.code_type}): <span className="font-semibold text-gray-700">{getMaxSeriesCapacity(formData.code_type, formData.random_code_length).toLocaleString()}</span> codes.
+                        Max Capacity ({formData.code_type}): <span className="font-semibold text-gray-700">{getMaxSeriesCapacity(formData.code_type, formData.random_code_length, formData.starting_number).toLocaleString()}</span> codes.
                       </p>
                     )}
                   </div>
