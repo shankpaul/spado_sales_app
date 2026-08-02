@@ -59,6 +59,8 @@ import {
   AlertCircle,
   TrendingDown,
   ChartPie,
+  Car,
+  MapPin,
 } from 'lucide-react';
 import { format, parseISO, differenceInDays, eachDayOfInterval, eachWeekOfInterval, eachMonthOfInterval, startOfWeek, startOfMonth, endOfWeek, endOfMonth } from 'date-fns';
 import { getStatusLabel, getStatusColor, ORDER_STATUSES, PAYMENT_STATUSES } from '../lib/constants';
@@ -93,7 +95,7 @@ const Reports = () => {
     try {
       const response = await employeeService.getAllEmployees({ status: 'active', per_page: 1000 });
       setEmployees(response.employees || response || []);
-    } catch (_) {}
+    } catch (_) { }
   };
 
   // Fetch EOD Reports
@@ -156,6 +158,11 @@ const Reports = () => {
       currency: 'INR',
       minimumFractionDigits: 0,
     }).format(amount);
+  };
+
+  const formatCardNumber = (value) => {
+    const num = Number(value || 0);
+    return num % 1 === 0 ? num.toFixed(0) : num.toFixed(2);
   };
 
   const formatHoursWorked = (hours) => {
@@ -331,6 +338,8 @@ const Reports = () => {
       'Status': getStatusLabel(order.status),
       'Payment Status': order.payment_status,
       'Payment Type': order.payment_method || '',
+      'Distance (km)': order.travelled_distance,
+      'TA Amount': order.travel_allowance,
       'Subtotal': order.subtotal_amount,
       'Total': order.total_amount,
       'GST': order.gst_amount,
@@ -351,6 +360,8 @@ const Reports = () => {
       'Status': '',
       'Payment Status': '',
       'Payment Type': '',
+      'Distance (km)': reportData.summary.total_travelled_distance,
+      'TA Amount': reportData.summary.total_travel_allowance,
       'Subtotal': '',
       'Total': reportData.summary.total_amount,
       'GST': reportData.summary.gst_amount,
@@ -702,7 +713,7 @@ const Reports = () => {
 
       {/* Summary Cards */}
       {reportData && reportData.summary && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-8 gap-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Total Orders</CardTitle>
@@ -720,7 +731,7 @@ const Reports = () => {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                ₹{reportData.summary.total_amount.toFixed(2)}
+                ₹{formatCardNumber(reportData.summary.total_amount)}
               </div>
             </CardContent>
           </Card>
@@ -732,7 +743,7 @@ const Reports = () => {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                ₹{reportData.summary.gst_amount.toFixed(2)}
+                ₹{formatCardNumber(reportData.summary.gst_amount)}
               </div>
             </CardContent>
           </Card>
@@ -744,7 +755,7 @@ const Reports = () => {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-green-600">
-                ₹{reportData.summary.profit.toFixed(2)}
+                ₹{formatCardNumber(reportData.summary.profit)}
               </div>
             </CardContent>
           </Card>
@@ -756,7 +767,7 @@ const Reports = () => {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                ₹{reportData.summary.total_agent_incentive.toFixed(2)}
+                ₹{formatCardNumber(reportData.summary.total_agent_incentive)}
               </div>
             </CardContent>
           </Card>
@@ -768,7 +779,31 @@ const Reports = () => {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-yellow-600">
-                ₹{reportData.summary.total_five_star_incentive.toFixed(2)}
+                ₹{formatCardNumber(reportData.summary.total_five_star_incentive)}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Distance</CardTitle>
+              <MapPin className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                {formatCardNumber(reportData.summary.total_travelled_distance)} km
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total TA Amount</CardTitle>
+              <Car className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-blue-600">
+                ₹{formatCardNumber(reportData.summary.total_travel_allowance)}
               </div>
             </CardContent>
           </Card>
@@ -797,7 +832,7 @@ const Reports = () => {
               </CardHeader>
               <CardContent>
                 <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
+                  <table className="w-full text-sm whitespace-nowrap">
                     <thead>
                       <tr className="border-b">
                         <th className="text-left p-2">Order #</th>
@@ -805,7 +840,9 @@ const Reports = () => {
                         <th className="text-left p-2">Booking Date</th>
                         <th className="text-left p-2">Status</th>
                         <th className="text-left p-2">Payment</th>
-                        <th className="text-left p-2">Payment Type</th>
+                        <th className="text-left p-2">Type</th>
+                        <th className="text-right p-2">Distance</th>
+                        <th className="text-right p-2">TA Amount</th>
                         <th className="text-right p-2">Subtotal</th>
                         <th className="text-right p-2">Total</th>
                         <th className="text-right p-2">GST</th>
@@ -847,6 +884,12 @@ const Reports = () => {
                             ) : (
                               <span className="text-muted-foreground">-</span>
                             )}
+                          </td>
+                          <td className="text-right p-2 font-medium">
+                            {order.travelled_distance !== undefined && order.travelled_distance !== null ? `${order.travelled_distance.toFixed(2)} km` : '0.00 km'}
+                          </td>
+                          <td className="text-right p-2 font-medium text-slate-700">
+                            {order.travel_allowance !== undefined && order.travel_allowance !== null ? `₹${order.travel_allowance.toFixed(2)}` : '₹0.00'}
                           </td>
                           <td className="text-right p-2">₹{order.subtotal_amount.toFixed(2)}</td>
                           <td className="text-right p-2 font-medium">
@@ -1490,8 +1533,8 @@ const Reports = () => {
                 />
               </div>
               {(eodEmployeeFilter !== 'all' || eodStartDate || eodEndDate) && (
-                <Button 
-                  variant="ghost" 
+                <Button
+                  variant="ghost"
                   onClick={() => {
                     setEodEmployeeFilter('all');
                     setEodStartDate('');
