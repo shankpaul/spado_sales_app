@@ -330,6 +330,7 @@ const Reports = () => {
       'Booking Date': format(parseISO(order.booking_date), 'yyyy-MM-dd'),
       'Status': getStatusLabel(order.status),
       'Payment Status': order.payment_status,
+      'Payment Type': order.payment_method || '',
       'Subtotal': order.subtotal_amount,
       'Total': order.total_amount,
       'GST': order.gst_amount,
@@ -349,6 +350,7 @@ const Reports = () => {
       'Booking Date': '',
       'Status': '',
       'Payment Status': '',
+      'Payment Type': '',
       'Subtotal': '',
       'Total': reportData.summary.total_amount,
       'GST': reportData.summary.gst_amount,
@@ -803,6 +805,7 @@ const Reports = () => {
                         <th className="text-left p-2">Booking Date</th>
                         <th className="text-left p-2">Status</th>
                         <th className="text-left p-2">Payment</th>
+                        <th className="text-left p-2">Payment Type</th>
                         <th className="text-right p-2">Subtotal</th>
                         <th className="text-right p-2">Total</th>
                         <th className="text-right p-2">GST</th>
@@ -837,6 +840,13 @@ const Reports = () => {
                             <Badge2 variant={order.payment_status === 'paid' ? 'success' : 'warning'}>
                               {order.payment_status}
                             </Badge2>
+                          </td>
+                          <td className="p-2">
+                            {order.payment_method ? (
+                              <span className="capitalize">{order.payment_method.replace('_', ' ')}</span>
+                            ) : (
+                              <span className="text-muted-foreground">-</span>
+                            )}
                           </td>
                           <td className="text-right p-2">₹{order.subtotal_amount.toFixed(2)}</td>
                           <td className="text-right p-2 font-medium">

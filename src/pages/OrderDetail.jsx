@@ -638,13 +638,13 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
         rating: feedbackRating,
         comments: feedbackComment
       });
-      toast.success('Feedback submitted successfully');
+      toast.success('Customer feedback saved successfully');
       setIsFeedbackDialogOpen(false);
       setFeedbackRating(0);
       setFeedbackComment('');
       await fetchOrderDetails(true); // Pass true to trigger onUpdate
     } catch (error) {
-      toast.error('Failed to submit feedback');
+      toast.error('Failed to save customer feedback');
     } finally {
       setSubmittingFeedback(false);
     }
@@ -1203,7 +1203,7 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
                     className="flex-1 gap-1.5 bg-blue-600 hover:bg-blue-700 text-white"
                   >
                     <MessageSquare className="h-4 w-4" />
-                    Add Feedback
+                    Collect Customer Feedback
                   </Button>
                 )}
               </div>
@@ -1963,7 +1963,7 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
             {(order.rating || order.feedback_comments) && (
               <div className="border rounded-lg">
                 <div className="p-4 border-b">
-                  <h3 className="font-semibold">Customer Feedback</h3>
+                  <h3 className="font-semibold">Customer Feedback & Rating</h3>
                 </div>
 
                 <div className="p-4 space-y-4">
@@ -1998,7 +1998,7 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
 
                   {order.feedback_submitted_at && (
                     <div className="text-xs text-muted-foreground pt-2 border-t">
-                      Submitted on {formatDateTime(order.feedback_submitted_at)}
+                      Feedback collected on {formatDateTime(order.feedback_submitted_at)}
                     </div>
                   )}
                 </div>
@@ -2909,15 +2909,15 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
       <AlertDialog open={isFeedbackViewOpen} onOpenChange={setIsFeedbackViewOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Customer Feedback</AlertDialogTitle>
+            <AlertDialogTitle>Customer Feedback & Rating</AlertDialogTitle>
             <AlertDialogDescription>
-              Feedback submitted for this order
+              Recorded customer feedback and rating for this order
             </AlertDialogDescription>
           </AlertDialogHeader>
 
           <div className="space-y-4 py-4">
             <div>
-              <label className="text-sm font-medium mb-2 block">Rating</label>
+              <label className="text-sm font-medium mb-2 block">Customer Rating</label>
               <div className="flex items-center gap-1">
                 {[1, 2, 3, 4, 5].map((star) => (
                   <Star
@@ -2935,7 +2935,7 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
             </div>
 
             <div>
-              <label className="text-sm font-medium mb-2 block">Comments</label>
+              <label className="text-sm font-medium mb-2 block">Customer Comments</label>
               <div className="bg-gray-50 rounded-lg p-4 border text-sm">
                 {order.feedback_comments || 'No comments provided'}
               </div>
@@ -2943,7 +2943,7 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
 
             {order.feedback_submitted_at && (
               <div className="text-xs text-muted-foreground">
-                Submitted on {formatDateTime(order.feedback_submitted_at)}
+                Feedback collected on {formatDateTime(order.feedback_submitted_at)}
               </div>
             )}
 
@@ -2993,15 +2993,15 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
       <AlertDialog open={isFeedbackDialogOpen} onOpenChange={setIsFeedbackDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Submit Feedback</AlertDialogTitle>
+            <AlertDialogTitle>Record Customer Feedback & Rating</AlertDialogTitle>
             <AlertDialogDescription>
-              Please share your experience with this service order.
+              Record the customer's rating and feedback collected during or after service completion for {order.customer?.name || 'this customer'}.
             </AlertDialogDescription>
           </AlertDialogHeader>
 
           <div className="space-y-4 py-4">
             <div>
-              <label className="text-sm font-medium mb-3 block">Rating *</label>
+              <label className="text-sm font-semibold text-gray-800 mb-3 block">Customer Star Rating *</label>
               <div
                 className="flex gap-2 justify-center"
                 onMouseLeave={() => setHoveredRating(0)}
@@ -3024,16 +3024,16 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
                 ))}
               </div>
               <p className="text-xs text-muted-foreground mt-3 text-center">
-                Click to rate from 1 (Poor) to 5 (Excellent)
+                Select the rating (1 to 5 stars) given by the customer for this service
               </p>
             </div>
 
             <div>
-              <label className="text-sm font-medium mb-2 block">Feedback (Optional)</label>
+              <label className="text-sm font-semibold text-gray-800 mb-2 block">Customer Feedback & Remarks (Optional)</label>
               <Textarea
                 value={feedbackComment}
                 onChange={(e) => setFeedbackComment(e.target.value)}
-                placeholder="Add customer feedback about the service quality, agent, timeliness, etc... (Optional)"
+                placeholder="Enter customer's feedback, comments, or remarks regarding service quality, agent behavior, cleanliness, timeliness, etc..."
                 rows={4}
                 className="resize-none"
               />
@@ -3081,7 +3081,7 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
               className="bg-blue-600 hover:bg-blue-700"
             >
               {submittingFeedback && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-              Submit Feedback
+              Save Customer Feedback
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
