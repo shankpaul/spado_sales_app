@@ -33,6 +33,10 @@ const CampaignForm = lazy(() => import('./pages/CampaignForm'));
 const CampaignDetail = lazy(() => import('./pages/CampaignDetail'));
 const CampaignDashboard = lazy(() => import('./pages/CampaignDashboard'));
 const ValidateCoupon = lazy(() => import('./pages/ValidateCoupon'));
+const EmployeeWallet = lazy(() => import('./pages/EmployeeWallet'));
+const AllWallets = lazy(() => import('./pages/AllWallets'));
+const Settlements = lazy(() => import('./pages/Settlements'));
+const CashReconciliation = lazy(() => import('./pages/CashReconciliation'));
 
 // Loading fallback component
 const LoadingFallback = () => (
@@ -355,14 +359,55 @@ function App() {
           />
 
           <Route
-            path="/transactions"
+            path="/wallet"
             element={
               <ProtectedRoute allowedRoles={['admin', 'accountant']}>
                 <Layout>
-                  <div className="text-center py-12">
-                    <h2 className="text-2xl font-bold text-gray-900 mb-2">Transactions</h2>
-                    <p className="text-gray-600">Transactions page coming soon...</p>
-                  </div>
+                  <EmployeeWallet />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/wallets"
+            element={
+              <ProtectedRoute allowedRoles={['admin', 'accountant']}>
+                <Layout>
+                  <AllWallets />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/all-wallets"
+            element={
+              <ProtectedRoute allowedRoles={['admin', 'accountant']}>
+                <Layout>
+                  <AllWallets />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/settlements"
+            element={
+              <ProtectedRoute allowedRoles={['admin', 'accountant']}>
+                <Layout>
+                  <Settlements />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/cash-reconciliation"
+            element={
+              <ProtectedRoute allowedRoles={['admin', 'accountant']}>
+                <Layout>
+                  <CashReconciliation />
                 </Layout>
               </ProtectedRoute>
             }

@@ -343,6 +343,7 @@ const Employees = () => {
                     <TableHead>Status</TableHead>
                     <TableHead>Scheme</TableHead>
                     <TableHead>Compensation</TableHead>
+                    <TableHead>Settlement Cycle</TableHead>
                     <TableHead>Contact</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
@@ -350,7 +351,7 @@ const Employees = () => {
                 <TableBody>
                   {filteredEmployees.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={6} className="text-center py-8 text-gray-500 bg-white">
+                      <TableCell colSpan={7} className="text-center py-8 text-gray-500 bg-white">
                         No employees found matching the filters.
                       </TableCell>
                     </TableRow>
@@ -405,6 +406,16 @@ const Employees = () => {
                             )}
                             <div className="text-xs text-gray-500">
                               Work: {employee.work_incentive_percentage}% | 5★: {employee.five_star_incentive_percentage}%
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="space-y-1">
+                            <Badge variant="outline" className="uppercase font-mono text-xs bg-slate-50 border-slate-200">
+                              {employee.settlement_cycle || 'monthly'}
+                            </Badge>
+                            <div className="text-xs text-gray-500">
+                              Last: {employee.last_settlement_at ? new Date(employee.last_settlement_at).toLocaleDateString('en-IN') : 'Never'}
                             </div>
                           </div>
                         </TableCell>
