@@ -39,6 +39,9 @@ import {
   Package,
   Layers,
   ShieldCheck,
+  Wallet,
+  CheckCircle2,
+  Building2,
 } from 'lucide-react';
 import usePWAInstall from '../hooks/usePWAInstall';
 import Logo from './Logo';
@@ -153,6 +156,15 @@ const Layout = ({ children }) => {
           ]
         },
         {
+          title: 'Finance & Wallet',
+          items: [
+            { name: 'All Wallets', href: '/wallets', icon: Wallet },
+            { name: 'Wallet Ledger', href: '/wallet', icon: DollarSign },
+            { name: 'Settlements', href: '/settlements', icon: CheckCircle2 },
+            { name: 'Cash Reconciliation', href: '/cash-reconciliation', icon: Building2 }
+          ]
+        },
+        {
           title: 'User Management',
           items: [
             { name: 'System Users', href: '/users', icon: UserCircle },
@@ -197,10 +209,11 @@ const Layout = ({ children }) => {
         {
           title: 'Finance',
           items: [
-            { name: 'Transactions', href: '/transactions', icon: DollarSign },
-            { name: 'Reports', href: '/reports', icon: BarChart3 },
-            { name: 'Invoices', href: '/invoices', icon: ClipboardList },
-            { name: 'Payments', href: '/payments', icon: DollarSign }
+            { name: 'All Wallets', href: '/wallets', icon: Wallet },
+            { name: 'Wallet Ledger', href: '/wallet', icon: DollarSign },
+            { name: 'Settlements', href: '/settlements', icon: CheckCircle2 },
+            { name: 'Cash Reconciliation', href: '/cash-reconciliation', icon: Building2 },
+            { name: 'Reports', href: '/reports', icon: BarChart3 }
           ]
         }
       ]

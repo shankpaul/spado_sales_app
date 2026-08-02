@@ -32,6 +32,7 @@ const EmployeeForm = ({ employee, onSubmit, onCancel }) => {
     contact_number: '',
     status: 'active',
     monthly_target_amount: '',
+    settlement_cycle: 'monthly',
   });
 
   const [errors, setErrors] = useState({});
@@ -53,6 +54,7 @@ const EmployeeForm = ({ employee, onSubmit, onCancel }) => {
         contact_number: employee.contact_number || '',
         status: employee.status || 'active',
         monthly_target_amount: employee.monthly_target_amount || '',
+        settlement_cycle: employee.settlement_cycle || 'monthly',
       });
     }
   }, [employee]);
@@ -303,6 +305,24 @@ const EmployeeForm = ({ employee, onSubmit, onCancel }) => {
           </SelectContent>
         </Select>
         {errors.scheme && <p className="text-sm text-red-500">{errors.scheme}</p>}
+      </div>
+
+      {/* Settlement Cycle */}
+      <div className="space-y-2">
+        <Label htmlFor="settlement_cycle">Settlement Payout Cycle</Label>
+        <Select
+          value={formData.settlement_cycle}
+          onValueChange={(val) => setFormData(prev => ({ ...prev, settlement_cycle: val }))}
+        >
+          <SelectTrigger id="settlement_cycle">
+            <SelectValue placeholder="Select cycle" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="daily">Daily</SelectItem>
+            <SelectItem value="weekly">Weekly</SelectItem>
+            <SelectItem value="monthly">Monthly</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
       {/* Fixed Salary (only for salary scheme) */}
