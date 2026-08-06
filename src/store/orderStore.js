@@ -130,16 +130,16 @@ const useOrderStore = create((set, get) => ({
   fetchOrders: async (reset = false) => {
     const state = get();
 
+    const targetPage = reset ? 1 : state.page + 1;
+
     if (reset) {
       set({ page: 1, orders: [], hasMore: true });
     }
 
-    const currentPage = reset ? 1 : state.page;
-
     set({ isLoading: true, error: null });
     try {
       const params = {
-        page: currentPage,
+        page: targetPage,
         per_page: state.perPage,
         ...state.filters,
       };
@@ -153,14 +153,16 @@ const useOrderStore = create((set, get) => ({
 
       const response = await orderService.getAllOrders(params);
       const newOrders = response.orders || [];
+      const totalCount = response.total ?? response.total_count ?? response.pagination?.total_count ?? 0;
+      const totalPages = response.total_pages ?? response.pagination?.total_pages ?? (totalCount > 0 ? Math.ceil(totalCount / state.perPage) : 1);
 
       set({
         orders: reset ? newOrders : [...state.orders, ...newOrders],
-        hasMore: newOrders.length === state.perPage,
-        page: currentPage + 1,
+        hasMore: targetPage < totalPages,
+        page: targetPage,
         isLoading: false,
-        totalPages: response.pagination?.total_pages || 1,
-        totalCount: response.pagination?.total_count || 0,
+        totalPages,
+        totalCount,
       });
     } catch (error) {
       set({ error: error.message, isLoading: false });
@@ -190,14 +192,16 @@ const useOrderStore = create((set, get) => ({
 
       const response = await orderService.getAllOrders(params);
       const newOrders = response.orders || [];
+      const totalCount = response.total ?? response.total_count ?? response.pagination?.total_count ?? 0;
+      const totalPages = response.total_pages ?? response.pagination?.total_pages ?? (totalCount > 0 ? Math.ceil(totalCount / state.perPage) : 1);
 
       set({
         orders: newOrders,
         page: pageNumber,
-        hasMore: pageNumber < (response.pagination?.total_pages || 1),
+        hasMore: pageNumber < totalPages,
         isLoading: false,
-        totalPages: response.pagination?.total_pages || 1,
-        totalCount: response.pagination?.total_count || 0,
+        totalPages,
+        totalCount,
       });
     } catch (error) {
       set({ error: error.message, isLoading: false });

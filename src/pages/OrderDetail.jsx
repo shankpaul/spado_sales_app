@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
+import useAuthStore from '../store/authStore';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Card } from '../components/ui/card';
@@ -132,6 +133,7 @@ import ablyClient from '../services/ablyClient';
  * Real-time updates via Ably WebSocket for live order changes
  */
 const OrderDetail = ({ orderId, onClose, onUpdate }) => {
+  const user = useAuthStore((state) => state.user);
   // Use orderId prop instead of route params, but keep useParams as fallback for direct route access
   const routeParams = useParams();
   const id = orderId || routeParams.id;
@@ -721,7 +723,7 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
 
               {/* Tabs Skeleton */}
               <div className="space-y-4">
-                <div className="flex gap-2 border-b">
+                <div className="flex gap-2">
                   <Skeleton className="h-10 w-24" />
                   <Skeleton className="h-10 w-24" />
                   <Skeleton className="h-10 w-24" />
@@ -810,7 +812,8 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
     );
   }
 
-  const isEditable = order.status !== 'completed' && order.status !== 'cancelled';
+  const isAdmin = user?.role === 'admin';
+  const isEditable = isAdmin || (order.status !== 'completed' && order.status !== 'cancelled');
 
   // Get order status progress
   const getOrderProgress = () => {
@@ -1187,14 +1190,16 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
                         Complete Order
                       </Button>
                     )}
-                    <Button
-                      variant="destructive"
-                      onClick={() => setIsCancelDialogOpen(true)}
-                      className="flex-1 gap-1.5"
-                    >
-                      <Ban className="h-4 w-4" />
-                      Cancel
-                    </Button>
+                    {(order.status != 'completed') && (
+                      <Button
+                        variant="destructive"
+                        onClick={() => setIsCancelDialogOpen(true)}
+                        className="flex-1 gap-1.5"
+                      >
+                        <Ban className="h-4 w-4" />
+                        Cancel
+                      </Button>
+                    )}
                   </>
                 )}
                 {order.status === 'completed' && !order.feedback_submitted_at && (

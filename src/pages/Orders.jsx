@@ -18,6 +18,7 @@ import OrderWizard from '../components/OrderWizard';
 import OrderDetail from './OrderDetail';
 import {
   ORDER_STATUSES,
+  SELECTABLE_ORDER_STATUSES,
   PAYMENT_STATUSES,
   getStatusColor,
   getStatusLabel,
@@ -110,8 +111,10 @@ const Orders = () => {
         let isToday = false;
         try {
           const dateObj = new Date(dateKey);
-          const today = format(new Date(), 'yyyy-MM-dd');
-          const yesterday = format(new Date(Date.now() - 86400000), 'yyyy-MM-dd');
+          const now = new Date();
+          const today = format(now, 'yyyy-MM-dd');
+          const yesterdayDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+          const yesterday = format(yesterdayDate, 'yyyy-MM-dd');
           if (dateKey === today) {
             displayTitle = 'Today';
             isToday = true;
@@ -350,7 +353,7 @@ const Orders = () => {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Statuses</SelectItem>
-              {ORDER_STATUSES.map((s) => (
+              {SELECTABLE_ORDER_STATUSES.map((s) => (
                 <SelectItem key={s.value} value={s.value}>
                   {s.label}
                 </SelectItem>
@@ -903,80 +906,82 @@ const Orders = () => {
       </Card>
 
       {/* Desktop Pagination with Page Numbers */}
-      {!isMobile && totalPages > 1 && (
-        <div className="flex items-center justify-between">
-          <p className="text-sm text-muted-foreground">
+      {!isMobile && totalCount > 0 && (
+        <div className="flex items-center justify-between mt-4 bg-white p-4 rounded-xl border border-gray-100 shadow-xs">
+          <p className="text-sm text-muted-foreground font-medium">
             Showing {Math.min((storePage - 1) * perPage + 1, totalCount)} to {Math.min(storePage * perPage, totalCount)} of {totalCount} orders
           </p>
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => fetchPage(Math.max(1, storePage - 1))}
-              disabled={storePage === 1 || loading}
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
+          {totalPages > 1 && (
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => fetchPage(Math.max(1, storePage - 1))}
+                disabled={storePage === 1 || loading}
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
 
-            {/* Page numbers */}
-            <div className="flex gap-1">
-              {/* First page */}
-              {storePage > 3 && (
-                <>
-                  <Button
-                    variant={storePage === 1 ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => fetchPage(1)}
-                    className="min-w-[40px]"
-                  >
-                    1
-                  </Button>
-                  {storePage > 4 && <span className="px-2 flex items-center text-muted-foreground">...</span>}
-                </>
-              )}
+              {/* Page numbers */}
+              <div className="flex gap-1">
+                {/* First page */}
+                {storePage > 3 && (
+                  <>
+                    <Button
+                      variant={storePage === 1 ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => fetchPage(1)}
+                      className="min-w-[40px]"
+                    >
+                      1
+                    </Button>
+                    {storePage > 4 && <span className="px-2 flex items-center text-muted-foreground">...</span>}
+                  </>
+                )}
 
-              {/* Pages around current */}
-              {Array.from({ length: totalPages }, (_, i) => i + 1)
-                .filter(p => p === storePage || p === storePage - 1 || p === storePage + 1 || p === storePage - 2 || p === storePage + 2)
-                .filter(p => p > 0 && p <= totalPages)
-                .map(p => (
-                  <Button
-                    key={p}
-                    variant={storePage === p ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => fetchPage(p)}
-                    disabled={loading}
-                    className="min-w-[40px]"
-                  >
-                    {p}
-                  </Button>
-                ))}
+                {/* Pages around current */}
+                {Array.from({ length: totalPages }, (_, i) => i + 1)
+                  .filter(p => p === storePage || p === storePage - 1 || p === storePage + 1 || p === storePage - 2 || p === storePage + 2)
+                  .filter(p => p > 0 && p <= totalPages)
+                  .map(p => (
+                    <Button
+                      key={p}
+                      variant={storePage === p ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => fetchPage(p)}
+                      disabled={loading}
+                      className="min-w-[40px]"
+                    >
+                      {p}
+                    </Button>
+                  ))}
 
-              {/* Last page */}
-              {storePage < totalPages - 2 && (
-                <>
-                  {storePage < totalPages - 3 && <span className="px-2 flex items-center text-muted-foreground">...</span>}
-                  <Button
-                    variant={storePage === totalPages ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => fetchPage(totalPages)}
-                    className="min-w-[40px]"
-                  >
-                    {totalPages}
-                  </Button>
-                </>
-              )}
+                {/* Last page */}
+                {storePage < totalPages - 2 && (
+                  <>
+                    {storePage < totalPages - 3 && <span className="px-2 flex items-center text-muted-foreground">...</span>}
+                    <Button
+                      variant={storePage === totalPages ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => fetchPage(totalPages)}
+                      className="min-w-[40px]"
+                    >
+                      {totalPages}
+                    </Button>
+                  </>
+                )}
+              </div>
+
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => fetchPage(Math.min(totalPages, storePage + 1))}
+                disabled={storePage === totalPages || loading}
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
             </div>
-
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => fetchPage(Math.min(totalPages, storePage + 1))}
-              disabled={storePage === totalPages || loading}
-            >
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-          </div>
+          )}
         </div>
       )}
 

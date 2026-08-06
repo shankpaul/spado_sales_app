@@ -63,7 +63,7 @@ import {
   MapPin,
 } from 'lucide-react';
 import { format, parseISO, differenceInDays, eachDayOfInterval, eachWeekOfInterval, eachMonthOfInterval, startOfWeek, startOfMonth, endOfWeek, endOfMonth } from 'date-fns';
-import { getStatusLabel, getStatusColor, ORDER_STATUSES, PAYMENT_STATUSES } from '../lib/constants';
+import { getStatusLabel, getStatusColor, ORDER_STATUSES, SELECTABLE_ORDER_STATUSES, PAYMENT_STATUSES } from '../lib/constants';
 import { Badge2 } from '../components/ui/badge2';
 import apiClient from '../services/apiClient';
 import useAuthStore from '../store/authStore';
@@ -649,7 +649,7 @@ const Reports = () => {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Statuses</SelectItem>
-                  {ORDER_STATUSES.map((status) => (
+                  {SELECTABLE_ORDER_STATUSES.map((status) => (
                     <SelectItem key={status.value} value={status.value}>
                       {status.label}
                     </SelectItem>

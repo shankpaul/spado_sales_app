@@ -22,7 +22,20 @@ const orderService = {
    * @param {string} params.order_number - Order number search
    */
   getAllOrders: async (params = {}) => {
-    const response = await apiClient.get('/orders', { params });
+    const queryParams = { ...params };
+    if (queryParams.date_from && !queryParams.start_date) {
+      queryParams.start_date = queryParams.date_from;
+    }
+    if (queryParams.date_to && !queryParams.end_date) {
+      queryParams.end_date = queryParams.date_to;
+    }
+    if (queryParams.start_date && !queryParams.date_from) {
+      queryParams.date_from = queryParams.start_date;
+    }
+    if (queryParams.end_date && !queryParams.date_to) {
+      queryParams.date_to = queryParams.end_date;
+    }
+    const response = await apiClient.get('/orders', { params: queryParams });
     return response.data;
   },
 

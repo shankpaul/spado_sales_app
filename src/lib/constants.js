@@ -114,6 +114,9 @@ export const ORDER_STATUSES = [
   { value: 'in_progress', label: 'In Progress', color: 'amber' },
 ];
 
+// Selectable Order Statuses for dropdowns/options (excluding draft)
+export const SELECTABLE_ORDER_STATUSES = ORDER_STATUSES.filter((s) => s.value !== 'draft');
+
 // Payment Status Constants
 export const PAYMENT_STATUSES = [
   { value: 'pending', label: 'Unpaid', color: 'yellow' },

@@ -139,6 +139,7 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
   const [loadingLoyalty, setLoadingLoyalty] = useState(false);
   const [pointsToRedeem, setPointsToRedeem] = useState('');
   const [maxRedeemablePoints, setMaxRedeemablePoints] = useState(0);
+  const [existingPointsRedeemed, setExistingPointsRedeemed] = useState(0);
 
   // Form refs
   const customerFormRef = useRef(null);
@@ -516,9 +517,10 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
           const newMaxRedeemable = maxRedeemable.data.max_redeemable_points || 0;
           setMaxRedeemablePoints(newMaxRedeemable);
 
-          // If user has already entered points, validate they're still within the new max
-          if (pointsToRedeem && parseInt(pointsToRedeem) > newMaxRedeemable) {
-            setPointsToRedeem(newMaxRedeemable);
+          // If user has already entered points, validate they're within the effective max
+          const effectiveMax = newMaxRedeemable + (existingPointsRedeemed || 0);
+          if (pointsToRedeem && parseInt(pointsToRedeem, 10) > effectiveMax && effectiveMax > 0) {
+            setPointsToRedeem(effectiveMax);
           }
         }
       } catch (error) {
@@ -852,20 +854,52 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
     }
   };
 
-  // Extract time in HH:MM format from datetime string
+  // Extract time in HH:MM format from datetime string or time string
   const extractTimeFromDateTime = (dateTimeString) => {
     if (!dateTimeString) return '';
     try {
-      if (typeof dateTimeString === 'string' && dateTimeString.includes('T')) {
-        const timePart = dateTimeString.split('T')[1];
-        if (timePart && timePart.length >= 5) {
-          return timePart.substring(0, 5);
+      if (typeof dateTimeString === 'string') {
+        const trimmed = dateTimeString.trim();
+        // 1. If string is a time-only string (e.g., "10:30" or "10:30:00")
+        const timeOnlyMatch = trimmed.match(/^(\d{1,2}):(\d{2})(?::\d{2})?$/);
+        if (timeOnlyMatch) {
+          const hours = timeOnlyMatch[1].padStart(2, '0');
+          const minutes = timeOnlyMatch[2];
+          return `${hours}:${minutes}`;
         }
       }
+
+      // 2. Try parsing as a Date object (handles ISO strings with timezone like "2026-08-06T10:30:00+05:30")
       const date = new Date(dateTimeString);
-      const hours = String(date.getHours()).padStart(2, '0');
-      const minutes = String(date.getMinutes()).padStart(2, '0');
-      return `${hours}:${minutes}`;
+      if (!isNaN(date.getTime())) {
+        const hours = String(date.getHours()).padStart(2, '0');
+        const minutes = String(date.getMinutes()).padStart(2, '0');
+        return `${hours}:${minutes}`;
+      }
+
+      // 3. Fallback string parsing for ISO "T" separator
+      if (typeof dateTimeString === 'string' && dateTimeString.includes('T')) {
+        const timePart = dateTimeString.split('T')[1];
+        if (timePart) {
+          const match = timePart.match(/^(\d{1,2}):(\d{2})/);
+          if (match) {
+            return `${match[1].padStart(2, '0')}:${match[2]}`;
+          }
+        }
+      }
+
+      // 4. Fallback string parsing for space separator ("2026-08-06 10:30:00")
+      if (typeof dateTimeString === 'string' && dateTimeString.includes(' ')) {
+        const timePart = dateTimeString.split(' ')[1];
+        if (timePart) {
+          const match = timePart.match(/^(\d{1,2}):(\d{2})/);
+          if (match) {
+            return `${match[1].padStart(2, '0')}:${match[2]}`;
+          }
+        }
+      }
+
+      return '';
     } catch {
       return '';
     }
@@ -875,10 +909,20 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
   const extractDateFromDateTime = (dateTimeString) => {
     if (!dateTimeString) return '';
     try {
-      if (typeof dateTimeString === 'string' && dateTimeString.includes('T')) {
-        return dateTimeString.split('T')[0];
+      if (typeof dateTimeString === 'string') {
+        const trimmed = dateTimeString.trim();
+        if (trimmed.includes('T')) {
+          return trimmed.split('T')[0];
+        }
+        if (trimmed.includes(' ')) {
+          return trimmed.split(' ')[0];
+        }
+        if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+          return trimmed;
+        }
       }
       const date = new Date(dateTimeString);
+      if (isNaN(date.getTime())) return '';
       const year = date.getFullYear();
       const month = String(date.getMonth() + 1).padStart(2, '0');
       const day = String(date.getDate()).padStart(2, '0');
@@ -984,6 +1028,9 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
         // Set redeemed points if any
         if (order.points_redeemed) {
           setPointsToRedeem(order.points_redeemed);
+          setExistingPointsRedeemed(order.points_redeemed);
+        } else {
+          setExistingPointsRedeemed(0);
         }
 
         // Set offer and coupon code if present
@@ -1078,6 +1125,7 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
     setPointsToRedeem('');
     setLoyaltySummary(null);
     setMaxRedeemablePoints(0);
+    setExistingPointsRedeemed(0);
   };
 
   // Close handler
@@ -1320,18 +1368,33 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
     return subtotal - discount;
   };
 
-  // Generate time options in 30-minute intervals
-  const generateTimeOptions = () => {
+  // Generate time options for select dropdown (00:00 to 23:30 in 30-min intervals)
+  const generateTimeOptions = (currentVal = '') => {
     const times = [];
-    for (let hour = 6; hour <= 20; hour++) {
+    for (let hour = 0; hour < 24; hour++) {
       for (let minute of [0, 30]) {
         const timeValue = `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
-        const displayHour = hour === 12 ? 12 : hour > 12 ? hour - 12 : hour;
+        const displayHour = hour === 0 ? 12 : hour === 12 ? 12 : hour > 12 ? hour - 12 : hour;
         const period = hour < 12 ? 'AM' : 'PM';
         const displayTime = `${displayHour}:${String(minute).padStart(2, '0')} ${period}`;
         times.push({ value: timeValue, label: displayTime });
       }
     }
+
+    // If currentVal is provided and not in standard 30-min times, add it as a custom option so Select displays it
+    if (currentVal && !times.some((t) => t.value === currentVal)) {
+      const match = currentVal.match(/^(\d{1,2}):(\d{2})$/);
+      if (match) {
+        const hour = parseInt(match[1], 10);
+        const minute = match[2];
+        const displayHour = hour === 0 ? 12 : hour === 12 ? 12 : hour > 12 ? hour - 12 : hour;
+        const period = hour < 12 ? 'AM' : 'PM';
+        const displayTime = `${displayHour}:${minute} ${period}`;
+        times.push({ value: currentVal, label: displayTime });
+        times.sort((a, b) => a.value.localeCompare(b.value));
+      }
+    }
+
     return times;
   };
 
@@ -1357,7 +1420,7 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
     const subtotalAfterDiscount = Math.max(0, subtotal - offerDiscount);
 
     // Apply loyalty points discount (points_to_redeem is the discount value in rupees)
-    const pointsDiscount = pointsToRedeem || 0;
+    const pointsDiscount = parseFloat(pointsToRedeem) || 0;
     const subtotalAfterPointsDiscount = Math.max(0, subtotalAfterDiscount - pointsDiscount);
 
     const gst = (subtotalAfterPointsDiscount * GST_PERCENTAGE) / 100;
@@ -1528,8 +1591,43 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
       toast.error('Please fix the errors before submitting');
       return;
     }
-    // If no status provided and in edit mode, keep current status
-    const finalStatus = status || orderStatus || 'draft';
+
+    // Validate loyalty points redemption (min points, max points, customer balance)
+    let pointsToRedeemNum = 0;
+    if (pointsToRedeem !== '' && pointsToRedeem !== null && pointsToRedeem !== undefined) {
+      pointsToRedeemNum = parseInt(pointsToRedeem, 10);
+      if (isNaN(pointsToRedeemNum) || pointsToRedeemNum < 0) {
+        toast.error('Please enter a valid loyalty points amount');
+        return;
+      }
+
+      if (pointsToRedeemNum > 0) {
+        const minPoints = loyaltySummary?.min_redeem_points || 100;
+        const effectiveBalance = (loyaltySummary?.current_balance || 0) + (existingPointsRedeemed || 0);
+        const effectiveMax = maxRedeemablePoints + (existingPointsRedeemed || 0);
+
+        if (pointsToRedeemNum < minPoints && pointsToRedeemNum !== existingPointsRedeemed) {
+          toast.error(`Minimum ${minPoints} loyalty points required to redeem`);
+          return;
+        }
+
+        if (loyaltySummary && pointsToRedeemNum > effectiveBalance) {
+          toast.error(`Redeemed points (${pointsToRedeemNum}) exceeds customer available balance (${effectiveBalance} pts)`);
+          return;
+        }
+
+        if (effectiveMax > 0 && pointsToRedeemNum > effectiveMax) {
+          toast.error(`Points to redeem cannot exceed maximum allowed (${effectiveMax} pts)`);
+          return;
+        }
+      }
+    }
+
+    // If in edit mode, preserve existing orderStatus unless explicitly confirming draft/tentative
+    const isEditMode = !!orderId;
+    const finalStatus = isEditMode
+      ? (status || orderStatus || 'confirmed')
+      : (status || 'draft');
     setLoading(true);
     try {
       // Convert time to ISO 8601 datetime format with timezone (RFC3339)
@@ -1548,7 +1646,7 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
         assigned_to_id: selectedAgent && selectedAgent !== 'unassigned' ? parseInt(selectedAgent, 10) : null,
         offer_id: selectedOffer ? parseInt(selectedOffer.id, 10) : null,
         coupon_code: isCouponVerified ? couponCode.trim().toUpperCase() : undefined,
-        points_redeemed: pointsToRedeem || 0,
+        points_redeemed: pointsToRedeem ? (parseInt(pointsToRedeem, 10) || 0) : 0,
         notes,
         packages: packageItems.map((item) => ({
           package_id: parseInt(item.package_id, 10),
@@ -2569,7 +2667,7 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
                   <Label className="text-xs text-muted-foreground font-medium mb-1 block">From *</Label>
                   <Select value={bookingTimeFrom} onValueChange={(value) => {
                     setBookingTimeFrom(value);
-                    if (value) {
+                    if (value && (!bookingTimeTo || value >= bookingTimeTo)) {
                       const [hours, minutes] = value.split(':').map(Number);
                       const fromDate = new Date();
                       fromDate.setHours(hours, minutes);
@@ -2580,7 +2678,7 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
                   }}>
                     <SelectTrigger><SelectValue placeholder="From" /></SelectTrigger>
                     <SelectContent className="max-h-60 overflow-y-auto">
-                      {generateTimeOptions().map((t) => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
+                      {generateTimeOptions(bookingTimeFrom).map((t) => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
                     </SelectContent>
                   </Select>
                   {errors.bookingTimeFrom && <p className="text-xs text-destructive mt-1">{errors.bookingTimeFrom}</p>}
@@ -2590,7 +2688,8 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
                   <Select value={bookingTimeTo} onValueChange={(value) => { setBookingTimeTo(value); saveDraft(); }}>
                     <SelectTrigger><SelectValue placeholder="To" /></SelectTrigger>
                     <SelectContent className="max-h-60 overflow-y-auto">
-                      {generateTimeOptions().filter((time) => {
+                      {generateTimeOptions(bookingTimeTo).filter((time) => {
+                        if (bookingTimeTo && time.value === bookingTimeTo) return true;
                         if (bookingTimeFrom) {
                           const [h, m] = time.value.split(':').map(Number);
                           const [fh, fm] = bookingTimeFrom.split(':').map(Number);
@@ -2863,61 +2962,88 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
                     <Skeleton className="h-9 w-full" />
                   </div>
                 ) : loyaltySummary ? (
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between p-3 rounded-lg bg-blue-50 border border-blue-100">
-                      <div>
-                        <p className="text-xs text-blue-700 font-medium">Available Balance</p>
-                        <p className="text-xl font-bold text-blue-700">{loyaltySummary.current_balance} <span className="text-xs font-normal">pts</span></p>
-                        <p className="text-[11px] text-blue-600/80 mt-0.5">≈ ₹{loyaltySummary.current_value_in_rupees?.toFixed(2)}</p>
-                      </div>
-                      <div className="w-10 h-10 rounded-full bg-blue-200 flex items-center justify-center">
-                        <Coins className="h-5 w-5 text-blue-600" />
-                      </div>
-                    </div>
-                    {maxRedeemablePoints > 0 && loyaltySummary.current_balance >= (loyaltySummary.min_redeem_points || 100) ? (
-                      <div className="space-y-2">
-                        <Label className="text-xs font-semibold text-gray-700">Redeem Points (Min: {loyaltySummary.min_redeem_points})</Label>
-                        <div className="flex gap-2">
-                          <Input
-                            type="number"
-                            min={loyaltySummary.min_redeem_points || 100}
-                            max={maxRedeemablePoints}
-                            value={pointsToRedeem}
-                            onChange={(e) => {
-                              const val = parseInt(e.target.value) || 0;
-                              const minPoints = loyaltySummary.min_redeem_points || 100;
-                              if (val === 0) { setPointsToRedeem(''); return; }
-                              if (val < minPoints) { setPointsToRedeem(minPoints); return; }
-                              if (val > maxRedeemablePoints) { setPointsToRedeem(maxRedeemablePoints); return; }
-                              setPointsToRedeem(val);
-                            }}
-                            onBlur={(e) => {
-                              const val = parseInt(e.target.value) || 0;
-                              const minPoints = loyaltySummary.min_redeem_points || 100;
-                              if (val > 0 && val < minPoints) { setPointsToRedeem(minPoints); }
-                              else if (val === 0) { setPointsToRedeem(''); }
-                            }}
-                            placeholder="Enter points to redeem"
-                            className="flex-1 h-9"
-                            disabled={loyaltySummary.current_balance < (loyaltySummary.min_redeem_points || 100)}
-                          />
-                          <Button type="button" variant="outline" size="sm" onClick={() => setPointsToRedeem(maxRedeemablePoints)} disabled={maxRedeemablePoints === 0}>Max</Button>
-                          {pointsToRedeem > 0 && (
-                            <Button type="button" variant="ghost" size="sm" onClick={() => setPointsToRedeem('')}>Clear</Button>
-                          )}
+                  (() => {
+                    const minPoints = loyaltySummary.min_redeem_points || 100;
+                    const effectiveBalance = (loyaltySummary.current_balance || 0) + (existingPointsRedeemed || 0);
+                    const effectiveMax = maxRedeemablePoints + (existingPointsRedeemed || 0);
+                    const canRedeem = effectiveBalance >= minPoints || existingPointsRedeemed > 0 || (pointsToRedeem && parseInt(pointsToRedeem, 10) > 0);
+
+                    return (
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between p-3 rounded-lg bg-blue-50 border border-blue-100">
+                          <div>
+                            <p className="text-xs text-blue-700 font-medium">Available Balance</p>
+                            <p className="text-xl font-bold text-blue-700">{loyaltySummary.current_balance} <span className="text-xs font-normal">pts</span></p>
+                            {existingPointsRedeemed > 0 && (
+                              <p className="text-[11px] text-blue-800 font-semibold mt-0.5">
+                                ({existingPointsRedeemed} pts redeemed on this order)
+                              </p>
+                            )}
+                            <p className="text-[11px] text-blue-600/80 mt-0.5">≈ ₹{loyaltySummary.current_value_in_rupees?.toFixed(2)}</p>
+                          </div>
+                          <div className="w-10 h-10 rounded-full bg-blue-200 flex items-center justify-center">
+                            <Coins className="h-5 w-5 text-blue-600" />
+                          </div>
                         </div>
-                        {pointsToRedeem > 0 && (
-                          <p className="text-xs text-green-600 font-semibold">−₹{(pointsToRedeem || 0).toFixed(2)} discount applied</p>
+                        {canRedeem ? (
+                          <div className="space-y-2">
+                            <Label className="text-xs font-semibold text-gray-700">Redeem Points (Min: {minPoints})</Label>
+                            <div className="flex gap-2">
+                              <Input
+                                type="number"
+                                value={pointsToRedeem}
+                                onChange={(e) => {
+                                  setPointsToRedeem(e.target.value);
+                                }}
+                                onBlur={(e) => {
+                                  const raw = e.target.value;
+                                  if (raw === '' || raw === '0') {
+                                    setPointsToRedeem('');
+                                    return;
+                                  }
+                                  const val = parseInt(raw, 10);
+                                  if (isNaN(val)) {
+                                    setPointsToRedeem('');
+                                    return;
+                                  }
+                                  const limit = effectiveMax > 0 ? effectiveMax : maxRedeemablePoints;
+                                  if (limit > 0 && val > limit) {
+                                    setPointsToRedeem(limit);
+                                    toast.info(`Max redeemable points for this order is ${limit}`);
+                                  }
+                                }}
+                                placeholder="Enter points to redeem"
+                                className="flex-1 h-9"
+                              />
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setPointsToRedeem(effectiveMax > 0 ? effectiveMax : maxRedeemablePoints)}
+                                disabled={(effectiveMax || maxRedeemablePoints) === 0}
+                              >
+                                Max
+                              </Button>
+                              {pointsToRedeem !== '' && parseFloat(pointsToRedeem) > 0 && (
+                                <Button type="button" variant="ghost" size="sm" onClick={() => setPointsToRedeem('')}>
+                                  Clear
+                                </Button>
+                              )}
+                            </div>
+                            {pointsToRedeem > 0 && (
+                              <p className="text-xs text-green-600 font-semibold">−₹{(parseFloat(pointsToRedeem) || 0).toFixed(2)} discount applied</p>
+                            )}
+                          </div>
+                        ) : (
+                          <p className="text-xs text-muted-foreground">
+                            {effectiveBalance < minPoints
+                              ? `Minimum ${minPoints} pts required. Customer has ${loyaltySummary.current_balance} pts.`
+                              : 'Max redeemable points (50% of order) is 0 for this amount.'}
+                          </p>
                         )}
                       </div>
-                    ) : (
-                      <p className="text-xs text-muted-foreground">
-                        {loyaltySummary.current_balance < (loyaltySummary.min_redeem_points || 100)
-                          ? `Minimum ${loyaltySummary.min_redeem_points || 100} pts required. Customer has ${loyaltySummary.current_balance} pts.`
-                          : 'Max redeemable points (50% of order) is 0 for this amount.'}
-                      </p>
-                    )}
-                  </div>
+                    );
+                  })()
                 ) : (
                   <p className="text-sm text-muted-foreground py-1">No loyalty points available</p>
                 )}
@@ -3256,29 +3382,16 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
                     </Button>
                   ) : orderId ? (
                     // Edit mode buttons
-                    <>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => handleSubmit()}
-                        disabled={loading || loadingOffers || loadingLoyalty}
-                        size="sm"
-                        className="h-10 hidden md:flex"
-                      >
-                        {loading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                        Save
-                      </Button>
-                      <Button
-                        type="button"
-                        onClick={() => handleSubmit('confirmed')}
-                        disabled={loading || loadingOffers || loadingLoyalty}
-                        size="sm"
-                        className="h-10 px-4"
-                      >
-                        {loading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                        {orderStatus === 'draft' || orderStatus === 'tentative' ? 'Confirm' : 'Update'}
-                      </Button>
-                    </>
+                    <Button
+                      type="button"
+                      onClick={() => handleSubmit(orderStatus === 'draft' || orderStatus === 'tentative' ? 'confirmed' : null)}
+                      disabled={loading || loadingOffers || loadingLoyalty}
+                      size="sm"
+                      className="h-10 px-4"
+                    >
+                      {loading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                      {orderStatus === 'draft' || orderStatus === 'tentative' ? 'Confirm' : 'Update'}
+                    </Button>
                   ) : (
                     // Create mode buttons
                     <>
