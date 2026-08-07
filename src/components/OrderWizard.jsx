@@ -37,6 +37,8 @@ import {
   DrawerHeader,
   DrawerTitle,
   DrawerDescription,
+  DrawerFooter,
+  DrawerClose,
 } from './ui/drawer';
 import { Card } from './ui/card';
 import { Skeleton } from './ui/skeleton';
@@ -1368,20 +1370,33 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
     return subtotal - discount;
   };
 
-  // Generate time options for select dropdown (00:00 to 23:30 in 30-min intervals)
+  // Generate time options for select dropdown (6:00 AM to 8:00 PM in 30-min intervals)
   const generateTimeOptions = (currentVal = '') => {
-    const times = [];
-    for (let hour = 0; hour < 24; hour++) {
+    let times = [];
+    const now = new Date();
+    const todayDateStr = extractDateFromDateTime(now);
+    const isToday = !orderId && bookingDate && bookingDate === todayDateStr;
+    const currentTotalMinutes = now.getHours() * 60 + now.getMinutes();
+
+    for (let hour = 6; hour <= 20; hour++) {
       for (let minute of [0, 30]) {
+        if (hour === 20 && minute > 0) continue; // stop at 8:00 PM
+        const optionMinutes = hour * 60 + minute;
+
+        // When creating a new order for today, filter out past time slots
+        if (isToday && optionMinutes < currentTotalMinutes) {
+          continue;
+        }
+
         const timeValue = `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
-        const displayHour = hour === 0 ? 12 : hour === 12 ? 12 : hour > 12 ? hour - 12 : hour;
+        const displayHour = hour === 12 ? 12 : hour > 12 ? hour - 12 : hour;
         const period = hour < 12 ? 'AM' : 'PM';
         const displayTime = `${displayHour}:${String(minute).padStart(2, '0')} ${period}`;
         times.push({ value: timeValue, label: displayTime });
       }
     }
 
-    // If currentVal is provided and not in standard 30-min times, add it as a custom option so Select displays it
+    // If currentVal is provided and not in standard times, add it as a custom option so Select displays it
     if (currentVal && !times.some((t) => t.value === currentVal)) {
       const match = currentVal.match(/^(\d{1,2}):(\d{2})$/);
       if (match) {
@@ -2441,18 +2456,17 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
                       <div className="flex items-end gap-3">
                         <div className="flex-1 min-w-0">
                           <Label className="text-xs text-muted-foreground font-medium mb-1 block">Add-on Service *</Label>
-                          <Select value={item.addon_id} onValueChange={(v) => updateAddonItem(index, 'addon_id', v)} disabled={item.is_reward}>
-                            <SelectTrigger className="h-9 text-sm w-full">
-                              <SelectValue placeholder="Select add-on" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {addons.map((addon) => (
-                                <SelectItem key={addon.id} value={String(addon.id)}>
-                                  {addon.name} — ₹{addon.unit_price || addon.price}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                          <ComboBox
+                            value={item.addon_id}
+                            onValueChange={(v) => updateAddonItem(index, 'addon_id', v)}
+                            options={addons.map((addon) => ({
+                              value: String(addon.id),
+                              label: `${addon.name} — ₹${addon.unit_price || addon.price}`,
+                            }))}
+                            placeholder="Add-on"
+                            disabled={item.is_reward}
+                            className="h-9 text-sm w-full"
+                          />
                         </div>
                         <div className="shrink-0">
                           <Label className="text-xs text-muted-foreground font-medium mb-1 block">Qty</Label>
@@ -2528,18 +2542,17 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
                     return (
                       <tr key={index} className={`hover:bg-secondary/20 transition-colors ${item.is_reward ? 'bg-green-50/50' : ''} ${hasError ? 'bg-destructive/5' : ''}`}>
                         <td className="p-3 align-middle">
-                          <Select value={item.addon_id} onValueChange={(v) => updateAddonItem(index, 'addon_id', v)} disabled={item.is_reward}>
-                            <SelectTrigger className="h-9 w-full border-gray-300 text-sm">
-                              <SelectValue placeholder="Select add-on" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {addons.map((addon) => (
-                                <SelectItem key={addon.id} value={String(addon.id)}>
-                                  {addon.name} — ₹{addon.unit_price || addon.price}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                          <ComboBox
+                            value={item.addon_id}
+                            onValueChange={(v) => updateAddonItem(index, 'addon_id', v)}
+                            options={addons.map((addon) => ({
+                              value: String(addon.id),
+                              label: `${addon.name} — ₹${addon.unit_price || addon.price}`,
+                            }))}
+                            placeholder="Select add-on"
+                            disabled={item.is_reward}
+                            className="h-9 w-full border-gray-300 text-sm"
+                          />
                         </td>
 
                         <td className="p-3 align-middle">
@@ -2658,7 +2671,12 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
                 <Label className="text-xs text-muted-foreground font-medium mb-1 block">Date *</Label>
                 <DatePicker
                   value={bookingDate}
-                  onChange={(value) => { setBookingDate(value); saveDraft(); }}
+                  onChange={(value) => {
+                    setBookingDate(value);
+                    setBookingTimeFrom('');
+                    setBookingTimeTo('');
+                    saveDraft();
+                  }}
                 />
                 {errors.bookingDate && <p className="text-xs text-destructive mt-1">{errors.bookingDate}</p>}
               </div>
@@ -2676,9 +2694,13 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
                     }
                     saveDraft();
                   }}>
-                    <SelectTrigger><SelectValue placeholder="From" /></SelectTrigger>
+                    <SelectTrigger><SelectValue placeholder={generateTimeOptions(bookingTimeFrom).length === 0 ? "No slots available" : "From"} /></SelectTrigger>
                     <SelectContent className="max-h-60 overflow-y-auto">
-                      {generateTimeOptions(bookingTimeFrom).map((t) => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
+                      {generateTimeOptions(bookingTimeFrom).length > 0 ? (
+                        generateTimeOptions(bookingTimeFrom).map((t) => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)
+                      ) : (
+                        <div className="p-3 text-xs text-muted-foreground text-center">No slots available</div>
+                      )}
                     </SelectContent>
                   </Select>
                   {errors.bookingTimeFrom && <p className="text-xs text-destructive mt-1">{errors.bookingTimeFrom}</p>}
@@ -2686,7 +2708,7 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
                 <div>
                   <Label className="text-xs text-muted-foreground font-medium mb-1 block">To *</Label>
                   <Select value={bookingTimeTo} onValueChange={(value) => { setBookingTimeTo(value); saveDraft(); }}>
-                    <SelectTrigger><SelectValue placeholder="To" /></SelectTrigger>
+                    <SelectTrigger><SelectValue placeholder={generateTimeOptions(bookingTimeTo).length === 0 ? "No slots available" : "To"} /></SelectTrigger>
                     <SelectContent className="max-h-60 overflow-y-auto">
                       {generateTimeOptions(bookingTimeTo).filter((time) => {
                         if (bookingTimeTo && time.value === bookingTimeTo) return true;
@@ -2696,13 +2718,31 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
                           return (h * 60 + m) > (fh * 60 + fm);
                         }
                         return true;
-                      }).map((t) => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
+                      }).length > 0 ? (
+                        generateTimeOptions(bookingTimeTo).filter((time) => {
+                          if (bookingTimeTo && time.value === bookingTimeTo) return true;
+                          if (bookingTimeFrom) {
+                            const [h, m] = time.value.split(':').map(Number);
+                            const [fh, fm] = bookingTimeFrom.split(':').map(Number);
+                            return (h * 60 + m) > (fh * 60 + fm);
+                          }
+                          return true;
+                        }).map((t) => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)
+                      ) : (
+                        <div className="p-3 text-xs text-muted-foreground text-center">No slots available</div>
+                      )}
                     </SelectContent>
                   </Select>
                   {errors.bookingTimeTo && <p className="text-xs text-destructive mt-1">{errors.bookingTimeTo}</p>}
                 </div>
               </div>
             </div>
+            {generateTimeOptions(bookingTimeFrom).length === 0 && (
+              <div className="flex items-center gap-2 text-xs text-amber-700 font-medium bg-amber-50 border border-amber-200/80 rounded-lg px-3 py-2.5">
+                <AlertCircle className="h-4 w-4 shrink-0 text-amber-600" />
+                <span>No slots available. Please select another date.</span>
+              </div>
+            )}
             {bookingTimeFrom && bookingTimeTo && (
               <div className="flex items-center gap-2 text-sm text-blue-600 font-medium bg-blue-50 rounded-lg px-3 py-2">
                 <Clock className="h-3.5 w-3.5 shrink-0" />
@@ -2796,13 +2836,14 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
                     type="button"
                     variant="link"
                     size="sm"
-                    className="h-auto p-0 text-xs font-semibold text-primary cursor-pointer hover:underline"
+                    className="h-auto p-0 text-xs font-semibold text-primary cursor-pointer hover:underline inline-flex items-center gap-1"
                     onClick={() => {
                       setIsCustomerCouponsOpen(true);
                       fetchCustomerCoupons();
                     }}
                   >
-                    Search Available Coupons
+                    <Search className="h-3.5 w-3.5" />
+                    <span>Search Available Coupons</span>
                   </Button>
                 )}
               </div>
@@ -3631,7 +3672,6 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
           {/* Available Customer Coupons Drawer (Mobile) */}
           <Drawer open={isMobile && isCustomerCouponsOpen} onOpenChange={setIsCustomerCouponsOpen}>
             <DrawerContent>
-              <div className="mx-auto w-12 h-1.5 flex-shrink-0 rounded-full bg-muted my-2" />
               <DrawerHeader className="text-left px-4">
                 <DrawerTitle className="flex items-center gap-2">
                   <Gift className="h-5 w-5 text-primary" />
@@ -3641,9 +3681,16 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
                   Active promo coupons linked to {selectedCustomer?.name || 'this customer'}
                 </DrawerDescription>
               </DrawerHeader>
-              <div className="px-4 pb-8 overflow-y-auto max-h-[60vh]">
+              <div className="px-4 pb-4 overflow-y-auto max-h-[55vh]">
                 {renderCustomerCouponsList()}
               </div>
+              <DrawerFooter className="pt-3 border-t px-4 pb-6">
+                <DrawerClose asChild>
+                  <Button className="w-full">
+                    Close
+                  </Button>
+                </DrawerClose>
+              </DrawerFooter>
             </DrawerContent>
           </Drawer>
 

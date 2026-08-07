@@ -91,11 +91,15 @@ const Orders = () => {
     orders.forEach((order) => {
       let dateKey = 'Unknown Date';
       if (order.booking_date) {
-        try {
-          const dateObj = new Date(order.booking_date);
-          dateKey = format(dateObj, 'yyyy-MM-dd');
-        } catch (e) {
-          console.error(e);
+        if (typeof order.booking_date === 'string') {
+          dateKey = order.booking_date.split('T')[0].split(' ')[0];
+        } else {
+          try {
+            const dateObj = new Date(order.booking_date);
+            dateKey = format(dateObj, 'yyyy-MM-dd');
+          } catch (e) {
+            console.error(e);
+          }
         }
       }
       if (!groups[dateKey]) {
@@ -104,31 +108,51 @@ const Orders = () => {
       groups[dateKey].push(order);
     });
 
+    const now = new Date();
+    const today = format(now, 'yyyy-MM-dd');
+    const tomorrowDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+    const tomorrow = format(tomorrowDate, 'yyyy-MM-dd');
+    const yesterdayDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+    const yesterday = format(yesterdayDate, 'yyyy-MM-dd');
+
     return Object.keys(groups)
       .sort((a, b) => b.localeCompare(a))
       .map(dateKey => {
         let displayTitle = dateKey;
         let isToday = false;
-        try {
-          const dateObj = new Date(dateKey);
-          const now = new Date();
-          const today = format(now, 'yyyy-MM-dd');
-          const yesterdayDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
-          const yesterday = format(yesterdayDate, 'yyyy-MM-dd');
-          if (dateKey === today) {
-            displayTitle = 'Today';
-            isToday = true;
-          } else if (dateKey === yesterday) {
-            displayTitle = 'Yesterday';
-          } else {
-            displayTitle = format(dateObj, 'MMMM d, yyyy');
-          }
-        } catch (e) { }
+        let isTomorrow = false;
+        let isPast = false;
+        let isFuture = false;
+
+        if (dateKey === today) {
+          displayTitle = 'Today';
+          isToday = true;
+        } else if (dateKey === tomorrow) {
+          displayTitle = 'Tomorrow';
+          isTomorrow = true;
+        } else if (dateKey === yesterday) {
+          displayTitle = 'Yesterday';
+          isPast = true;
+        } else if (dateKey !== 'Unknown Date') {
+          if (dateKey < today) isPast = true;
+          else if (dateKey > tomorrow) isFuture = true;
+
+          try {
+            const [y, m, d] = dateKey.split('-').map(Number);
+            if (y && m && d) {
+              const localDate = new Date(y, m - 1, d);
+              displayTitle = format(localDate, 'MMMM d, yyyy');
+            }
+          } catch (e) { }
+        }
 
         return {
           dateKey,
           displayTitle,
           isToday,
+          isTomorrow,
+          isPast,
+          isFuture,
           items: groups[dateKey]
         };
       });
@@ -711,8 +735,14 @@ const Orders = () => {
             <div className="block md:hidden space-y-4">
               {getGroupedOrders().map((group) => (
                 <div key={group.dateKey} className="space-y-2">
-                  <div className={`text-[11px] font-bold uppercase tracking-wider pl-1 pt-2 sticky top-0 bg-gray-50/90 backdrop-blur-xs py-1 z-10 ${group.isToday ? 'text-emerald-600' : 'text-blue-500'}`}>
-                    {group.displayTitle}
+                  <div className={`text-[11px] font-bold tracking-wider pl-1 pt-2 sticky top-0 bg-gray-50/90 backdrop-blur-xs py-1 z-10 ${group.isToday ? 'text-emerald-600' : 'text-blue-500'}`}>
+                    <div className='flex items-center justify-between'>
+                      <span className='uppercase'>{group.displayTitle}</span>
+                      <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full ${group.isToday ? 'bg-emerald-200/80 text-emerald-900' : 'bg-blue-100 text-blue-800'
+                        }`}>
+                        {group.items.length} {group.items.length === 1 ? 'order' : 'orders'}
+                      </span>
+                    </div>
                   </div>
                   {group.items.map((order) => (
                     <div
@@ -820,8 +850,14 @@ const Orders = () => {
                     {getGroupedOrders().map((group) => (
                       <Fragment key={group.dateKey}>
                         <tr className={group.isToday ? "bg-emerald-50/60 border-b border-emerald-100" : "bg-blue-50/60 border-b border-blue-100"}>
-                          <td colSpan={8} className={`px-6 py-2.5 font-bold text-xs uppercase tracking-wider ${group.isToday ? "text-emerald-600" : "text-blue-600"}`}>
-                            {group.displayTitle}
+                          <td colSpan={8} className={`px-6 py-2.5 font-bold text-xs tracking-wider ${group.isToday ? "text-emerald-600" : "text-blue-600"}`}>
+                            <div className='flex items-center justify-between'>
+                              <span className='uppercase'>{group.displayTitle}</span>
+                              <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full ${group.isToday ? 'bg-emerald-200/80 text-emerald-900' : 'bg-blue-100 text-blue-800'
+                                }`}>
+                                {group.items.length} {group.items.length === 1 ? 'order' : 'orders'}
+                              </span>
+                            </div>
                           </td>
                         </tr>
                         {group.items.map((order) => (
