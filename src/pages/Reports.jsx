@@ -36,6 +36,7 @@ import {
 import * as XLSX from 'xlsx';
 import { saveAs } from 'file-saver';
 import employeeService from '../services/employeeService';
+import orderService from '../services/orderService';
 import { ENQUIRY_STATUS_LABELS } from '../constants/enquiryConstants';
 import {
   Download,
@@ -84,6 +85,83 @@ const Reports = () => {
   const [eodEndDate, setEodEndDate] = useState('');
   const [selectedEodReport, setSelectedEodReport] = useState(null);
   const [isEodDetailsOpen, setIsEodDetailsOpen] = useState(false);
+
+  // Repeat Customer Reports State
+  const [repeatFilters, setRepeatFilters] = useState({
+    date_from: '',
+    date_to: '',
+    min_orders: 2,
+    page: 1,
+    per_page: 50,
+  });
+  const [repeatReportData, setRepeatReportData] = useState(null);
+  const [repeatLoading, setRepeatLoading] = useState(false);
+
+  const fetchRepeatCustomersReport = async () => {
+    setRepeatLoading(true);
+    try {
+      const params = {};
+      if (repeatFilters.date_from) params.date_from = repeatFilters.date_from;
+      if (repeatFilters.date_to) params.date_to = repeatFilters.date_to;
+      if (repeatFilters.min_orders) params.min_orders = repeatFilters.min_orders;
+      if (repeatFilters.page) params.page = repeatFilters.page;
+      if (repeatFilters.per_page) params.per_page = repeatFilters.per_page;
+
+      const data = await orderService.getRepeatCustomersReport(params);
+      setRepeatReportData(data);
+    } catch (error) {
+      console.error('Error fetching repeat customers report:', error);
+      toast.error('Failed to fetch repeat customers report');
+    } finally {
+      setRepeatLoading(false);
+    }
+  };
+
+  const handleExportRepeatReport = () => {
+    if (!repeatReportData || !repeatReportData.customers || repeatReportData.customers.length === 0) {
+      toast.error('No data available to export');
+      return;
+    }
+
+    const { summary, customers } = repeatReportData;
+
+    const summaryData = [
+      { Metric: 'Total Distinct Customers', Value: summary.total_customers },
+      { Metric: 'Repeat Customers Count', Value: summary.repeat_customers_count },
+      { Metric: 'Repeat Customer Rate (%)', Value: `${summary.repeat_customer_rate}%` },
+      { Metric: 'Total Orders Count', Value: summary.total_orders_count },
+      { Metric: 'Repeat Orders Count', Value: summary.repeat_orders_count },
+      { Metric: 'Total Revenue (₹)', Value: summary.total_revenue },
+      { Metric: 'Repeat Orders Revenue (₹)', Value: summary.repeat_orders_revenue },
+      { Metric: 'Avg Orders / Repeat Customer', Value: summary.avg_orders_per_repeat_customer },
+    ];
+
+    const customerRows = customers.map((c) => ({
+      'Customer ID': c.customer_id,
+      'Customer Name': c.customer_name || 'N/A',
+      'Phone': c.customer_phone || 'N/A',
+      'Email': c.customer_email || 'N/A',
+      'City': c.city || 'N/A',
+      'Total Orders': c.total_orders,
+      'Total Spent (₹)': c.total_spent,
+      'First Order Date': formatReportDate(c.first_order_date),
+      'Last Order Date': formatReportDate(c.last_order_date),
+    }));
+
+    const workbook = XLSX.utils.book_new();
+    const summarySheet = XLSX.utils.json_to_sheet(summaryData);
+    const detailSheet = XLSX.utils.json_to_sheet(customerRows);
+
+    XLSX.utils.book_append_sheet(workbook, summarySheet, 'Summary');
+    XLSX.utils.book_append_sheet(workbook, detailSheet, 'Repeat Customers');
+
+    const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+    const blob = new Blob([excelBuffer], {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    });
+    saveAs(blob, `repeat_customers_report_${repeatFilters.date_from || 'all'}_to_${repeatFilters.date_to || 'all'}.xlsx`);
+    toast.success('Repeat Customers report exported successfully');
+  };
 
   const handleViewEodDetails = (report) => {
     setSelectedEodReport(report);
@@ -581,6 +659,27 @@ const Reports = () => {
           <CardContent>
             <p className="text-muted-foreground">
               Review daily end-of-day checkout logs for agents, track distance traveled, cash collected, and checkout notes.
+            </p>
+          </CardContent>
+        </Card>
+
+        {/* Repeat Customers & Orders Report Card */}
+        <Card
+          className="cursor-pointer hover:shadow-lg transition-shadow"
+          onClick={() => {
+            setSelectedReport('repeat_customers');
+            fetchRepeatCustomersReport();
+          }}
+        >
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <CardTitle className="mt-4">Repeat Customers & Orders</CardTitle>
+              <Users className="h-6 w-6 text-muted-foreground" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <p className="text-muted-foreground">
+              Analyze customer retention metrics, repeat order rate, revenue generated from repeat buyers, and customer frequency breakdown.
             </p>
           </CardContent>
         </Card>
@@ -1739,12 +1838,264 @@ const Reports = () => {
     );
   };
 
+  // Repeat Customers Report View
+  const renderRepeatCustomersReport = () => (
+    <>
+      <div className="flex justify-between items-center">
+        <div className="flex items-center gap-4">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => {
+              setSelectedReport(null);
+              setRepeatReportData(null);
+            }}
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          <div>
+            <h1 className="text-3xl font-bold">Repeat Customers & Orders Report</h1>
+            <p className="text-sm text-muted-foreground">Analyze repeat customer frequency, retention rate, and revenue contributions.</p>
+          </div>
+        </div>
+        {repeatReportData && repeatReportData.customers && repeatReportData.customers.length > 0 && (
+          <Button onClick={handleExportRepeatReport} className="flex items-center gap-2">
+            <Download className="h-4 w-4" />
+            Export Excel
+          </Button>
+        )}
+      </div>
+
+      {/* Filters Section */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Filter className="h-5 w-5" />
+            Filters
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div>
+              <Label htmlFor="repeat_date_from">Date From</Label>
+              <Input
+                id="repeat_date_from"
+                type="date"
+                value={repeatFilters.date_from}
+                onChange={(e) => setRepeatFilters((prev) => ({ ...prev, date_from: e.target.value, page: 1 }))}
+              />
+            </div>
+            <div>
+              <Label htmlFor="repeat_date_to">Date To</Label>
+              <Input
+                id="repeat_date_to"
+                type="date"
+                value={repeatFilters.date_to}
+                onChange={(e) => setRepeatFilters((prev) => ({ ...prev, date_to: e.target.value, page: 1 }))}
+              />
+            </div>
+            <div>
+              <Label htmlFor="min_orders">Min Orders Threshold</Label>
+              <Select
+                value={String(repeatFilters.min_orders)}
+                onValueChange={(val) => setRepeatFilters((prev) => ({ ...prev, min_orders: parseInt(val), page: 1 }))}
+              >
+                <SelectTrigger id="min_orders">
+                  <SelectValue placeholder="Select min orders" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="2">2+ Orders (Repeat)</SelectItem>
+                  <SelectItem value="3">3+ Orders</SelectItem>
+                  <SelectItem value="5">5+ Orders (VIP)</SelectItem>
+                  <SelectItem value="10">10+ Orders (Loyal)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex items-end gap-2">
+              <Button onClick={fetchRepeatCustomersReport} className="w-full" disabled={repeatLoading}>
+                {repeatLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                Apply Filters
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setRepeatFilters({ date_from: '', date_to: '', min_orders: 2, page: 1, per_page: 50 });
+                }}
+              >
+                Reset
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Loading Skeleton */}
+      {repeatLoading && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {[1, 2, 3, 4].map((i) => (
+            <Skeleton key={i} className="h-28 w-full rounded-xl" />
+          ))}
+        </div>
+      )}
+
+      {/* KPI Cards */}
+      {!repeatLoading && repeatReportData && repeatReportData.summary && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Repeat Customers</CardTitle>
+              <Users className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{repeatReportData.summary.repeat_customers_count}</div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Out of {repeatReportData.summary.total_customers} total distinct customers
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Repeat Customer Rate</CardTitle>
+              <TrendingUp className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-emerald-600">
+                {repeatReportData.summary.repeat_customer_rate}%
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">Customer retention metric</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Repeat Revenue</CardTitle>
+              <IndianRupee className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                ₹{formatCardNumber(repeatReportData.summary.repeat_orders_revenue)}
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                From {repeatReportData.summary.repeat_orders_count} orders placed by repeat customers
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Avg Orders / Customer</CardTitle>
+              <BarChart3 className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                {repeatReportData.summary.avg_orders_per_repeat_customer}
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">Average order frequency</p>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Repeat Customers Data Table */}
+      {!repeatLoading && repeatReportData && repeatReportData.customers && (
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle>Repeat Customers Directory ({repeatReportData.total_repeat_customers})</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {repeatReportData.customers.length === 0 ? (
+              <div className="text-center py-12 text-muted-foreground">
+                No repeat customers found matching the selected criteria.
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm text-left">
+                  <thead className="text-xs uppercase bg-muted/50 text-muted-foreground">
+                    <tr>
+                      <th className="px-4 py-3">Customer Name</th>
+                      <th className="px-4 py-3">Contact</th>
+                      <th className="px-4 py-3 text-center">Total Orders</th>
+                      <th className="px-4 py-3 text-right">Total Spent</th>
+                      <th className="px-4 py-3">First Order</th>
+                      <th className="px-4 py-3">Last Order</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {repeatReportData.customers.map((c) => (
+                      <tr key={c.customer_id} className="hover:bg-muted/30 transition-colors">
+                        <td className="px-4 py-3 font-medium text-foreground">
+                          {c.customer_name || 'N/A'}
+                          {c.city ? <span className="block text-xs text-muted-foreground font-normal">{c.city}</span> : null}
+                        </td>
+                        <td className="px-4 py-3 text-xs">
+                          <div>{c.customer_phone || '-'}</div>
+                          {c.customer_email && <div className="text-muted-foreground">{c.customer_email}</div>}
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          <Badge2 variant="outline" className="font-bold text-primary">
+                            {c.total_orders} Orders
+                          </Badge2>
+                        </td>
+                        <td className="px-4 py-3 text-right font-semibold text-emerald-600">
+                          ₹{formatCardNumber(c.total_spent)}
+                        </td>
+                        <td className="px-4 py-3 text-xs text-muted-foreground">
+                          {formatReportDate(c.first_order_date)}
+                        </td>
+                        <td className="px-4 py-3 text-xs text-muted-foreground">
+                          {formatReportDate(c.last_order_date)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {/* Pagination Controls */}
+            {repeatReportData.total_pages > 1 && (
+              <div className="flex justify-between items-center mt-4 pt-4 border-t">
+                <span className="text-xs text-muted-foreground">
+                  Page {repeatReportData.current_page} of {repeatReportData.total_pages}
+                </span>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={repeatReportData.current_page <= 1 || repeatLoading}
+                    onClick={() => {
+                      setRepeatFilters((prev) => ({ ...prev, page: prev.page - 1 }));
+                    }}
+                  >
+                    Previous
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={repeatReportData.current_page >= repeatReportData.total_pages || repeatLoading}
+                    onClick={() => {
+                      setRepeatFilters((prev) => ({ ...prev, page: prev.page + 1 }));
+                    }}
+                  >
+                    Next
+                  </Button>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+    </>
+  );
+
   return (
     <div className="container mx-auto p-6 space-y-6">
       {!selectedReport && renderReportSelection()}
       {selectedReport === 'orders' && renderOrdersReport()}
       {selectedReport === 'enquiries' && renderEnquiriesReport()}
       {selectedReport === 'eod' && renderEodReport()}
+      {selectedReport === 'repeat_customers' && renderRepeatCustomersReport()}
     </div>
   );
 };

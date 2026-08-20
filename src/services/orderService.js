@@ -307,6 +307,15 @@ const orderService = {
     const response = await apiClient.put(`/orders/${id}`, formData);
     return response.data;
   },
+
+  /**
+   * Get repeat customers & orders report
+   * @param {Object} params - Query parameters (date_from, date_to, min_orders, page, per_page)
+   */
+  getRepeatCustomersReport: async (params = {}) => {
+    const response = await apiClient.get('/orders/reports/repeat-customers', { params });
+    return response.data;
+  },
 };
 
 export default orderService;
