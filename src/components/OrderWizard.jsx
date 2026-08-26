@@ -92,6 +92,7 @@ import {
   FileText,
   User,
 } from 'lucide-react';
+import { Badge2 } from './ui/badge2';
 
 /**
  * Order Wizard Component
@@ -430,8 +431,8 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
         return;
       }
 
-      // Clear offers if no customer or packages
-      if (!selectedCustomer || packageItems.length === 0) {
+      // Clear offers if no customer
+      if (!selectedCustomer) {
         setAvailableOffers([]);
         setSelectedOffer(null);
         return;
@@ -441,12 +442,6 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
       try {
         const packageIds = packageItems.map(item => parseInt(item.package_id)).filter(id => !isNaN(id));
         const addonIds = addonItems.map(item => parseInt(item.addon_id)).filter(id => !isNaN(id));
-
-        if (packageIds.length === 0) {
-          setAvailableOffers([]);
-          setSelectedOffer(null);
-          return;
-        }
 
         const response = await offerService.getAvailableOffers({
           package_ids: packageIds,
@@ -2843,7 +2838,7 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
                     }}
                   >
                     <Search className="h-3.5 w-3.5" />
-                    <span>Search Available Coupons</span>
+                    <span>Search Coupons</span>
                   </Button>
                 )}
               </div>
@@ -2856,7 +2851,7 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
                     </p>
                     <div className="flex gap-2">
                       <Input
-                        placeholder="e.g. COCHIN-HYP-DW02-X87F9B"
+                        placeholder="Enter coupon code"
                         value={couponCode}
                         onChange={(e) => setCouponCode(e.target.value)}
                         className="uppercase font-mono text-sm h-9 border-gray-300"
@@ -2889,7 +2884,7 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
                       <div className="flex-1 min-w-0">
                         <div className="flex flex-wrap items-center gap-1.5">
                           <Tag className="h-4 w-4 text-green-600 shrink-0" />
-                          <span className="font-semibold text-green-800 text-sm">{selectedOffer.name}</span>
+                          <span className="font-semibold text-green-800 text-sm capitalize">{selectedOffer.name}</span>
                           {selectedOffer.coupon_required && (
                             <span className="bg-amber-100 text-amber-800 text-[10px] px-2 py-0.5 rounded-full font-bold border border-amber-200">Coupon Required</span>
                           )}
@@ -2951,7 +2946,7 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
                           <div className="flex-1 min-w-0">
                             <div className="flex flex-wrap items-center gap-1.5">
                               <Tag className="h-4 w-4 text-primary shrink-0" />
-                              <span className="font-medium text-sm">{offer.name}</span>
+                              <span className="font-medium text-sm capitalize">{offer.name}</span>
                               {offer.coupon_required && (
                                 <span className="bg-amber-100 text-amber-800 border border-amber-200 text-[10px] py-0.5 px-2 rounded-full font-bold">Coupon Required</span>
                               )}
@@ -2961,10 +2956,9 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
                               </button>
                             </div>
                             <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{offer.description}</p>
-                            <div className="flex items-center gap-1 mt-1.5 text-xs font-semibold text-primary">
-                              <Percent className="h-3 w-3" />
+                            <Badge2 variant="success">
                               {offer.discount_type === 'percentage' ? `${offer.discount_value}% Off` : `₹${offer.discount_value} Off`}
-                            </div>
+                            </Badge2>
                           </div>
                           <button type="button" onClick={() => {
                             setSelectedOffer(offer);
