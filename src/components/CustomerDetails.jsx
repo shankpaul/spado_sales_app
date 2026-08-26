@@ -318,7 +318,7 @@ const CustomerDetails = ({ customer, open, onOpenChange }) => {
                       <Award className="h-5 w-5 text-primary" />
                       <div className="text-sm text-muted-foreground">Current Balance</div>
                     </div>
-                    <div className="text-3xl font-bold text-primary">
+                    <div className="text-2xl font-bold text-primary">
                       {loyaltySummary?.current_balance || 0}
                       <span className="text-sm font-normal text-muted-foreground ml-2">points</span>
                     </div>

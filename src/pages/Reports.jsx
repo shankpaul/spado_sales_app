@@ -20,6 +20,9 @@ import {
   DialogDescription,
 } from '../components/ui/dialog';
 import MapPreview from '../components/MapPreview';
+import MapReportViewer from '../components/MapReportViewer';
+import { Popover, PopoverContent, PopoverTrigger } from '../components/ui/popover';
+import { Checkbox } from '../components/ui/checkbox';
 import { toast } from 'sonner';
 import {
   LineChart,
@@ -62,16 +65,30 @@ import {
   ChartPie,
   Car,
   MapPin,
+  Flame,
+  Layers,
+  Map,
 } from 'lucide-react';
 import { format, parseISO, differenceInDays, eachDayOfInterval, eachWeekOfInterval, eachMonthOfInterval, startOfWeek, startOfMonth, endOfWeek, endOfMonth } from 'date-fns';
 import { getStatusLabel, getStatusColor, ORDER_STATUSES, SELECTABLE_ORDER_STATUSES, PAYMENT_STATUSES } from '../lib/constants';
 import { Badge2 } from '../components/ui/badge2';
+import { useSearchParams } from 'react-router-dom';
 import apiClient from '../services/apiClient';
 import useAuthStore from '../store/authStore';
 
 const Reports = () => {
   const { user } = useAuthStore();
-  const [selectedReport, setSelectedReport] = useState(null); // null, 'orders', 'enquiries'
+  const [searchParams, setSearchParams] = useSearchParams();
+  const selectedReport = searchParams.get('type') || null;
+
+  const setSelectedReport = (reportType) => {
+    if (reportType) {
+      setSearchParams({ type: reportType });
+    } else {
+      setSearchParams({});
+    }
+  };
+
   const [loading, setLoading] = useState(false);
   const [reportData, setReportData] = useState(null);
   const [agents, setAgents] = useState([]);
@@ -116,6 +133,108 @@ const Reports = () => {
       setRepeatLoading(false);
     }
   };
+
+  // Orders Map Report State
+  const [ordersMapFilters, setOrdersMapFilters] = useState({
+    date_from: '',
+    date_to: '',
+    statuses: ['confirmed', 'completed', 'in_progress', 'tentative', 'cancelled'],
+  });
+  const [ordersMapData, setOrdersMapData] = useState(null);
+  const [ordersMapLoading, setOrdersMapLoading] = useState(false);
+  const [ordersMapViewMode, setOrdersMapViewMode] = useState('markers');
+
+  const fetchOrdersMapReport = async () => {
+    setOrdersMapLoading(true);
+    try {
+      const params = {};
+      if (ordersMapFilters.date_from) params.date_from = ordersMapFilters.date_from;
+      if (ordersMapFilters.date_to) params.date_to = ordersMapFilters.date_to;
+      if (ordersMapFilters.statuses && ordersMapFilters.statuses.length > 0) {
+        params.status = ordersMapFilters.statuses.join(',');
+      }
+
+      const data = await orderService.getOrdersMapReport(params);
+      setOrdersMapData(data);
+    } catch (error) {
+      console.error('Error fetching orders map report:', error);
+      toast.error('Failed to fetch orders map report');
+    } finally {
+      setOrdersMapLoading(false);
+    }
+  };
+
+  // Enquiries Map Report State
+  const [enquiriesMapFilters, setEnquiriesMapFilters] = useState({
+    date_from: '',
+    date_to: '',
+    statuses: ['new', 'contacted', 'interested', 'needs_followup', 'converted', 'lost'],
+    source: '',
+  });
+  const [enquiriesMapData, setEnquiriesMapData] = useState(null);
+  const [enquiriesMapLoading, setEnquiriesMapLoading] = useState(false);
+  const [enquiriesMapViewMode, setEnquiriesMapViewMode] = useState('markers');
+
+  const fetchEnquiriesMapReport = async () => {
+    setEnquiriesMapLoading(true);
+    try {
+      const params = {};
+      if (enquiriesMapFilters.date_from) params.date_from = enquiriesMapFilters.date_from;
+      if (enquiriesMapFilters.date_to) params.date_to = enquiriesMapFilters.date_to;
+      if (enquiriesMapFilters.statuses && enquiriesMapFilters.statuses.length > 0) {
+        params.status = enquiriesMapFilters.statuses.join(',');
+      }
+      if (enquiriesMapFilters.source) params.source = enquiriesMapFilters.source;
+
+      const data = await orderService.getEnquiriesMapReport(params);
+      setEnquiriesMapData(data);
+    } catch (error) {
+      console.error('Error fetching enquiries map report:', error);
+      toast.error('Failed to fetch enquiries map report');
+    } finally {
+      setEnquiriesMapLoading(false);
+    }
+  };
+
+  // Peak & Off-Peak Demand State
+  const [peakDemandFilters, setPeakDemandFilters] = useState({
+    date_from: '',
+    date_to: '',
+    area: '',
+  });
+  const [peakDemandData, setPeakDemandData] = useState(null);
+  const [peakDemandLoading, setPeakDemandLoading] = useState(false);
+
+  const fetchPeakDemandReport = async () => {
+    setPeakDemandLoading(true);
+    try {
+      const params = {};
+      if (peakDemandFilters.date_from) params.date_from = peakDemandFilters.date_from;
+      if (peakDemandFilters.date_to) params.date_to = peakDemandFilters.date_to;
+      if (peakDemandFilters.area) params.area = peakDemandFilters.area;
+
+      const data = await orderService.getPeakDemandReport(params);
+      setPeakDemandData(data);
+    } catch (error) {
+      console.error('Error fetching peak demand report:', error);
+      toast.error('Failed to fetch peak demand report');
+    } finally {
+      setPeakDemandLoading(false);
+    }
+  };
+
+  // Auto-fetch report data on mount or when selectedReport changes via URL query param
+  useEffect(() => {
+    if (selectedReport === 'orders_map' && !ordersMapData) {
+      fetchOrdersMapReport();
+    } else if (selectedReport === 'enquiries_map' && !enquiriesMapData) {
+      fetchEnquiriesMapReport();
+    } else if (selectedReport === 'repeat_customers' && !repeatReportData) {
+      fetchRepeatCustomersReport();
+    } else if (selectedReport === 'peak_demand' && !peakDemandData) {
+      fetchPeakDemandReport();
+    }
+  }, [selectedReport]);
 
   const handleExportRepeatReport = () => {
     if (!repeatReportData || !repeatReportData.customers || repeatReportData.customers.length === 0) {
@@ -683,6 +802,69 @@ const Reports = () => {
             </p>
           </CardContent>
         </Card>
+
+        {/* Orders Map & Heatmap Report Card */}
+        <Card
+          className="cursor-pointer hover:shadow-lg transition-shadow"
+          onClick={() => {
+            setSelectedReport('orders_map');
+            fetchOrdersMapReport();
+          }}
+        >
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <CardTitle className="mt-4">Orders Map & Heatmap</CardTitle>
+              <MapPin className="h-6 w-6 text-muted-foreground" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <p className="text-muted-foreground">
+              Visualize orders geographically on an interactive map. Pinpoint locations, view area demand heatmaps, and analyze revenue by neighborhood.
+            </p>
+          </CardContent>
+        </Card>
+
+        {/* Enquiries Map & Heatmap Report Card */}
+        <Card
+          className="cursor-pointer hover:shadow-lg transition-shadow"
+          onClick={() => {
+            setSelectedReport('enquiries_map');
+            fetchEnquiriesMapReport();
+          }}
+        >
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <CardTitle className="mt-4">Enquiries Map & Heatmap</CardTitle>
+              <Map className="h-6 w-6 text-muted-foreground" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <p className="text-muted-foreground">
+              Visualize prospective customer enquiries geographically. Identify high-demand lead areas, conversion hotspots, and source distributions.
+            </p>
+          </CardContent>
+        </Card>
+
+        {/* Peak & Off-Peak Demand Report Card */}
+        <Card
+          className="cursor-pointer hover:shadow-lg transition-shadow"
+          onClick={() => {
+            setSelectedReport('peak_demand');
+            fetchPeakDemandReport();
+          }}
+        >
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <CardTitle className="mt-4">Peak & Off-Peak Demand</CardTitle>
+              <Clock className="h-6 w-6 text-muted-foreground" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <p className="text-muted-foreground">
+              Analyze booking volume trends by day of week and time slot. Identify peak operational bottlenecks and quiet slots to launch targeted off-peak discount campaigns.
+            </p>
+          </CardContent>
+        </Card>
       </div>
     </>
   );
@@ -703,7 +885,7 @@ const Reports = () => {
           >
             <ArrowLeft className="h-5 w-5" />
           </Button>
-          <h1 className="text-3xl font-bold">Orders Report</h1>
+          <h1 className="text-2xl font-bold">Orders Report</h1>
         </div>
       </div>
 
@@ -1119,7 +1301,7 @@ const Reports = () => {
             >
               <ArrowLeft className="h-4 w-4" />
             </Button>
-            <h1 className="text-3xl font-bold">Enquiries Report</h1>
+            <h1 className="text-2xl font-bold">Enquiries Report</h1>
           </div>
         </div>
 
@@ -1562,7 +1744,7 @@ const Reports = () => {
           >
             <ArrowLeft className="h-4 w-4" />
           </Button>
-          <h1 className="text-3xl font-bold">End of Day Reports</h1>
+          <h1 className="text-2xl font-bold">End of Day Reports</h1>
         </div>
 
         {/* EOD Summary Cards */}
@@ -1854,7 +2036,7 @@ const Reports = () => {
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div>
-            <h1 className="text-3xl font-bold">Repeat Customers & Orders Report</h1>
+            <h1 className="text-2xl font-bold">Repeat Customers & Orders Report</h1>
             <p className="text-sm text-muted-foreground">Analyze repeat customer frequency, retention rate, and revenue contributions.</p>
           </div>
         </div>
@@ -2089,6 +2271,826 @@ const Reports = () => {
     </>
   );
 
+  // Orders Map Report View
+  const renderOrdersMapReport = () => {
+    const orderStatusesList = [
+      { id: 'tentative', label: 'Tentative', color: 'bg-amber-500' },
+      { id: 'confirmed', label: 'Confirmed', color: 'bg-blue-500' },
+      { id: 'in_progress', label: 'In Progress', color: 'bg-purple-500' },
+      { id: 'completed', label: 'Completed', color: 'bg-emerald-500' },
+      { id: 'cancelled', label: 'Cancelled', color: 'bg-red-500' },
+    ];
+
+    const toggleOrderStatus = (statusId) => {
+      setOrdersMapFilters((prev) => {
+        const current = prev.statuses || [];
+        const updated = current.includes(statusId)
+          ? current.filter((s) => s !== statusId)
+          : [...current, statusId];
+        return { ...prev, statuses: updated };
+      });
+    };
+
+    const summary = ordersMapData?.summary || { total_orders: 0, total_revenue: 0, mapped_orders: 0, unmapped_orders: 0, top_area: '-' };
+
+    return (
+      <>
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <div className="flex items-center gap-4">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => {
+                setSelectedReport(null);
+                setOrdersMapData(null);
+              }}
+            >
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+            <div>
+              <h1 className="text-2xl font-bold">Orders Map & Heatmap Report</h1>
+              <p className="text-sm text-muted-foreground">Geographical demand visualization, order pinpoints, and area revenue analysis.</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={fetchOrdersMapReport} disabled={ordersMapLoading} className="flex items-center gap-2">
+              {ordersMapLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Filter className="h-4 w-4" />}
+              Refresh Data
+            </Button>
+          </div>
+        </div>
+
+        {/* Filters Section */}
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-base font-semibold">
+              <Filter className="h-4 w-4 text-primary" />
+              Filter Map & Analytics
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div>
+                <Label htmlFor="orders_map_date_from">Date From</Label>
+                <Input
+                  id="orders_map_date_from"
+                  type="date"
+                  value={ordersMapFilters.date_from}
+                  onChange={(e) => setOrdersMapFilters((prev) => ({ ...prev, date_from: e.target.value }))}
+                />
+              </div>
+              <div>
+                <Label htmlFor="orders_map_date_to">Date To</Label>
+                <Input
+                  id="orders_map_date_to"
+                  type="date"
+                  value={ordersMapFilters.date_to}
+                  onChange={(e) => setOrdersMapFilters((prev) => ({ ...prev, date_to: e.target.value }))}
+                />
+              </div>
+              <div>
+                <Label>Order Statuses (Multi-Select)</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" className="w-full justify-between font-normal text-left truncate h-9">
+                      <span>
+                        {ordersMapFilters.statuses?.length === 0
+                          ? 'Select Statuses'
+                          : ordersMapFilters.statuses?.length === orderStatusesList.length
+                            ? 'All Statuses'
+                            : `${ordersMapFilters.statuses?.length} Statuses Selected`}
+                      </span>
+                      <Filter className="h-3.5 w-3.5 opacity-50 shrink-0 ml-2" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-64 p-3 space-y-2">
+                    <div className="flex items-center justify-between pb-2 border-b">
+                      <span className="text-xs font-semibold text-gray-700">Filter Statuses</span>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setOrdersMapFilters((prev) => ({
+                            ...prev,
+                            statuses: prev.statuses?.length === orderStatusesList.length ? [] : orderStatusesList.map((s) => s.id),
+                          }))
+                        }
+                        className="text-[11px] text-primary hover:underline font-semibold"
+                      >
+                        {ordersMapFilters.statuses?.length === orderStatusesList.length ? 'Deselect All' : 'Select All'}
+                      </button>
+                    </div>
+                    <div className="space-y-2 max-h-48 overflow-y-auto pt-1">
+                      {orderStatusesList.map((st) => (
+                        <label key={st.id} className="flex items-center gap-2.5 text-xs text-gray-700 cursor-pointer hover:bg-gray-50 p-1.5 rounded transition-colors">
+                          <Checkbox
+                            checked={ordersMapFilters.statuses?.includes(st.id)}
+                            onCheckedChange={() => toggleOrderStatus(st.id)}
+                          />
+                          <span className={`w-2 h-2 rounded-full ${st.color}`} />
+                          <span className="capitalize">{st.label}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </PopoverContent>
+                </Popover>
+              </div>
+              <div className="flex items-end gap-2">
+                <Button onClick={fetchOrdersMapReport} className="w-full bg-emerald-600 hover:bg-emerald-700 text-white" disabled={ordersMapLoading}>
+                  {ordersMapLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                  Apply Filters
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* KPI Metrics */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <Card>
+            <CardContent className="pt-4 pb-3">
+              <p className="text-xs font-medium text-muted-foreground">Total Orders</p>
+              <p className="text-2xl font-bold text-slate-900 mt-1">{summary.total_orders}</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-4 pb-3">
+              <p className="text-xs font-medium text-muted-foreground">Total Revenue</p>
+              <p className="text-2xl font-bold text-emerald-700 mt-1">₹{summary.total_revenue?.toLocaleString()}</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-4 pb-3">
+              <p className="text-xs font-medium text-muted-foreground">Mapped Coordinates</p>
+              <p className="text-2xl font-bold text-slate-900 mt-1">{summary.mapped_orders} <span className="text-xs font-normal text-slate-500">/ {summary.total_orders}</span></p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-4 pb-3">
+              <p className="text-xs font-medium text-muted-foreground">Top Demand Area</p>
+              <p className="text-2xl font-bold text-slate-900 mt-1 truncate">{summary.top_area || '-'}</p>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Map Header & View Mode Switcher */}
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3 bg-card border rounded-xl p-3">
+          <div className="flex items-center gap-2">
+            <Map className="h-5 w-5 text-emerald-600" />
+            <span className="font-semibold text-sm">Geographical Map View</span>
+            <span className="text-xs text-muted-foreground">({ordersMapData?.points?.length || 0} locations plotted)</span>
+          </div>
+          <div className="flex items-center gap-1 bg-muted/60 p-1 rounded-lg border">
+            <Button
+              variant={ordersMapViewMode === 'markers' ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => setOrdersMapViewMode('markers')}
+              className="h-7 text-xs gap-1.5"
+            >
+              <MapPin className="h-3.5 w-3.5" />
+              Pin Markers
+            </Button>
+            <Button
+              variant={ordersMapViewMode === 'heatmap' ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => setOrdersMapViewMode('heatmap')}
+              className="h-7 text-xs gap-1.5"
+            >
+              <Flame className="h-3.5 w-3.5" />
+              Heatmap
+            </Button>
+            <Button
+              variant={ordersMapViewMode === 'both' ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => setOrdersMapViewMode('both')}
+              className="h-7 text-xs gap-1.5"
+            >
+              <Layers className="h-3.5 w-3.5" />
+              Combined
+            </Button>
+          </div>
+        </div>
+
+        {/* Leaflet Map Rendering */}
+        {ordersMapLoading ? (
+          <Skeleton className="w-full h-[480px] rounded-xl" />
+        ) : (
+          <MapReportViewer
+            points={ordersMapData?.points || []}
+            viewMode={ordersMapViewMode}
+            reportType="orders"
+            onNavigateDetail={(id) => window.open(`/orders/${id}`, '_blank')}
+          />
+        )}
+
+        {/* Area Breakdown Summary Table */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base font-semibold flex items-center justify-between">
+              <span>Area Order Breakdown & Revenue</span>
+              <span className="text-xs font-normal text-muted-foreground">({ordersMapData?.area_breakdown?.length || 0} Areas)</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {ordersMapData?.area_breakdown && ordersMapData.area_breakdown.length > 0 ? (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm text-left">
+                  <thead className="bg-muted/50 text-xs font-semibold text-muted-foreground uppercase border-b">
+                    <tr>
+                      <th className="px-4 py-3">Area</th>
+                      <th className="px-4 py-3 text-right">Orders Count</th>
+                      <th className="px-4 py-3 text-right">Completed Orders</th>
+                      <th className="px-4 py-3 text-right">Total Revenue (₹)</th>
+                      <th className="px-4 py-3 text-right">% of Total Orders</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {ordersMapData.area_breakdown.map((row, idx) => {
+                      const percentage = summary.total_orders > 0
+                        ? ((row.order_count / summary.total_orders) * 100).toFixed(1)
+                        : 0;
+
+                      return (
+                        <tr key={idx} className="hover:bg-muted/30 transition-colors">
+                          <td className="px-4 py-3 font-semibold text-slate-800 capitalize flex items-center gap-2">
+                            <MapPin className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
+                            {row.area}
+                          </td>
+                          <td className="px-4 py-3 text-right font-bold">{row.order_count}</td>
+                          <td className="px-4 py-3 text-right text-emerald-600 font-semibold">{row.completed_count}</td>
+                          <td className="px-4 py-3 text-right font-extrabold text-slate-900">₹{row.total_revenue?.toLocaleString()}</td>
+                          <td className="px-4 py-3 text-right">
+                            <span className="bg-emerald-50 text-emerald-700 text-xs font-bold px-2 py-0.5 rounded border border-emerald-200">
+                              {percentage}%
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <p className="text-center py-6 text-sm text-muted-foreground">No area data available for the selected filters.</p>
+            )}
+          </CardContent>
+        </Card>
+      </>
+    );
+  };
+
+  // Enquiries Map Report View
+  const renderEnquiriesMapReport = () => {
+    const enquiryStatusesList = [
+      { id: 'new', label: 'New', color: 'bg-sky-500' },
+      { id: 'contacted', label: 'Contacted', color: 'bg-blue-500' },
+      { id: 'interested', label: 'Interested', color: 'bg-indigo-500' },
+      { id: 'needs_followup', label: 'Needs Followup', color: 'bg-amber-500' },
+      { id: 'converted', label: 'Converted', color: 'bg-emerald-500' },
+      { id: 'lost', label: 'Lost', color: 'bg-rose-500' },
+    ];
+
+    const toggleEnquiryStatus = (statusId) => {
+      setEnquiriesMapFilters((prev) => {
+        const current = prev.statuses || [];
+        const updated = current.includes(statusId)
+          ? current.filter((s) => s !== statusId)
+          : [...current, statusId];
+        return { ...prev, statuses: updated };
+      });
+    };
+
+    const summary = enquiriesMapData?.summary || { total_enquiries: 0, converted_count: 0, conversion_rate: 0, mapped_enquiries: 0, unmapped_enquiries: 0, top_area: '-' };
+
+    return (
+      <>
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <div className="flex items-center gap-4">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => {
+                setSelectedReport(null);
+                setEnquiriesMapData(null);
+              }}
+            >
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+            <div>
+              <h1 className="text-2xl font-bold">Enquiries Map & Heatmap Report</h1>
+              <p className="text-sm text-muted-foreground">Geographical lead generation, conversion hotspots, and area lead density analysis.</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={fetchEnquiriesMapReport} disabled={enquiriesMapLoading} className="flex items-center gap-2">
+              {enquiriesMapLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Filter className="h-4 w-4" />}
+              Refresh Data
+            </Button>
+          </div>
+        </div>
+
+        {/* Filters Section */}
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-base font-semibold">
+              <Filter className="h-4 w-4 text-primary" />
+              Filter Map & Analytics
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div>
+                <Label htmlFor="enquiries_map_date_from">Date From</Label>
+                <Input
+                  id="enquiries_map_date_from"
+                  type="date"
+                  value={enquiriesMapFilters.date_from}
+                  onChange={(e) => setEnquiriesMapFilters((prev) => ({ ...prev, date_from: e.target.value }))}
+                />
+              </div>
+              <div>
+                <Label htmlFor="enquiries_map_date_to">Date To</Label>
+                <Input
+                  id="enquiries_map_date_to"
+                  type="date"
+                  value={enquiriesMapFilters.date_to}
+                  onChange={(e) => setEnquiriesMapFilters((prev) => ({ ...prev, date_to: e.target.value }))}
+                />
+              </div>
+              <div>
+                <Label>Enquiry Statuses (Multi-Select)</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" className="w-full justify-between font-normal text-left truncate h-9">
+                      <span>
+                        {enquiriesMapFilters.statuses?.length === 0
+                          ? 'Select Statuses'
+                          : enquiriesMapFilters.statuses?.length === enquiryStatusesList.length
+                            ? 'All Statuses'
+                            : `${enquiriesMapFilters.statuses?.length} Statuses Selected`}
+                      </span>
+                      <Filter className="h-3.5 w-3.5 opacity-50 shrink-0 ml-2" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-64 p-3 space-y-2">
+                    <div className="flex items-center justify-between pb-2 border-b">
+                      <span className="text-xs font-semibold text-gray-700">Filter Statuses</span>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setEnquiriesMapFilters((prev) => ({
+                            ...prev,
+                            statuses: prev.statuses?.length === enquiryStatusesList.length ? [] : enquiryStatusesList.map((s) => s.id),
+                          }))
+                        }
+                        className="text-[11px] text-primary hover:underline font-semibold"
+                      >
+                        {enquiriesMapFilters.statuses?.length === enquiryStatusesList.length ? 'Deselect All' : 'Select All'}
+                      </button>
+                    </div>
+                    <div className="space-y-2 max-h-48 overflow-y-auto pt-1">
+                      {enquiryStatusesList.map((st) => (
+                        <label key={st.id} className="flex items-center gap-2.5 text-xs text-gray-700 cursor-pointer hover:bg-gray-50 p-1.5 rounded transition-colors">
+                          <Checkbox
+                            checked={enquiriesMapFilters.statuses?.includes(st.id)}
+                            onCheckedChange={() => toggleEnquiryStatus(st.id)}
+                          />
+                          <span className={`w-2 h-2 rounded-full ${st.color}`} />
+                          <span className="capitalize">{st.label}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </PopoverContent>
+                </Popover>
+              </div>
+              <div className="flex items-end gap-2">
+                <Button onClick={fetchEnquiriesMapReport} className="w-full bg-indigo-600 hover:bg-indigo-700 text-white" disabled={enquiriesMapLoading}>
+                  {enquiriesMapLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                  Apply Filters
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* KPI Metrics */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <Card>
+            <CardContent className="pt-4 pb-3">
+              <p className="text-xs font-medium text-muted-foreground">Total Enquiries</p>
+              <p className="text-2xl font-bold text-slate-900 mt-1">{summary.total_enquiries}</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-4 pb-3">
+              <p className="text-xs font-medium text-muted-foreground">Converted Leads</p>
+              <p className="text-2xl font-bold text-emerald-700 mt-1">{summary.converted_count}</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-4 pb-3">
+              <p className="text-xs font-medium text-muted-foreground">Conversion Rate</p>
+              <p className="text-2xl font-bold text-slate-900 mt-1">{summary.conversion_rate}%</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-4 pb-3">
+              <p className="text-xs font-medium text-muted-foreground">Top Lead Area</p>
+              <p className="text-2xl font-bold text-slate-900 mt-1 truncate">{summary.top_area || '-'}</p>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Map Header & View Mode Switcher */}
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3 bg-card border rounded-xl p-3">
+          <div className="flex items-center gap-2">
+            <Map className="h-5 w-5 text-indigo-600" />
+            <span className="font-semibold text-sm">Geographical Lead Map View</span>
+            <span className="text-xs text-muted-foreground">({enquiriesMapData?.points?.length || 0} lead points plotted)</span>
+          </div>
+          <div className="flex items-center gap-1 bg-muted/60 p-1 rounded-lg border">
+            <Button
+              variant={enquiriesMapViewMode === 'markers' ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => setEnquiriesMapViewMode('markers')}
+              className="h-7 text-xs gap-1.5"
+            >
+              <MapPin className="h-3.5 w-3.5" />
+              Pin Markers
+            </Button>
+            <Button
+              variant={enquiriesMapViewMode === 'heatmap' ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => setEnquiriesMapViewMode('heatmap')}
+              className="h-7 text-xs gap-1.5"
+            >
+              <Flame className="h-3.5 w-3.5" />
+              Heatmap
+            </Button>
+            <Button
+              variant={enquiriesMapViewMode === 'both' ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => setEnquiriesMapViewMode('both')}
+              className="h-7 text-xs gap-1.5"
+            >
+              <Layers className="h-3.5 w-3.5" />
+              Combined
+            </Button>
+          </div>
+        </div>
+
+        {/* Leaflet Map Rendering */}
+        {enquiriesMapLoading ? (
+          <Skeleton className="w-full h-[480px] rounded-xl" />
+        ) : (
+          <MapReportViewer
+            points={enquiriesMapData?.points || []}
+            viewMode={enquiriesMapViewMode}
+            reportType="enquiries"
+            onNavigateDetail={(id) => window.open(`/enquiries/${id}`, '_blank')}
+          />
+        )}
+
+        {/* Area Breakdown Summary Table */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base font-semibold flex items-center justify-between">
+              <span>Area Lead Breakdown & Conversion Rates</span>
+              <span className="text-xs font-normal text-muted-foreground">({enquiriesMapData?.area_breakdown?.length || 0} Areas)</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {enquiriesMapData?.area_breakdown && enquiriesMapData.area_breakdown.length > 0 ? (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm text-left">
+                  <thead className="bg-muted/50 text-xs font-semibold text-muted-foreground uppercase border-b">
+                    <tr>
+                      <th className="px-4 py-3">Area</th>
+                      <th className="px-4 py-3 text-right">Enquiry Count</th>
+                      <th className="px-4 py-3 text-right">Converted Count</th>
+                      <th className="px-4 py-3 text-right">Conversion Rate (%)</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {enquiriesMapData.area_breakdown.map((row, idx) => (
+                      <tr key={idx} className="hover:bg-muted/30 transition-colors">
+                        <td className="px-4 py-3 font-semibold text-slate-800 capitalize flex items-center gap-2">
+                          <Map className="h-3.5 w-3.5 text-indigo-600 shrink-0" />
+                          {row.area}
+                        </td>
+                        <td className="px-4 py-3 text-right font-bold">{row.enquiry_count}</td>
+                        <td className="px-4 py-3 text-right text-emerald-600 font-semibold">{row.converted_count}</td>
+                        <td className="px-4 py-3 text-right font-extrabold text-slate-900">
+                          <span className="bg-indigo-50 text-indigo-700 text-xs font-bold px-2.5 py-0.5 rounded border border-indigo-200">
+                            {row.conversion_rate}%
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <p className="text-center py-6 text-sm text-muted-foreground">No area lead data available for the selected filters.</p>
+            )}
+          </CardContent>
+        </Card>
+      </>
+    );
+  };
+
+  // Peak & Off-Peak Demand Report View
+  const renderPeakDemandReport = () => {
+    const summary = peakDemandData?.summary || {
+      total_orders: 0,
+      total_revenue: 0,
+      busiest_day: '-',
+      busiest_hour: '-',
+      quietest_day: '-',
+      quietest_hour: '-',
+      weekend_order_share: 0,
+      weekday_order_share: 0,
+    };
+
+    const daysList = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const hoursList = [8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20];
+
+    const getMatrixCell = (dayIdx, hour) => {
+      if (!peakDemandData?.demand_matrix) return { order_count: 0, total_revenue: 0, is_peak: false };
+      return peakDemandData.demand_matrix.find((m) => m.day_of_week === dayIdx && m.hour === hour) || {
+        order_count: 0,
+        total_revenue: 0,
+        is_peak: false,
+      };
+    };
+
+    return (
+      <>
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <div className="flex items-center gap-4">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => {
+                setSelectedReport(null);
+                setPeakDemandData(null);
+              }}
+            >
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+            <div>
+              <h1 className="text-2xl font-bold">Peak & Off-Peak Demand Report</h1>
+              <p className="text-sm text-muted-foreground">Analyze booking volume trends by day of week and time slot to optimize ad schedules and off-peak promotions.</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={fetchPeakDemandReport} disabled={peakDemandLoading} className="flex items-center gap-2">
+              {peakDemandLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Filter className="h-4 w-4" />}
+              Refresh Data
+            </Button>
+          </div>
+        </div>
+
+        {/* Filters Section */}
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-base font-semibold">
+              <Filter className="h-4 w-4 text-primary" />
+              Filter Demand Analytics
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div>
+                <Label htmlFor="peak_date_from">Date From</Label>
+                <Input
+                  id="peak_date_from"
+                  type="date"
+                  value={peakDemandFilters.date_from}
+                  onChange={(e) => setPeakDemandFilters((prev) => ({ ...prev, date_from: e.target.value }))}
+                />
+              </div>
+              <div>
+                <Label htmlFor="peak_date_to">Date To</Label>
+                <Input
+                  id="peak_date_to"
+                  type="date"
+                  value={peakDemandFilters.date_to}
+                  onChange={(e) => setPeakDemandFilters((prev) => ({ ...prev, date_to: e.target.value }))}
+                />
+              </div>
+              <div>
+                <Label htmlFor="peak_area">Area / Location Filter</Label>
+                <Input
+                  id="peak_area"
+                  type="text"
+                  placeholder="e.g. Cochin, Kakkanad"
+                  value={peakDemandFilters.area}
+                  onChange={(e) => setPeakDemandFilters((prev) => ({ ...prev, area: e.target.value }))}
+                />
+              </div>
+              <div className="flex items-end gap-2">
+                <Button onClick={fetchPeakDemandReport} className="w-full bg-primary text-white" disabled={peakDemandLoading}>
+                  {peakDemandLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                  Apply Filters
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* KPI Metrics */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <Card>
+            <CardContent className="pt-4 pb-3">
+              <p className="text-xs font-medium text-muted-foreground">Busiest Day</p>
+              <p className="text-2xl font-bold text-slate-900 mt-1">{summary.busiest_day}</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-4 pb-3">
+              <p className="text-xs font-medium text-muted-foreground">Peak Time Slot</p>
+              <p className="text-xl font-bold text-emerald-700 mt-1 truncate">{summary.busiest_hour}</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-4 pb-3">
+              <p className="text-xs font-medium text-muted-foreground">Quietest Off-Peak Slot</p>
+              <p className="text-xl font-bold text-amber-700 mt-1 truncate">{summary.quietest_hour}</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-4 pb-3">
+              <p className="text-xs font-medium text-muted-foreground">Weekend vs Weekday Share</p>
+              <p className="text-2xl font-bold text-slate-900 mt-1">
+                {summary.weekend_order_share}% <span className="text-xs font-normal text-slate-500">Weekend / {summary.weekday_order_share}% Weekday</span>
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* 7x24 Demand Heatmap Grid */}
+        <Card>
+          <CardHeader>
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+              <CardTitle className="text-base font-semibold flex items-center gap-2">
+                <Clock className="h-5 w-5 text-primary" />
+                Hourly Demand Matrix (7 Days × 12 Operating Hours)
+              </CardTitle>
+              <div className="flex items-center gap-4 text-xs font-medium text-muted-foreground">
+                <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-amber-100 border border-amber-300" /> Peak Demand</span>
+                <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-blue-50 border border-blue-200" /> Moderate Demand</span>
+                <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-gray-50 border border-gray-200" /> Off-Peak / Quiet</span>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {peakDemandLoading ? (
+              <Skeleton className="w-full h-64 rounded-xl" />
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs text-center border-collapse">
+                  <thead>
+                    <tr className="bg-muted/50 border-b">
+                      <th className="px-3 py-2 text-left font-semibold text-muted-foreground">Day \ Hour</th>
+                      {hoursList.map((h) => (
+                        <th key={h} className="px-2 py-2 font-semibold text-muted-foreground whitespace-nowrap">
+                          {h % 12 === 0 ? 12 : h % 12}{h >= 12 ? 'pm' : 'am'}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {daysList.map((dayName, dIdx) => (
+                      <tr key={dayName} className="hover:bg-muted/20 transition-colors">
+                        <td className="px-3 py-2.5 font-bold text-left text-slate-800 bg-muted/30 whitespace-nowrap">{dayName}</td>
+                        {hoursList.map((h) => {
+                          const cell = getMatrixCell(dIdx, h);
+                          const count = cell.order_count;
+                          const isPeak = cell.is_peak;
+
+                          let cellBg = 'bg-gray-50/50 text-slate-400 border-gray-100';
+                          if (isPeak) {
+                            cellBg = 'bg-amber-100 text-amber-900 border-amber-300 font-extrabold shadow-xs';
+                          } else if (count > 0) {
+                            cellBg = 'bg-blue-50 text-blue-900 border-blue-200 font-bold';
+                          }
+
+                          return (
+                            <td key={h} className={`px-2 py-2 border text-center transition-all ${cellBg}`} title={`${dayName} ${h}:00 - ${count} orders (₹${cell.total_revenue})`}>
+                              <div className="flex flex-col items-center justify-center">
+                                <span>{count > 0 ? count : '-'}</span>
+                                {count > 0 && <span className="text-[10px] opacity-75 font-normal">₹{cell.total_revenue}</span>}
+                              </div>
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Charts Section */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Day of Week Breakdown Chart */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base font-semibold">Orders by Day of Week</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {peakDemandData?.day_of_week_breakdown ? (
+                <div className="h-64">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={peakDemandData.day_of_week_breakdown}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                      <XAxis dataKey="day_name" tick={{ fontSize: 11 }} />
+                      <YAxis />
+                      <Tooltip formatter={(value, name) => [name === 'total_revenue' ? `₹${value}` : value, name === 'total_revenue' ? 'Revenue' : 'Orders']} />
+                      <Bar dataKey="order_count" name="Orders" fill="#2563eb" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              ) : (
+                <Skeleton className="w-full h-64" />
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Time Block Breakdown Chart */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base font-semibold">Orders by Time Block</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {peakDemandData?.time_block_breakdown ? (
+                <div className="h-64">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={peakDemandData.time_block_breakdown}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                      <XAxis dataKey="block_name" tick={{ fontSize: 10 }} interval={0} />
+                      <YAxis />
+                      <Tooltip formatter={(value) => [value, 'Orders']} />
+                      <Bar dataKey="order_count" name="Orders" fill="#10b981" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              ) : (
+                <Skeleton className="w-full h-64" />
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Off-Peak Marketing Opportunities Table */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base font-semibold flex items-center justify-between">
+              <span>Off-Peak Marketing Opportunities & Recommendations</span>
+              <span className="text-xs font-normal text-muted-foreground">Actionable Campaign Suggestions</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {peakDemandData?.recommendations && peakDemandData.recommendations.length > 0 ? (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm text-left">
+                  <thead className="bg-muted/50 text-xs font-semibold text-muted-foreground uppercase border-b">
+                    <tr>
+                      <th className="px-4 py-3">Day</th>
+                      <th className="px-4 py-3">Time Slot</th>
+                      <th className="px-4 py-3 text-center">Current Bookings</th>
+                      <th className="px-4 py-3">Suggested Marketing Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {peakDemandData.recommendations.map((rec, idx) => (
+                      <tr key={idx} className="hover:bg-muted/30 transition-colors">
+                        <td className="px-4 py-3 font-semibold text-slate-800">{rec.day_name}</td>
+                        <td className="px-4 py-3 font-medium text-slate-700">{rec.time_slot}</td>
+                        <td className="px-4 py-3 text-center">
+                          <span className="bg-amber-50 text-amber-700 text-xs font-bold px-2.5 py-0.5 rounded border border-amber-200">
+                            {rec.current_count} Bookings
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-xs text-slate-600 font-medium">
+                          {rec.suggested_strategy}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <p className="text-center py-6 text-sm text-muted-foreground">No off-peak recommendation data available for the selected filters.</p>
+            )}
+          </CardContent>
+        </Card>
+      </>
+    );
+  };
+
   return (
     <div className="container mx-auto p-6 space-y-6">
       {!selectedReport && renderReportSelection()}
@@ -2096,6 +3098,9 @@ const Reports = () => {
       {selectedReport === 'enquiries' && renderEnquiriesReport()}
       {selectedReport === 'eod' && renderEodReport()}
       {selectedReport === 'repeat_customers' && renderRepeatCustomersReport()}
+      {selectedReport === 'orders_map' && renderOrdersMapReport()}
+      {selectedReport === 'enquiries_map' && renderEnquiriesMapReport()}
+      {selectedReport === 'peak_demand' && renderPeakDemandReport()}
     </div>
   );
 };

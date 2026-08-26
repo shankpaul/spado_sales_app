@@ -316,6 +316,33 @@ const orderService = {
     const response = await apiClient.get('/orders/reports/repeat-customers', { params });
     return response.data;
   },
+
+  /**
+   * Get orders map report
+   * @param {Object} params - Query parameters (date_from, date_to, status)
+   */
+  getOrdersMapReport: async (params = {}) => {
+    const response = await apiClient.get('/orders/reports/orders-map', { params });
+    return response.data;
+  },
+
+  /**
+   * Get enquiries map report
+   * @param {Object} params - Query parameters (date_from, date_to, status, source)
+   */
+  getEnquiriesMapReport: async (params = {}) => {
+    const response = await apiClient.get('/orders/reports/enquiries-map', { params });
+    return response.data;
+  },
+
+  /**
+   * Get peak & off-peak demand report
+   * @param {Object} params - Query parameters (date_from, date_to, area)
+   */
+  getPeakDemandReport: async (params = {}) => {
+    const response = await apiClient.get('/orders/reports/peak-demand', { params });
+    return response.data;
+  },
 };
 
 export default orderService;
