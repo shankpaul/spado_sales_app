@@ -1190,7 +1190,7 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
                         Complete Order
                       </Button>
                     )}
-                    {(order.status != 'completed') && (
+                    {(order.status != 'completed' && order.status != 'cancelled' && order.status != 'archived') && (
                       <Button
                         variant="destructive"
                         onClick={() => setIsCancelDialogOpen(true)}
