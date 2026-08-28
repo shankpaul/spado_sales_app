@@ -74,6 +74,7 @@ import OrderWizard from '../components/OrderWizard';
 import {
   ORDER_STATUSES,
   PAYMENT_STATUSES,
+  PAYMENT_METHODS,
   CANCELLATION_REASONS,
   getStatusColor,
   getStatusLabel,
@@ -118,12 +119,14 @@ import {
   Navigation,
   Route,
   Home,
+  CreditCard,
 } from 'lucide-react';
 import MapPreview from '@/components/MapPreview';
 import VehicleIcon from '../components/VehicleIcon';
 import { formatDate, formatDateTime, formatTime, formatCurrency, reverseGeocode } from '../lib/utilities';
 import { Badge2 } from '@/components/ui/badge2';
 import LetterAvatar from '@/components/LetterAvatar';
+import CustomerDetails from '../components/CustomerDetails';
 import useOrderStore from '../store/orderStore';
 import ablyClient from '../services/ablyClient';
 
@@ -260,6 +263,14 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
   const [recordPaymentMethod, setRecordPaymentMethod] = useState('');
   const [recordPaymentVerified, setRecordPaymentVerified] = useState(false);
   const [recordingPayment, setRecordingPayment] = useState(false);
+
+  // Edit payment method dialog state
+  const [isEditPaymentMethodOpen, setIsEditPaymentMethodOpen] = useState(false);
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState('');
+  const [updatingPaymentMethod, setUpdatingPaymentMethod] = useState(false);
+
+  // Customer details dialog state
+  const [isCustomerDetailsOpen, setIsCustomerDetailsOpen] = useState(false);
 
   // Quick booking edit dialog state
   const [isBookingEditOpen, setIsBookingEditOpen] = useState(false);
@@ -415,6 +426,22 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
       toast.error('Failed to update location');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSavePaymentMethod = async () => {
+    try {
+      setUpdatingPaymentMethod(true);
+      await orderService.updateOrder(id, {
+        payment_method: selectedPaymentMethod || 'none',
+      });
+      toast.success(selectedPaymentMethod ? 'Payment method updated successfully' : 'Payment method cleared');
+      setIsEditPaymentMethodOpen(false);
+      await fetchOrderDetails(true);
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to update payment method');
+    } finally {
+      setUpdatingPaymentMethod(false);
     }
   };
 
@@ -814,6 +841,7 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
 
   const isAdmin = user?.role === 'admin';
   const isEditable = isAdmin || (order.status !== 'completed' && order.status !== 'cancelled');
+  const canAddPaymentMethod = order && order.status !== 'cancelled' && order.status !== 'archived' && !order.archived && order.payment_status === 'pending';
 
   // Get order status progress
   const getOrderProgress = () => {
@@ -1014,7 +1042,7 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-muted-foreground bg-gray-50 border rounded-xl px-4 py-2.5">
               <span>Ordered <span className="font-semibold text-foreground">{formatDate(order.created_at)}</span></span>
               <span className="text-gray-300">•</span>
-              <span>Customer <span className="font-semibold text-foreground">{order.customer?.name}</span></span>
+              <span>Customer <button type="button" onClick={() => setIsCustomerDetailsOpen(true)} className="font-semibold text-foreground hover:text-primary hover:underline cursor-pointer">{order.customer?.name}</button></span>
               {order.converted_from_enquiry_id && (
                 <>
                   <span className="text-gray-300">•</span>
@@ -1459,7 +1487,15 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
                             <div key={index} className="flex gap-4">
                               <div className="flex flex-col items-center">
                                 <div className="w-5 h-5 text-muted-foreground rounded-full flex items-center justify-center flex-shrink-0 ">
-                                  {event.type === 'status_changed' ? (
+                                  {event.event_type === 'payment_method' || event.eventType === 'payment_method' ? (
+                                    <CreditCard size={14} className="text-emerald-600" />
+                                  ) : event.event_type === 'payment_completed' || event.eventType === 'payment_completed' ? (
+                                    <CheckCircle2 size={14} className="text-green-600" />
+                                  ) : event.event_type === 'rescheduled' || event.eventType === 'rescheduled' ? (
+                                    <CalendarClock size={14} className="text-blue-600" />
+                                  ) : event.event_type === 'location_updated' || event.eventType === 'location_updated' ? (
+                                    <MapPin size={14} className="text-orange-600" />
+                                  ) : event.type === 'status_changed' || event.event_type === 'status_change' ? (
                                     <CheckCircle2 size={14} />
                                   ) : event.type === 'cancelled' ? (
                                     <XCircle size={14} />
@@ -1832,7 +1868,7 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
 
             {order.offer && <div className="p-4 border flex  items-center gap-2 rounded-lg bg-green-50">
               <BadgePercent className='text-green-600' />
-              <span className="text-sm text-green-700">{order.offer.name} applied
+              <span className="text-sm text-green-700 capitalize">{order.offer.name} applied
               </span>
             </div>
             }
@@ -1851,10 +1887,40 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
                     <Badge2 variant={getBadgeVariant(order.payment_status, 'payment')}>
                       {getStatusLabel(order.payment_status, PAYMENT_STATUSES)}
                     </Badge2>
+
                   </div>
                 </div>
 
                 <div className="p-5 space-y-2.5">
+                  {canAddPaymentMethod && (
+                    <div className="flex items-center justify-between p-3 rounded-lg bg-blue-50/70 border border-blue-100 mb-3">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center shrink-0">
+                          <CreditCard className="h-4 w-4 text-blue-600" />
+                        </div>
+                        <div>
+                          <p className="text-xs font-semibold text-gray-900">
+                            {order.payment_method
+                              ? `Preferred Method: ${order.payment_method.replace('_', ' ').toUpperCase()}`
+                              : 'No Payment Method Selected'}
+                          </p>
+                          <p className="text-[11px] text-muted-foreground">Pre-select payment method for this pending order</p>
+                        </div>
+                      </div>
+                      <Button
+                        size="sm"
+                        onClick={() => {
+                          setSelectedPaymentMethod(order.payment_method || '');
+                          setIsEditPaymentMethodOpen(true);
+                        }}
+                        className="mt-2 gap-1.5 bg-blue-600 hover:bg-blue-700 text-white"
+
+                      >
+                        <Edit className="h-3 w-3" />
+                        {order.payment_method ? 'Change' : 'Add Payment Method'}
+                      </Button>
+                    </div>
+                  )}
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">
                       Subtotal ({(order.packages?.length || 0) + (order.addons?.length || 0)} items)
@@ -1929,7 +1995,7 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
                     <Button
                       className="w-full mt-2 gap-1.5 bg-blue-600 hover:bg-blue-700 text-white"
                       onClick={() => {
-                        setRecordPaymentMethod('');
+                        setRecordPaymentMethod(order?.payment_method || '');
                         setRecordPaymentVerified(false);
                         setIsPaymentDialogOpen(true);
                       }}
@@ -2134,9 +2200,11 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
               </div>
               <div className="p-4">
                 <div className="flex items-center gap-3">
-                  <LetterAvatar name={order.customer?.name} size="md" className="text-white" />
+                  <LetterAvatar name={order.customer?.name} size="md" className="text-white cursor-pointer hover:opacity-80 transition-opacity" onClick={() => setIsCustomerDetailsOpen(true)} />
                   <div className="flex-1">
-                    <div className="font-medium">{order.customer?.name}</div>
+                    <button type="button" onClick={() => setIsCustomerDetailsOpen(true)} className="font-medium text-left text-foreground hover:text-primary hover:underline cursor-pointer">
+                      {order.customer?.name}
+                    </button>
                     <div className="text-xs text-muted-foreground">
                       {order.customer?.phone}
                     </div>
@@ -2162,7 +2230,9 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
                   <div className="space-y-1 text-sm">
                     <div className='flex justify-between items-center'>
                       {order.customer?.name && (
-                        <div className="font-medium">{order.customer.name}</div>
+                        <button type="button" onClick={() => setIsCustomerDetailsOpen(true)} className="font-medium text-foreground hover:text-primary hover:underline cursor-pointer">
+                          {order.customer.name}
+                        </button>
                       )}
 
                       {order.address.map_link && (
@@ -2277,7 +2347,9 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
       {/* Record Payment Dialog - Desktop */}
       <Dialog open={isPaymentDialogOpen && !isMobile} onOpenChange={(open) => {
         setIsPaymentDialogOpen(open);
-        if (!open) {
+        if (open) {
+          setRecordPaymentMethod(order?.payment_method || '');
+        } else {
           setRecordPaymentMethod('');
           setRecordPaymentVerified(false);
         }
@@ -2372,7 +2444,9 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
       {/* Record Payment Drawer - Mobile */}
       <Drawer open={isPaymentDialogOpen && isMobile} onOpenChange={(open) => {
         setIsPaymentDialogOpen(open);
-        if (!open) {
+        if (open) {
+          setRecordPaymentMethod(order?.payment_method || '');
+        } else {
           setRecordPaymentMethod('');
           setRecordPaymentVerified(false);
         }
@@ -2458,6 +2532,162 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
               >
                 {recordingPayment && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                 Confirm Payment
+              </Button>
+            </div>
+          </div>
+        </DrawerContent>
+      </Drawer>
+
+      {/* Edit Payment Method Dialog - Desktop */}
+      <Dialog open={isEditPaymentMethodOpen && !isMobile} onOpenChange={setIsEditPaymentMethodOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <CreditCard className="h-5 w-5 text-primary" />
+              Preferred Payment Method
+            </DialogTitle>
+            <DialogDescription>
+              Select or update the preferred payment method for this order.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-3">
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <Label className="text-sm font-semibold">Select Payment Method</Label>
+                {selectedPaymentMethod && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setSelectedPaymentMethod('')}
+                    className="h-7 px-2 text-xs text-red-500 hover:text-red-700 hover:bg-red-50 font-medium"
+                  >
+                    <XIcon className="h-3.5 w-3.5 mr-1" />
+                    Remove Selection
+                  </Button>
+                )}
+              </div>
+
+              <RadioGroup
+                value={selectedPaymentMethod}
+                onValueChange={setSelectedPaymentMethod}
+                className="grid grid-cols-2 gap-2.5"
+                disabled={updatingPaymentMethod}
+              >
+                {PAYMENT_METHODS.map((method) => (
+                  <div
+                    key={method.value}
+                    className={`flex items-center gap-2.5 border rounded-lg p-3 cursor-pointer transition-all ${selectedPaymentMethod === method.value
+                      ? 'border-primary bg-primary/5 font-semibold text-primary'
+                      : 'hover:bg-slate-50'
+                      }`}
+                  >
+                    <RadioGroupItem value={method.value} id={`opt-pm-${method.value}`} />
+                    <Label htmlFor={`opt-pm-${method.value}`} className="text-sm font-medium cursor-pointer select-none">
+                      {method.label}
+                    </Label>
+                  </div>
+                ))}
+              </RadioGroup>
+
+              {!selectedPaymentMethod && (
+                <p className="text-xs text-muted-foreground italic mt-1">
+                  No payment method selected. You can save without choosing a method or remove existing selection.
+                </p>
+              )}
+            </div>
+          </div>
+
+          <div className="flex gap-2 pt-2">
+            <Button
+              variant="outline"
+              onClick={() => setIsEditPaymentMethodOpen(false)}
+              disabled={updatingPaymentMethod}
+              className="flex-1"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSavePaymentMethod}
+              disabled={updatingPaymentMethod}
+              className="flex-1 bg-primary text-white font-medium"
+            >
+              {updatingPaymentMethod && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Save Payment Method
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Payment Method Drawer - Mobile */}
+      <Drawer open={isEditPaymentMethodOpen && isMobile} onOpenChange={setIsEditPaymentMethodOpen}>
+        <DrawerContent className="max-h-[90vh]">
+          <DrawerHeader className="px-4 text-left">
+            <DrawerTitle className="flex items-center gap-2">
+              <CreditCard className="h-5 w-5 text-primary" />
+              Preferred Payment Method
+            </DrawerTitle>
+            <DrawerDescription>
+              Select or update the preferred payment method for this order.
+            </DrawerDescription>
+          </DrawerHeader>
+
+          <div className="px-4 pb-4 space-y-4">
+            <div className="flex items-center justify-between">
+              <Label className="text-sm font-semibold">Select Payment Method</Label>
+              {selectedPaymentMethod && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setSelectedPaymentMethod('')}
+                  className="h-7 px-2 text-xs text-red-500 hover:text-red-700 font-medium"
+                >
+                  <XIcon className="h-3.5 w-3.5 mr-1" />
+                  Remove Selection
+                </Button>
+              )}
+            </div>
+
+            <RadioGroup
+              value={selectedPaymentMethod}
+              onValueChange={setSelectedPaymentMethod}
+              className="grid grid-cols-2 gap-2.5"
+              disabled={updatingPaymentMethod}
+            >
+              {PAYMENT_METHODS.map((method) => (
+                <div
+                  key={method.value}
+                  className={`flex items-center gap-2.5 border rounded-lg p-3 cursor-pointer transition-all ${selectedPaymentMethod === method.value
+                    ? 'border-primary bg-primary/5 font-semibold text-primary'
+                    : 'hover:bg-slate-50'
+                    }`}
+                >
+                  <RadioGroupItem value={method.value} id={`mobile-opt-pm-${method.value}`} />
+                  <Label htmlFor={`mobile-opt-pm-${method.value}`} className="text-sm font-medium cursor-pointer select-none">
+                    {method.label}
+                  </Label>
+                </div>
+              ))}
+            </RadioGroup>
+
+            <div className="flex gap-2 pt-2">
+              <Button
+                variant="outline"
+                onClick={() => setIsEditPaymentMethodOpen(false)}
+                disabled={updatingPaymentMethod}
+                className="flex-1"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleSavePaymentMethod}
+                disabled={updatingPaymentMethod}
+                className="flex-1 bg-primary text-white font-medium"
+              >
+                {updatingPaymentMethod && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                Save Payment Method
               </Button>
             </div>
           </div>
@@ -3493,6 +3723,13 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
           </div>
         </DrawerContent>
       </Drawer>
+
+      {/* Customer Details Dialog */}
+      <CustomerDetails
+        customer={order.customer}
+        open={isCustomerDetailsOpen}
+        onOpenChange={setIsCustomerDetailsOpen}
+      />
     </div>
   );
 };

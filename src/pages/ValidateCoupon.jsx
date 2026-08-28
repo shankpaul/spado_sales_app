@@ -1,21 +1,21 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate, Link } from 'react-router-dom';
-import { 
-  Search, 
-  CheckCircle2, 
-  XCircle, 
-  AlertTriangle, 
-  Clock, 
-  Tag, 
-  Gift, 
-  User, 
-  Phone, 
-  Mail, 
-  ShoppingBag, 
-  RefreshCw, 
-  Copy, 
-  Check, 
-  Sparkles, 
+import {
+  Search,
+  CheckCircle2,
+  XCircle,
+  AlertTriangle,
+  Clock,
+  Tag,
+  Gift,
+  User,
+  Phone,
+  Mail,
+  ShoppingBag,
+  RefreshCw,
+  Copy,
+  Check,
+  Sparkles,
   ArrowRight,
   ShieldCheck,
   Calendar,
@@ -38,7 +38,7 @@ export default function ValidateCoupon() {
   const [couponCode, setCouponCode] = useState(initialCode);
   const [mobileNumber, setMobileNumber] = useState(initialMobile);
   const [customerId, setCustomerId] = useState('');
-  
+
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
   const [errorMsg, setErrorMsg] = useState(null);
@@ -80,7 +80,7 @@ export default function ValidateCoupon() {
       }
     } catch (err) {
       const serverMessage = err.response?.data?.errors?.[0] || err.message || 'Invalid coupon code';
-      
+
       // 2. Try searching in general coupons list or offers list as fallback lookup
       try {
         const couponsRes = await campaignService.getAllCoupons({ search: cleanCode, per_page: 1 });
@@ -119,8 +119,8 @@ export default function ValidateCoupon() {
           setResult({
             type: 'offer_code',
             valid: isValidNow,
-            message: isValidNow 
-              ? 'Promotional Offer Coupon Code is active and valid.' 
+            message: isValidNow
+              ? 'Promotional Offer Coupon Code is active and valid.'
               : isExpired ? 'Offer has expired.' : isMaxReached ? 'Offer maximum total redemptions reached.' : 'Offer is inactive.',
             offer: matchedOffer
           });
@@ -183,7 +183,7 @@ export default function ValidateCoupon() {
 
       {/* Input Search Card */}
       <div className="bg-white p-4 sm:p-6 rounded-2xl border border-gray-200 shadow-sm space-y-4">
-        <form 
+        <form
           onSubmit={(e) => {
             e.preventDefault();
             handleValidate();
@@ -199,7 +199,7 @@ export default function ValidateCoupon() {
                 <Input
                   id="coupon_code_input"
                   type="text"
-                  placeholder="e.g. DXB-LULU-SUMMER-1001 or SAVE20"
+                  placeholder="e.g. SUMMER-1001 or SAVE20"
                   value={couponCode}
                   onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
                   className="h-11 sm:h-12 font-mono uppercase font-semibold text-sm sm:text-base tracking-wider pr-10 border-gray-300 focus:border-primary focus:ring-primary"
@@ -207,17 +207,17 @@ export default function ValidateCoupon() {
                 <Search className="h-5 w-5 text-gray-400 absolute right-3 top-3 sm:top-3.5 pointer-events-none" />
               </div>
               <div className="flex items-center gap-2 shrink-0">
-                <Button 
-                  type="button" 
-                  variant="outline" 
+                <Button
+                  type="button"
+                  variant="outline"
                   onClick={handleReset}
                   disabled={loading || !couponCode}
                   className="h-11 sm:h-12 text-xs px-3.5 sm:px-4 border-gray-300 text-gray-700 flex-1 sm:flex-initial"
                 >
                   Clear
                 </Button>
-                <Button 
-                  type="submit" 
+                <Button
+                  type="submit"
                   disabled={loading || !couponCode.trim()}
                   className="h-11 sm:h-12 text-xs sm:text-sm px-5 sm:px-6 font-semibold bg-primary hover:bg-primary/95 text-white shadow-md flex-1 sm:flex-initial"
                 >
@@ -241,16 +241,14 @@ export default function ValidateCoupon() {
 
       {/* Validation Result Banner */}
       {result && (
-        <div className={`p-4 sm:p-6 rounded-2xl border transition-all duration-200 shadow-sm ${
-          result.valid 
-            ? 'bg-emerald-50/90 border-emerald-200 text-emerald-950' 
-            : 'bg-rose-50/90 border-rose-200 text-rose-950'
-        }`}>
+        <div className={`p-4 sm:p-6 rounded-2xl border transition-all duration-200 shadow-sm ${result.valid
+          ? 'bg-emerald-50/90 border-emerald-200 text-emerald-950'
+          : 'bg-rose-50/90 border-rose-200 text-rose-950'
+          }`}>
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3.5">
             <div className="flex items-start gap-3 flex-1">
-              <div className={`p-2.5 sm:p-3 rounded-xl shrink-0 ${
-                result.valid ? 'bg-emerald-500 text-white' : 'bg-rose-500 text-white'
-              }`}>
+              <div className={`p-2.5 sm:p-3 rounded-xl shrink-0 ${result.valid ? 'bg-emerald-500 text-white' : 'bg-rose-500 text-white'
+                }`}>
                 {result.valid ? <CheckCircle2 className="h-5 w-5 sm:h-6 sm:w-6" /> : <XCircle className="h-5 w-5 sm:h-6 sm:w-6" />}
               </div>
 
@@ -313,8 +311,8 @@ export default function ValidateCoupon() {
               <div className="p-3 bg-blue-50/70 border border-blue-100 rounded-xl space-y-1">
                 <span className="text-[10px] sm:text-[11px] font-bold text-blue-600 uppercase tracking-wider">Discount Value</span>
                 <p className="text-base sm:text-lg font-black text-blue-700">
-                  {(coupon?.discount_type || offer?.discount_type) === 'percentage' 
-                    ? `${coupon?.discount_value || offer?.discount_value || 0}% OFF` 
+                  {(coupon?.discount_type || offer?.discount_type) === 'percentage'
+                    ? `${coupon?.discount_value || offer?.discount_value || 0}% OFF`
                     : `₹${coupon?.discount_value || offer?.discount_value || 0}`
                   }
                 </p>
@@ -366,7 +364,7 @@ export default function ValidateCoupon() {
                   <Calendar className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-gray-400 shrink-0" /> Expiry Date:
                 </span>
                 <span className="font-semibold text-gray-800">
-                  {(coupon?.expiry_date || offer?.end_date) 
+                  {(coupon?.expiry_date || offer?.end_date)
                     ? new Date(coupon?.expiry_date || offer?.end_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
                     : 'No Expiry Set'
                   }
@@ -377,7 +375,7 @@ export default function ValidateCoupon() {
             {/* Campaign Navigation Link */}
             {coupon?.campaign_id && (
               <div className="pt-3 border-t border-gray-100 flex justify-end">
-                <Link 
+                <Link
                   to={`/campaigns/${coupon.campaign_id}`}
                   className="text-xs font-bold text-primary hover:text-primary/80 flex items-center gap-1"
                 >
@@ -445,7 +443,7 @@ export default function ValidateCoupon() {
                     {coupon?.order_id ? (
                       <div className="flex items-center justify-between pt-0.5">
                         <span className="text-xs font-semibold text-gray-700">Order ID: #{coupon.order_id}</span>
-                        <Link 
+                        <Link
                           to={`/orders/${coupon.order_id}`}
                           className="text-xs font-bold text-primary hover:underline inline-flex items-center gap-1 bg-white px-2 py-1 rounded border border-gray-200 shadow-xs"
                         >
@@ -455,7 +453,7 @@ export default function ValidateCoupon() {
                     ) : (
                       <div className="flex items-center justify-between pt-0.5">
                         <span className="text-xs font-semibold text-gray-700">Redeemed in Sales Orders</span>
-                        <Link 
+                        <Link
                           to={`/orders?search=${encodeURIComponent(coupon?.code || offer?.coupon_code || '')}`}
                           className="text-xs font-bold text-primary hover:underline inline-flex items-center gap-1 bg-white px-2 py-1 rounded border border-gray-200 shadow-xs"
                         >

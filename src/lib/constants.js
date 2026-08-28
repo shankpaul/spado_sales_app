@@ -206,9 +206,9 @@ export const SUBSCRIPTION_STATUSES = [
 // Payment Method Constants
 export const PAYMENT_METHODS = [
   { value: 'cash', label: 'Cash' },
-  { value: 'card', label: 'Card' },
+  // { value: 'card', label: 'Card' },
   { value: 'upi', label: 'UPI' },
-  { value: 'bank_transfer', label: 'Bank Transfer' },
+  // { value: 'bank_transfer', label: 'Bank Transfer' },
 ];
 
 // Subscription Payment Status Constants

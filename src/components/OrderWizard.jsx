@@ -60,6 +60,7 @@ import {
   MAX_DISCOUNT_PERCENTAGE,
   DISCOUNT_TYPES,
   GST_PERCENTAGE,
+  PAYMENT_METHODS,
 } from '../lib/constants';
 import {
   ChevronLeft,
@@ -91,6 +92,7 @@ import {
   Clock,
   FileText,
   User,
+  CreditCard,
 } from 'lucide-react';
 import { Badge2 } from './ui/badge2';
 
@@ -180,6 +182,7 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
     longitude: 0,
   });
   const [customerPhone, setCustomerPhone] = useState(''); // Order-specific customer phone
+  const [paymentMethod, setPaymentMethod] = useState(''); // Preferred payment method
   const [notes, setNotes] = useState('');
   const [orderStatus, setOrderStatus] = useState('');
   const [customerHistoryLoading, setCustomerHistoryLoading] = useState(false);
@@ -616,6 +619,7 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
     setSelectedAgent(data.selectedAgent || '');
     setAddress(data.address || { area: '', city: '', district: '', state: '', map_link: '' });
     setCustomerPhone(data.customerPhone || '');
+    setPaymentMethod(data.paymentMethod || '');
     setNotes(data.notes || '');
     setSelectedOffer(data.selectedOffer || null);
     setCouponCode(data.couponCode || '');
@@ -638,6 +642,7 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
       bookingTimeTo,
       selectedAgent,
       customerPhone,
+      paymentMethod,
       address,
       notes,
       selectedOffer,
@@ -1022,6 +1027,9 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
         // Set notes
         setNotes(order.notes || '');
 
+        // Set payment method
+        setPaymentMethod(order.payment_method || '');
+
         // Set redeemed points if any
         if (order.points_redeemed) {
           setPointsToRedeem(order.points_redeemed);
@@ -1107,6 +1115,7 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
     setSelectedAgent('');
     setAddress({ area: '', city: '', district: '', state: '', map_link: '', latitude: 0, longitude: 0 });
     setNotes('');
+    setPaymentMethod('');
     setOrderStatus('');
     setSubmitError('');
     setErrors({});
@@ -1657,6 +1666,7 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
         offer_id: selectedOffer ? parseInt(selectedOffer.id, 10) : null,
         coupon_code: isCouponVerified ? couponCode.trim().toUpperCase() : undefined,
         points_redeemed: pointsToRedeem ? (parseInt(pointsToRedeem, 10) || 0) : 0,
+        payment_method: paymentMethod || '',
         notes,
         packages: packageItems.map((item) => ({
           package_id: parseInt(item.package_id, 10),
@@ -3086,8 +3096,77 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
             </div>
           </div>
 
-          {/* RIGHT COLUMN: Order Summary */}
+          {/* RIGHT COLUMN: Payment Method & Order Summary */}
           <div className="space-y-4">
+            {/* Preferred Payment Method Card */}
+            <div className="rounded-xl border bg-card overflow-hidden">
+              <div className="flex items-center justify-between px-4 py-3 border-b bg-gray-50/60">
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center justify-center w-7 h-7 rounded-lg bg-emerald-100">
+                    <CreditCard className="h-4 w-4 text-emerald-600" />
+                  </div>
+                  <span className="font-semibold text-sm">Preferred Payment Method</span>
+                </div>
+                {paymentMethod && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPaymentMethod('');
+                      saveDraft();
+                    }}
+                    className="text-xs text-red-500 hover:text-red-700 hover:bg-red-50 font-medium px-2 py-1 rounded transition-colors flex items-center gap-1 cursor-pointer"
+                  >
+                    <X className="h-3 w-3" />
+                    Remove
+                  </button>
+                )}
+              </div>
+              <div className="p-4 space-y-3">
+                <div className="grid grid-cols-2 gap-2.5">
+                  {[
+                    { value: 'cash', label: 'Cash' },
+                    { value: 'upi', label: 'UPI' },
+                  ].map((method) => {
+                    const isSelected = paymentMethod === method.value;
+                    return (
+                      <label
+                        key={method.value}
+                        className={`flex items-center gap-2 p-2.5 rounded-lg border cursor-pointer transition-all select-none ${
+                          isSelected
+                            ? 'border-primary bg-primary/5 text-primary font-semibold shadow-xs'
+                            : 'border-input hover:bg-accent/40 text-gray-700'
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          name="preferred_payment_method_wizard"
+                          value={method.value}
+                          checked={isSelected}
+                          onChange={() => {
+                            setPaymentMethod(method.value);
+                            saveDraft();
+                          }}
+                          className="h-4 w-4 text-primary accent-primary focus:ring-primary"
+                        />
+                        <span className="text-xs font-semibold">{method.label}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+                {!paymentMethod ? (
+                  <p className="text-xs text-muted-foreground italic">
+                    Optional — No payment method pre-selected for this order.
+                  </p>
+                ) : (
+                  <p className="text-xs text-emerald-600 font-medium flex items-center gap-1">
+                    <Check className="h-3.5 w-3.5" />
+                    Pre-selected: <span className="font-bold uppercase">{paymentMethod}</span>
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {/* Order Summary Card */}
             <div className="lg:sticky lg:top-4 rounded-xl border bg-card overflow-hidden">
               <div className="bg-gradient-to-r from-primary/90 to-primary px-4 py-3">
                 <p className="text-white font-bold text-sm tracking-wide">Order Summary</p>

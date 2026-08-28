@@ -74,12 +74,18 @@ import {
   Megaphone,
   ShoppingCart,
   UserX,
+  Edit,
+  Plus,
+  X,
 } from 'lucide-react';
-import { formatDate, formatDateTime } from '../lib/utilities';
+import orderService from '../services/orderService';
+import customerService from '../services/customerService';
+import { formatDate, formatDateTime, formatBookingTime } from '../lib/utilities';
 import { sanitizeImageUrl, isValidUrl } from '../lib/security';
 import { Badge2 } from '@/components/ui/badge2';
 import LetterAvatar from '@/components/LetterAvatar';
 import CustomerContact from '@/components/CustomerContact';
+import CustomerDetails from '../components/CustomerDetails';
 import VoiceNoteRecorder from '@/components/VoiceNoteRecorder';
 import WaveformPlayer from '@/components/WaveformPlayer';
 import OrderWizard from '../components/OrderWizard';
@@ -133,6 +139,186 @@ const EnquiryDetail = ({ enquiryId, onClose, onUpdate }) => {
   // Order Wizard state
   const [isOrderWizardOpen, setIsOrderWizardOpen] = useState(false);
   const [selectedCustomerForOrder, setSelectedCustomerForOrder] = useState(null);
+
+  // Customer details dialog state
+  const [isCustomerDetailsOpen, setIsCustomerDetailsOpen] = useState(false);
+
+  // Customer statistics & location state
+  const [customerInfo, setCustomerInfo] = useState(null);
+  const [customerOrdersCount, setCustomerOrdersCount] = useState(null);
+  const [lastBookingInfo, setLastBookingInfo] = useState(null);
+  const [loadingCustomerStats, setLoadingCustomerStats] = useState(false);
+
+  useEffect(() => {
+    const custId = enquiry?.customer?.id || enquiry?.customer_id;
+    const phone = enquiry?.contact_phone;
+
+    if (custId || phone) {
+      setLoadingCustomerStats(true);
+
+      const fetchCustomerData = async () => {
+        try {
+          let cData = enquiry?.customer || null;
+          if (custId) {
+            try {
+              cData = await customerService.getCustomerById(custId);
+            } catch (err) { }
+          }
+          setCustomerInfo(cData);
+
+          // Fetch orders to calculate total bookings and last booking date/time
+          const ordersRes = await orderService.getAllOrders(
+            custId ? { customer_id: custId, per_page: 50 } : { search: phone, per_page: 50 }
+          );
+          const ordersList = ordersRes?.orders || ordersRes || [];
+          setCustomerOrdersCount(ordersList.length);
+
+          if (ordersList.length > 0) {
+            const sortedOrders = [...ordersList].sort((a, b) =>
+              new Date(b.booking_date || b.created_at) - new Date(a.booking_date || a.created_at)
+            );
+            setLastBookingInfo(sortedOrders[0]);
+          } else {
+            setLastBookingInfo(null);
+          }
+        } catch (error) {
+          console.error('Error fetching customer statistics:', error);
+        } finally {
+          setLoadingCustomerStats(false);
+        }
+      };
+
+      fetchCustomerData();
+    } else {
+      setCustomerInfo(null);
+      setCustomerOrdersCount(0);
+      setLastBookingInfo(null);
+    }
+  }, [enquiry?.id, enquiry?.customer_id, enquiry?.customer?.id, enquiry?.contact_phone]);
+
+  // Requirements edit dialog state (matching New Enquiry fields)
+  const [isRequirementsDialogOpen, setIsRequirementsDialogOpen] = useState(false);
+  const [reqVehicleType, setReqVehicleType] = useState('');
+  const [reqSelectedPackageIds, setReqSelectedPackageIds] = useState([]);
+  const [reqSelectedAddonIds, setReqSelectedAddonIds] = useState([]);
+  const [reqNotes, setReqNotes] = useState('');
+  const [availablePackages, setAvailablePackages] = useState([]);
+  const [availableAddons, setAvailableAddons] = useState([]);
+  const [loadingPackagesAddons, setLoadingPackagesAddons] = useState(false);
+  const [savingRequirements, setSavingRequirements] = useState(false);
+
+  // Fetch packages and addons when requirements dialog opens
+  useEffect(() => {
+    if (isRequirementsDialogOpen) {
+      setLoadingPackagesAddons(true);
+      Promise.all([
+        orderService.getPackages(),
+        orderService.getAddons(),
+      ])
+        .then(([packagesRes, addonsRes]) => {
+          const loadedPackages = packagesRes.packages || packagesRes || [];
+          loadedPackages.sort((a, b) => a.name.localeCompare(b.name));
+          setAvailablePackages(loadedPackages);
+          const loadedAddons = addonsRes.addons || addonsRes || [];
+          setAvailableAddons(loadedAddons);
+
+          // Parse existing requirements
+          if (enquiry?.requirements) {
+            const lines = enquiry.requirements.split('\n').filter(line => line.trim());
+            const parsedVehicleType = lines.find(line => line.startsWith('Vehicle Type:'))?.replace('Vehicle Type:', '').trim() || '';
+            const parsedPackagesStr = lines.find(line => line.startsWith('Packages:'))?.replace('Packages:', '').trim() || '';
+            const parsedAddonsStr = lines.find(line => line.startsWith('Add-ons:'))?.replace('Add-ons:', '').trim() || '';
+            const otherReqs = lines.filter(line =>
+              !line.startsWith('Vehicle Type:') &&
+              !line.startsWith('Packages:') &&
+              !line.startsWith('Add-ons:')
+            ).join('\n').trim();
+
+            setReqVehicleType(parsedVehicleType);
+            setReqNotes(otherReqs);
+
+            // Match package names to IDs
+            if (parsedPackagesStr) {
+              const names = parsedPackagesStr.split(',').map(s => s.trim().toLowerCase());
+              const matchedPkgIds = loadedPackages
+                .filter(p => names.includes(p.name.toLowerCase()))
+                .map(p => p.id);
+              setReqSelectedPackageIds(matchedPkgIds);
+            } else {
+              setReqSelectedPackageIds([]);
+            }
+
+            // Match addon names to IDs
+            if (parsedAddonsStr) {
+              const names = parsedAddonsStr.split(',').map(s => s.trim().toLowerCase());
+              const matchedAddonIds = loadedAddons
+                .filter(a => names.includes(a.name.toLowerCase()))
+                .map(a => a.id);
+              setReqSelectedAddonIds(matchedAddonIds);
+            } else {
+              setReqSelectedAddonIds([]);
+            }
+          } else {
+            setReqVehicleType('');
+            setReqSelectedPackageIds([]);
+            setReqSelectedAddonIds([]);
+            setReqNotes('');
+          }
+        })
+        .catch(() => {
+          toast.error('Failed to load packages and add-ons');
+        })
+        .finally(() => {
+          setLoadingPackagesAddons(false);
+        });
+    }
+  }, [isRequirementsDialogOpen, enquiry?.requirements]);
+
+  const handleSaveRequirements = async () => {
+    setSavingRequirements(true);
+    try {
+      let requirementsText = reqNotes.trim();
+
+      if (reqVehicleType) {
+        requirementsText += `\n\nVehicle Type: ${reqVehicleType}`;
+      }
+
+      if (reqSelectedPackageIds.length > 0) {
+        const packageNames = reqSelectedPackageIds
+          .map(id => availablePackages.find(p => p.id === id)?.name)
+          .filter(Boolean)
+          .join(', ');
+        if (packageNames) {
+          requirementsText += `\n\nPackages: ${packageNames}`;
+        }
+      }
+
+      if (reqSelectedAddonIds.length > 0) {
+        const addonNames = reqSelectedAddonIds
+          .map(id => availableAddons.find(a => a.id === id)?.name)
+          .filter(Boolean)
+          .join(', ');
+        if (addonNames) {
+          requirementsText += `\n\nAdd-ons: ${addonNames}`;
+        }
+      }
+
+      const finalReqs = requirementsText.trim();
+      await enquiryService.updateEnquiry(id, {
+        requirements: finalReqs,
+      });
+      toast.success(finalReqs ? 'Requirements updated successfully' : 'Requirements cleared');
+      setIsRequirementsDialogOpen(false);
+      await fetchEnquiryById(id);
+      if (onUpdate && enquiry) {
+        onUpdate({ ...enquiry, requirements: finalReqs });
+      }
+    } catch (error) {
+      toast.error(error.response?.data?.message || error.response?.data?.error || 'Failed to update requirements');
+    } finally {
+      setSavingRequirements(false);
+    }
+  };
 
   // Exclude from enquiries (non-customer) dialog state
   const [isExcludeDialogOpen, setIsExcludeDialogOpen] = useState(false);
@@ -701,53 +887,167 @@ const EnquiryDetail = ({ enquiryId, onClose, onUpdate }) => {
         <div className="grid gap-4 md:gap-6">
           {/* Contact Information Card */}
           <Card className="p-4 md:p-6 space-y-3 md:space-y-4">
-            <h2 className="text-base md:text-lg font-semibold">Customer Details</h2>
-            <div className="flex items-start gap-3 md:gap-4">
-              <LetterAvatar
-                name={enquiry.customer?.name || enquiry.contact_name || 'Unknown'}
-                size="xs"
-                className="md:w-10 md:h-10"
-              />
-              <div className="flex-1 space-y-2 md:space-y-3 min-w-0">
+            <div className="flex items-center justify-between">
+              <h2 className="text-base md:text-lg font-semibold">Customer Details</h2>
+              {customerOrdersCount !== null && (
+                <Badge2 variant="secondary" className="text-xs font-semibold gap-1 bg-gray-100 text-gray-700">
+                  <ShoppingCart className="h-3 w-3 text-primary" />
+                  {customerOrdersCount} {customerOrdersCount === 1 ? 'Booking' : 'Bookings'}
+                </Badge2>
+              )}
+            </div>
+
+            <div className="flex items-start gap-2 md:gap-4">
+
+              <div className="flex-1 space-y-2.5 min-w-0">
                 <div>
-                  <h2 className="text-sm md:text-md font-semibold capitalize truncate flex  gap-2">
-                    <span>{enquiry.customer?.name || enquiry.contact_name || 'N/A'}  </span>
+                  <h2 className="text-sm md:text-md font-semibold capitalize truncate flex justify-between items-center gap-2">
+                    <span className='flex gap-2'>
+                      <LetterAvatar
+                        name={enquiry.customer?.name || enquiry.contact_name || 'Unknown'}
+                        size="sm"
+                        className="cursor-pointer hover:opacity-80 transition-opacity shrink-0"
+                        onClick={() => {
+                          if (enquiry.customer || enquiry.customer_id) {
+                            setIsCustomerDetailsOpen(true);
+                          }
+                        }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (enquiry.customer || enquiry.customer_id) {
+                            setIsCustomerDetailsOpen(true);
+                          }
+                        }}
+                        className={`text-left capitalize underline font-bold text-foreground ${(enquiry.customer || enquiry.customer_id) ? 'hover:text-primary hover:underline cursor-pointer' : ''}`}
+                      >
+                        {enquiry.customer?.name || enquiry.contact_name || 'N/A'}
+                      </button>
+                    </span>
                     {
                       enquiry.sentiment && <Badge2 variant={getSentimentBadgeVariant(enquiry.sentiment)}>
                         {SENTIMENT_EMOJIS[enquiry.sentiment]} {SENTIMENT_LABELS[enquiry.sentiment]}
                       </Badge2>
                     }
                   </h2>
-                  <div className="flex flex-wrap gap-1.5 md:gap-2 mt-1.5 md:mt-2 text-xs md:text-sm">
+                  <div className="flex flex-wrap gap-1.5 md:gap-2 mt-1.5 text-xs md:text-sm">
                     <CustomerContact
                       phone={enquiry.contact_phone}
                       customerName={enquiry.customer?.name || enquiry.contact_name || 'Customer'}
                     />
-                    {enquiry.area && (
-                      <span className="flex items-center gap-1">
-                        <MapPin className="h-3 w-3" />
-                        {enquiry.area}
-                      </span>
-                    )}
                     {enquiry.preferred_date && (
-                      <span className="flex items-center gap-1">
-                        <Calendar className="h-3 w-3" />
-                        {formatDate(enquiry.preferred_date)}
+                      <span className="flex items-center gap-1 text-muted-foreground">
+                        <Calendar className="h-3.5 w-3.5 text-blue-500" />
+                        Preferred: {formatDate(enquiry.preferred_date)}
                       </span>
                     )}
+                  </div>
+                </div>
 
+                {/* Customer Location & Booking Stats Grid */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-2 border-t text-xs">
+                  {/* Total Bookings & Last Booked */}
+                  <div className="space-y-1 bg-slate-50/80 p-2.5 rounded-lg border border-slate-100">
+                    <div className="flex items-center justify-between text-muted-foreground">
+                      <span className="font-semibold text-[11px] uppercase tracking-wider text-gray-500 flex items-center gap-1">
+                        <ShoppingCart className="h-3 w-3 text-primary" />
+                        Booking History
+                      </span>
+                      <span className="font-bold text-primary">
+                        {loadingCustomerStats ? '...' : `${customerOrdersCount || 0} Total`}
+                      </span>
+                    </div>
 
-
+                    {lastBookingInfo ? (
+                      <div className="pt-1 text-gray-700">
+                        <div className="flex items-center gap-1 font-medium text-xs">
+                          <Clock className="h-3 w-3 text-emerald-600 shrink-0" />
+                          <span>Last Booked:</span>
+                          <span className="font-semibold">{formatDate(lastBookingInfo.booking_date || lastBookingInfo.created_at)}</span>
+                        </div>
+                        {formatBookingTime(lastBookingInfo.booking_time_from, lastBookingInfo.booking_time_to) && (
+                          <p className="text-[11px] text-muted-foreground pl-4">
+                            Slot: {formatBookingTime(lastBookingInfo.booking_time_from, lastBookingInfo.booking_time_to)}
+                          </p>
+                        )}
+                      </div>
+                    ) : (customerInfo?.last_booked_at || enquiry?.customer?.last_booked_at) ? (
+                      <div className="pt-1 text-gray-700">
+                        <div className="flex items-center gap-1 font-medium text-xs">
+                          <Clock className="h-3 w-3 text-emerald-600 shrink-0" />
+                          <span>Last Booked:</span>
+                          <span className="font-semibold">{formatDate(customerInfo?.last_booked_at || enquiry?.customer?.last_booked_at)}</span>
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-[11px] text-muted-foreground italic pt-0.5">
+                        No previous bookings recorded
+                      </p>
+                    )}
                   </div>
 
+                  {/* Customer Location */}
+                  <div className="space-y-1 bg-slate-50/80 p-2.5 rounded-lg border border-slate-100">
+                    <div className="flex items-center justify-between text-muted-foreground">
+                      <span className="font-semibold text-[11px] uppercase tracking-wider text-gray-500 flex items-center gap-1">
+                        <MapPin className="h-3 w-3 text-rose-500" />
+                        Customer Location
+                      </span>
+                      {(customerInfo?.map_link || enquiry?.map_link) && (
+                        <a
+                          href={customerInfo?.map_link || enquiry?.map_link}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-[11px] font-medium text-primary hover:underline flex items-center gap-0.5"
+                        >
+                          Map <ExternalLink className="h-2.5 w-2.5" />
+                        </a>
+                      )}
+                    </div>
+
+                    {(() => {
+                      const area = customerInfo?.area || enquiry?.area;
+                      const city = customerInfo?.city || enquiry?.city;
+                      const addressLine = customerInfo?.address_line1 || enquiry?.address;
+                      const locationStr = [addressLine, area, city].filter(Boolean).join(', ');
+
+                      if (locationStr) {
+                        return (
+                          <p className="text-xs font-medium text-gray-700 leading-tight pt-0.5 truncate" title={locationStr}>
+                            {locationStr}
+                          </p>
+                        );
+                      }
+                      return (
+                        <p className="text-[11px] text-muted-foreground italic pt-0.5">
+                          No location specified
+                        </p>
+                      );
+                    })()}
+                  </div>
                 </div>
               </div>
             </div>
           </Card>
 
           {/* Enquiry Details Card */}
+          {/* Contact Information Card */}
           <Card className="p-4 md:p-6 space-y-3 md:space-y-4">
-            <h2 className="text-base md:text-lg font-semibold">Enquiry Details</h2>
+            <div className="flex items-center justify-between">
+              <h2 className="text-base md:text-lg font-semibold">Enquiry Details</h2>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setIsRequirementsDialogOpen(true);
+                }}
+                className="h-8 px-2.5 text-xs font-semibold gap-1 text-primary hover:text-primary/80 hover:bg-primary/5 cursor-pointer"
+              >
+                <Edit className="h-3.5 w-3.5" />
+                {enquiry.requirements ? 'Edit Requirements' : '+ Add Requirements'}
+              </Button>
+            </div>
 
             <div className="space-y-2.5 md:space-y-3">
               {/* Parse requirements to show structured data */}
@@ -822,13 +1122,26 @@ const EnquiryDetail = ({ enquiryId, onClose, onUpdate }) => {
               })()}
 
               {!enquiry.requirements && (
-                <div className="flex items-start gap-2 md:gap-3">
-                  <MessageSquare className="h-3.5 w-3.5 md:h-4 md:w-4 mt-0.5 md:mt-1 text-muted-foreground shrink-0" />
-                  <div className="flex-1 min-w-0">
-                    <div className="text-xs md:text-sm text-muted-foreground">Requirements</div>
-                    <div className="text-sm font-medium text-muted-foreground">
-                      No requirements specified
+                <div className="flex items-start gap-2 md:gap-3 p-3 rounded-lg border border-dashed border-gray-200 bg-gray-50/50">
+                  <MessageSquare className="h-4 w-4 mt-0.5 text-muted-foreground shrink-0" />
+                  <div className="flex-1 min-w-0 flex items-center justify-between gap-2">
+                    <div>
+                      <div className="text-xs md:text-sm font-semibold text-gray-700">Requirements</div>
+                      <div className="text-xs text-muted-foreground">
+                        No requirements specified yet
+                      </div>
                     </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        setIsRequirementsDialogOpen(true);
+                      }}
+                      className="h-8 text-xs font-semibold gap-1 text-primary border-primary/30 hover:bg-primary/5 shrink-0 cursor-pointer"
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                      Add Requirements
+                    </Button>
                   </div>
                 </div>
               )}
@@ -1474,6 +1787,184 @@ const EnquiryDetail = ({ enquiryId, onClose, onUpdate }) => {
             toast.success('Order created successfully from enquiry');
           }}
         />
+
+        {/* Customer Details Dialog */}
+        <CustomerDetails
+          customer={enquiry.customer || { id: enquiry.customer_id, name: enquiry.contact_name, phone: enquiry.contact_phone }}
+          open={isCustomerDetailsOpen}
+          onOpenChange={setIsCustomerDetailsOpen}
+        />
+
+        {/* Add / Edit Requirements Dialog (Same fields as New Enquiry) */}
+        <Dialog open={isRequirementsDialogOpen} onOpenChange={setIsRequirementsDialogOpen}>
+          <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>{enquiry?.requirements ? 'Edit Requirements' : 'Add Requirements'}</DialogTitle>
+              <DialogDescription>
+                Select vehicle type, packages, add-ons, and enter specific requirement notes.
+              </DialogDescription>
+            </DialogHeader>
+
+            {loadingPackagesAddons ? (
+              <div className="flex flex-col items-center justify-center py-8 space-y-2">
+                <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                <p className="text-xs text-muted-foreground">Loading packages and add-ons...</p>
+              </div>
+            ) : (
+              <div className="space-y-4 py-2">
+                {/* Vehicle Type - Selectable Pills */}
+                <div className="space-y-2">
+                  <label className="text-xs font-semibold text-gray-700 uppercase tracking-wider">Vehicle Type</label>
+                  <div className="grid grid-cols-4 gap-2">
+                    {['Hatchback', 'Sedan', 'SUV', 'Luxury'].map((type) => (
+                      <button
+                        key={type}
+                        type="button"
+                        onClick={() => {
+                          setReqVehicleType(type);
+                          setReqSelectedPackageIds([]);
+                        }}
+                        className={`py-2 px-3 text-xs font-medium rounded-lg border transition-all select-none cursor-pointer ${reqVehicleType?.toLowerCase() === type.toLowerCase()
+                          ? 'bg-primary text-white border-primary shadow-xs'
+                          : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'
+                          }`}
+                      >
+                        {type}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Packages - Multi-select dropdown */}
+                <div className="space-y-2">
+                  <label className="text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                    {reqVehicleType ? `Packages (${reqVehicleType})` : 'Packages'}
+                  </label>
+                  <Select
+                    value={reqSelectedPackageIds[reqSelectedPackageIds.length - 1]?.toString() || ''}
+                    onValueChange={(value) => {
+                      const packageId = parseInt(value);
+                      if (!reqSelectedPackageIds.includes(packageId)) {
+                        setReqSelectedPackageIds(prev => [...prev, packageId]);
+                      }
+                    }}
+                    disabled={!reqVehicleType}
+                  >
+                    <SelectTrigger className="h-10">
+                      <SelectValue placeholder={reqVehicleType ? "Select packages..." : "Select vehicle type first"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availablePackages
+                        .filter((p) => !reqVehicleType || p.vehicle_type?.toLowerCase() === reqVehicleType?.toLowerCase())
+                        .map((pkg) => (
+                          <SelectItem key={pkg.id} value={String(pkg.id)}>
+                            {pkg.name} - ₹{pkg.unit_price || pkg.price || pkg.base_price}
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+
+                  {/* Selected package badges */}
+                  {reqSelectedPackageIds.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 pt-1">
+                      {reqSelectedPackageIds.map((id) => {
+                        const pkg = availablePackages.find(p => p.id === id);
+                        return pkg ? (
+                          <Badge2 key={id} variant="default" className="text-xs gap-1">
+                            {pkg.name}
+                            <button
+                              type="button"
+                              onClick={() => setReqSelectedPackageIds(prev => prev.filter(pId => pId !== id))}
+                              className="ml-1 hover:bg-white/20 rounded-full cursor-pointer"
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          </Badge2>
+                        ) : null;
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                {/* Add-ons - Multi-select dropdown */}
+                <div className="space-y-2">
+                  <label className="text-xs font-semibold text-gray-700 uppercase tracking-wider">Add-ons</label>
+                  <Select
+                    value={reqSelectedAddonIds[reqSelectedAddonIds.length - 1]?.toString() || ''}
+                    onValueChange={(value) => {
+                      const addonId = parseInt(value);
+                      if (!reqSelectedAddonIds.includes(addonId)) {
+                        setReqSelectedAddonIds(prev => [...prev, addonId]);
+                      }
+                    }}
+                  >
+                    <SelectTrigger className="h-10">
+                      <SelectValue placeholder="Select add-ons..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availableAddons.map((addon) => (
+                        <SelectItem key={addon.id} value={String(addon.id)}>
+                          {addon.name} - ₹{addon.unit_price || addon.price}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+
+                  {/* Selected addon badges */}
+                  {reqSelectedAddonIds.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 pt-1">
+                      {reqSelectedAddonIds.map((id) => {
+                        const addon = availableAddons.find(a => a.id === id);
+                        return addon ? (
+                          <Badge2 key={id} variant="success" className="text-xs gap-1">
+                            {addon.name}
+                            <button
+                              type="button"
+                              onClick={() => setReqSelectedAddonIds(prev => prev.filter(aId => aId !== id))}
+                              className="ml-1 hover:bg-white/20 rounded-full cursor-pointer"
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          </Badge2>
+                        ) : null;
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                {/* Additional Requirements */}
+                <div className="space-y-2">
+                  <label className="text-xs font-semibold text-gray-700 uppercase tracking-wider">Additional Requirements / Notes</label>
+                  <Textarea
+                    value={reqNotes}
+                    onChange={(e) => setReqNotes(e.target.value)}
+                    placeholder="Any specific requirements or notes..."
+                    rows={3}
+                    className="text-sm resize-none"
+                  />
+                </div>
+              </div>
+            )}
+
+            <DialogFooter className="gap-2 sm:gap-0 pt-2">
+              <Button
+                variant="outline"
+                onClick={() => setIsRequirementsDialogOpen(false)}
+                disabled={savingRequirements}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleSaveRequirements}
+                disabled={savingRequirements || loadingPackagesAddons}
+                className="gap-1.5 bg-primary hover:bg-primary/90 text-white font-semibold"
+              >
+                {savingRequirements && <Loader2 className="h-4 w-4 animate-spin" />}
+                {enquiry?.requirements ? 'Save Changes' : 'Add Requirements'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );

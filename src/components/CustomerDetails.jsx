@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
 import {
   Dialog,
+  DialogClose,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from './ui/dialog';
@@ -43,6 +45,7 @@ import {
 import { format } from 'date-fns';
 import { formatBookingTime } from '../lib/utilities';
 import CustomerContact from './CustomerContact';
+import { Button } from './ui/button';
 
 /**
  * CustomerDetails Component
@@ -423,6 +426,11 @@ const CustomerDetails = ({ customer, open, onOpenChange }) => {
             )}
           </TabsContent>
         </Tabs>
+        <DialogFooter>
+          <DialogClose asChild>
+            <Button variant="outline">Close</Button>
+          </DialogClose>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
