@@ -362,6 +362,18 @@ const Reports = () => {
     return num % 1 === 0 ? num.toFixed(0) : num.toFixed(2);
   };
 
+  const calculateOrderProfit = (order) => {
+    if (!order) return 0;
+    if (order.profit !== undefined && order.profit !== null && !isNaN(order.profit)) {
+      return order.profit;
+    }
+    const total = Number(order.total_amount || 0);
+    const agentIncentive = Number(order.agent_incentive || 0);
+    const ta = Number(order.travel_allowance || 0);
+    const fiveStarIncentive = Number(order.five_star_incentive || 0);
+    return total - agentIncentive - ta - fiveStarIncentive;
+  };
+
   const formatHoursWorked = (hours) => {
     if (!hours || isNaN(hours) || hours <= 0) return '-';
     const hrs = Math.floor(hours);
@@ -480,7 +492,7 @@ const Reports = () => {
       });
 
       const totalAmount = ordersInInterval.reduce((sum, order) => sum + order.total_amount, 0);
-      const profit = ordersInInterval.reduce((sum, order) => sum + order.profit, 0);
+      const profit = ordersInInterval.reduce((sum, order) => sum + calculateOrderProfit(order), 0);
       const orderCount = ordersInInterval.length;
 
       return {
@@ -527,25 +539,31 @@ const Reports = () => {
       return;
     }
 
-    const excelData = reportData.orders.map((order) => ({
-      'Order Number': order.order_number,
-      'Customer Name': order.customer?.name || '',
-      'Customer Phone': order.customer?.phone || '',
-      'Booking Date': format(parseISO(order.booking_date), 'yyyy-MM-dd'),
-      'Status': getStatusLabel(order.status),
-      'Payment Status': order.payment_status,
-      'Payment Type': order.payment_method || '',
-      'Distance (km)': order.travelled_distance,
-      'TA Amount': order.travel_allowance,
-      'Subtotal': order.subtotal_amount,
-      'Total': order.total_amount,
-      'GST': order.gst_amount,
-      'Profit': order.profit,
-      'Rating': order.rating || 'N/A',
-      'Agent Name': order.assigned_to?.name || '',
-      'Agent Incentive': order.agent_incentive,
-      'Five Star Incentive': order.five_star_incentive,
-    }));
+    const excelData = reportData.orders.map((order) => {
+      const discount = order.discount !== undefined
+        ? order.discount
+        : (order.offer_discount || 0) + (order.points_discount || 0);
+      return {
+        'Order Number': order.order_number,
+        'Customer Name': order.customer?.name || '',
+        'Customer Phone': order.customer?.phone || '',
+        'Booking Date': format(parseISO(order.booking_date), 'yyyy-MM-dd'),
+        'Status': getStatusLabel(order.status),
+        'Payment Status': order.payment_status,
+        'Payment Type': order.payment_method || '',
+        'Distance (km)': order.travelled_distance,
+        'TA Amount': order.travel_allowance,
+        'Subtotal': order.subtotal_amount,
+        'Discount': discount,
+        'Total': order.total_amount,
+        'GST': order.gst_amount,
+        'Rating': order.rating || 'N/A',
+        'Agent Name': order.assigned_to?.name || '',
+        'Agent Incentive': order.agent_incentive,
+        'Five Star Incentive': order.five_star_incentive,
+        'Profit': calculateOrderProfit(order),
+      };
+    });
 
     // Add summary row
     excelData.push({});
@@ -560,13 +578,16 @@ const Reports = () => {
       'Distance (km)': reportData.summary.total_travelled_distance,
       'TA Amount': reportData.summary.total_travel_allowance,
       'Subtotal': '',
+      'Discount': reportData.summary.total_discount !== undefined
+        ? reportData.summary.total_discount
+        : reportData.orders.reduce((sum, o) => sum + (o.discount !== undefined ? o.discount : (o.offer_discount || 0) + (o.points_discount || 0)), 0),
       'Total': reportData.summary.total_amount,
       'GST': reportData.summary.gst_amount,
-      'Profit': reportData.summary.profit,
       'Rating': '',
       'Agent Name': '',
       'Agent Incentive': reportData.summary.total_agent_incentive,
       'Five Star Incentive': reportData.summary.total_five_star_incentive,
+      'Profit': reportData.summary.profit !== undefined ? reportData.summary.profit : reportData.orders.reduce((sum, o) => sum + calculateOrderProfit(o), 0),
     });
 
     const worksheet = XLSX.utils.json_to_sheet(excelData);
@@ -994,7 +1015,7 @@ const Reports = () => {
 
       {/* Summary Cards */}
       {reportData && reportData.summary && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-8 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Total Orders</CardTitle>
@@ -1013,6 +1034,31 @@ const Reports = () => {
             <CardContent>
               <div className="text-2xl font-bold">
                 ₹{formatCardNumber(reportData.summary.total_amount)}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Sum of Discounts</CardTitle>
+              <DollarSign className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-rose-600">
+                ₹{formatCardNumber(
+                  reportData.summary.total_discount !== undefined
+                    ? reportData.summary.total_discount
+                    : reportData.orders
+                    ? reportData.orders.reduce(
+                        (sum, o) =>
+                          sum +
+                          (o.discount !== undefined
+                            ? o.discount
+                            : (o.offer_discount || 0) + (o.points_discount || 0)),
+                        0
+                      )
+                    : 0
+                )}
               </div>
             </CardContent>
           </Card>
@@ -1125,13 +1171,14 @@ const Reports = () => {
                         <th className="text-right p-2">Distance</th>
                         <th className="text-right p-2">TA Amount</th>
                         <th className="text-right p-2">Subtotal</th>
+                        <th className="text-right p-2">Discount</th>
                         <th className="text-right p-2">Total</th>
                         <th className="text-right p-2">GST</th>
-                        <th className="text-right p-2">Profit</th>
                         <th className="text-center p-2">Rating</th>
                         <th className="text-left p-2">Agent</th>
                         <th className="text-right p-2">Agent Inc.</th>
                         <th className="text-right p-2">5★ Inc.</th>
+                        <th className="text-right p-2">Profit</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1173,13 +1220,13 @@ const Reports = () => {
                             {order.travel_allowance !== undefined && order.travel_allowance !== null ? `₹${order.travel_allowance.toFixed(2)}` : '₹0.00'}
                           </td>
                           <td className="text-right p-2">₹{order.subtotal_amount.toFixed(2)}</td>
+                          <td className="text-right p-2 text-rose-600 font-medium">
+                            ₹{(order.discount !== undefined ? order.discount : (order.offer_discount || 0) + (order.points_discount || 0)).toFixed(2)}
+                          </td>
                           <td className="text-right p-2 font-medium">
                             ₹{order.total_amount.toFixed(2)}
                           </td>
                           <td className="text-right p-2">₹{order.gst_amount.toFixed(2)}</td>
-                          <td className="text-right p-2 text-green-600 font-medium">
-                            ₹{order.profit.toFixed(2)}
-                          </td>
                           <td className="text-center p-2">
                             {order.rating ? (
                               <div className="flex items-center justify-center gap-1">
@@ -1194,6 +1241,9 @@ const Reports = () => {
                           <td className="text-right p-2">₹{order.agent_incentive.toFixed(2)}</td>
                           <td className="text-right p-2 text-yellow-600">
                             ₹{order.five_star_incentive.toFixed(2)}
+                          </td>
+                          <td className="text-right p-2 text-green-600 font-medium">
+                            ₹{calculateOrderProfit(order).toFixed(2)}
                           </td>
                         </tr>
                       ))}
