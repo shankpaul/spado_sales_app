@@ -774,12 +774,19 @@ const Orders = () => {
                                 </Badge2>
                               )}
                             </div>
-                            <Badge2
-                              variant={getBadgeVariant(order.payment_status, 'payment')}
-                              className="h-5 text-[10px] px-1.5"
-                            >
-                              {getStatusLabel(order.payment_status, PAYMENT_STATUSES)}
-                            </Badge2>
+                            <div className="flex items-center gap-1.5">
+                              {order.payment_method && (
+                                <span className="text-[10px] font-semibold text-gray-700 uppercase bg-gray-100 px-1.5 py-0.5 rounded border border-gray-200">
+                                  {order.payment_method.replace('_', ' ')}
+                                </span>
+                              )}
+                              <Badge2
+                                variant={getBadgeVariant(order.payment_status, 'payment')}
+                                className="h-5 text-[10px] px-1.5"
+                              >
+                                {getStatusLabel(order.payment_status, PAYMENT_STATUSES)}
+                              </Badge2>
+                            </div>
                           </div>
 
                           {/* Booking Date & Time under Order Number */}
@@ -896,9 +903,16 @@ const Orders = () => {
                               </Badge2>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap">
-                              <Badge2 variant={getBadgeVariant(order.payment_status, 'payment')}>
-                                {getStatusLabel(order.payment_status, PAYMENT_STATUSES)}
-                              </Badge2>
+                              <div className="flex  items-start gap-1">
+                                <Badge2 variant={getBadgeVariant(order.payment_status, 'payment')}>
+                                  {getStatusLabel(order.payment_status, PAYMENT_STATUSES)}
+                                </Badge2>
+                                {order.payment_method && (
+                                  <span className="text-[10px] font-semibold text-gray-700 uppercase bg-gray-100 px-1.5 py-0.5 rounded border border-gray-200">
+                                    {order.payment_method.replace('_', ' ')}
+                                  </span>
+                                )}
+                              </div>
                             </td>
                             <td className="px-6 py-4 font-bold text-gray-900">
                               <div className="flex items-center gap-2">

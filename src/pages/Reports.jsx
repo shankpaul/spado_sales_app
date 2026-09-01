@@ -68,13 +68,30 @@ import {
   Flame,
   Layers,
   Map,
+  CreditCard,
 } from 'lucide-react';
-import { format, parseISO, differenceInDays, eachDayOfInterval, eachWeekOfInterval, eachMonthOfInterval, startOfWeek, startOfMonth, endOfWeek, endOfMonth } from 'date-fns';
+import { format, parseISO, differenceInDays, eachDayOfInterval, eachWeekOfInterval, eachMonthOfInterval, startOfWeek, startOfMonth, endOfWeek, endOfMonth, subDays, subMonths, startOfYear, endOfYear } from 'date-fns';
 import { getStatusLabel, getStatusColor, ORDER_STATUSES, SELECTABLE_ORDER_STATUSES, PAYMENT_STATUSES } from '../lib/constants';
 import { Badge2 } from '../components/ui/badge2';
 import { useSearchParams } from 'react-router-dom';
 import apiClient from '../services/apiClient';
 import useAuthStore from '../store/authStore';
+
+const DATE_PRESETS = [
+  { value: 'custom', label: 'Custom Date Range' },
+  { value: 'today', label: 'Today' },
+  { value: 'yesterday', label: 'Yesterday' },
+  { value: 'today_yesterday', label: 'Today & Yesterday' },
+  { value: 'this_week', label: 'This Week' },
+  { value: 'last_7_days', label: 'Last 7 Days' },
+  { value: 'last_14_days', label: 'Last 2 Weeks (14 Days)' },
+  { value: 'this_month', label: 'This Month' },
+  { value: 'last_30_days', label: 'Last 30 Days' },
+  { value: 'last_month', label: 'Last Month' },
+  { value: 'last_2_months', label: 'Last 2 Months' },
+  { value: 'last_3_months', label: 'Last 3 Months' },
+  { value: 'this_year', label: 'This Year' },
+];
 
 const Reports = () => {
   const { user } = useAuthStore();
@@ -87,6 +104,87 @@ const Reports = () => {
     } else {
       setSearchParams({});
     }
+  };
+
+  const handleDatePresetChange = (preset, filterSetter) => {
+    if (preset === 'custom') {
+      filterSetter((prev) => ({ ...prev, date_preset: 'custom' }));
+      return;
+    }
+
+    const today = new Date();
+    const formatDateStr = (d) => format(d, 'yyyy-MM-dd');
+
+    let fromDate = '';
+    let toDate = '';
+
+    switch (preset) {
+      case 'today':
+        fromDate = formatDateStr(today);
+        toDate = formatDateStr(today);
+        break;
+      case 'yesterday': {
+        const yesterday = subDays(today, 1);
+        fromDate = formatDateStr(yesterday);
+        toDate = formatDateStr(yesterday);
+        break;
+      }
+      case 'today_yesterday':
+        fromDate = formatDateStr(subDays(today, 1));
+        toDate = formatDateStr(today);
+        break;
+      case 'this_week':
+        fromDate = formatDateStr(startOfWeek(today, { weekStartsOn: 1 }));
+        toDate = formatDateStr(today);
+        break;
+      case 'last_7_days':
+        fromDate = formatDateStr(subDays(today, 6));
+        toDate = formatDateStr(today);
+        break;
+      case 'last_14_days':
+        fromDate = formatDateStr(subDays(today, 13));
+        toDate = formatDateStr(today);
+        break;
+      case 'this_month':
+        fromDate = formatDateStr(startOfMonth(today));
+        toDate = formatDateStr(endOfMonth(today));
+        break;
+      case 'last_30_days':
+        fromDate = formatDateStr(subDays(today, 29));
+        toDate = formatDateStr(today);
+        break;
+      case 'last_month': {
+        const lastMonth = subMonths(today, 1);
+        fromDate = formatDateStr(startOfMonth(lastMonth));
+        toDate = formatDateStr(endOfMonth(lastMonth));
+        break;
+      }
+      case 'last_2_months': {
+        const twoMonthsAgo = subMonths(today, 2);
+        fromDate = formatDateStr(startOfMonth(twoMonthsAgo));
+        toDate = formatDateStr(endOfMonth(today));
+        break;
+      }
+      case 'last_3_months': {
+        const threeMonthsAgo = subMonths(today, 3);
+        fromDate = formatDateStr(startOfMonth(threeMonthsAgo));
+        toDate = formatDateStr(endOfMonth(today));
+        break;
+      }
+      case 'this_year':
+        fromDate = formatDateStr(startOfYear(today));
+        toDate = formatDateStr(endOfYear(today));
+        break;
+      default:
+        return;
+    }
+
+    filterSetter((prev) => ({
+      ...prev,
+      date_preset: preset,
+      date_from: fromDate,
+      date_to: toDate,
+    }));
   };
 
   const [loading, setLoading] = useState(false);
@@ -395,17 +493,58 @@ const Reports = () => {
     );
   };
 
+  const getBadgeVariant = (statusValue, type = 'order') => {
+    if (type === 'order') {
+      switch (statusValue) {
+        case 'confirmed':
+          return 'info';
+        case 'in_progress':
+          return 'warning';
+        case 'completed':
+          return 'success';
+        case 'cancelled':
+          return 'destructive';
+        case 'draft':
+          return 'secondary';
+        default:
+          return 'outline';
+      }
+    }
+    if (type === 'payment') {
+      switch (statusValue) {
+        case 'paid':
+          return 'success';
+        case 'pending':
+          return 'warning';
+        case 'failed':
+          return 'destructive';
+        case 'refunded':
+          return 'secondary';
+        default:
+          return 'outline';
+      }
+    }
+    return 'outline';
+  };
+
   // Filter states
   const [filters, setFilters] = useState({
+    date_preset: '',
     date_from: '',
     date_to: '',
     status: '',
     payment_status: '',
+    payment_method: '',
     agent_id: '',
+    sort_by: 'booking_date',
+    sort_order: 'desc',
+    page: 1,
+    per_page: 50,
   });
 
   // Enquiry filter states
   const [enquiryFilters, setEnquiryFilters] = useState({
+    date_preset: '',
     date_from: '',
     date_to: '',
     source: '',
@@ -507,7 +646,7 @@ const Reports = () => {
   };
 
   // Fetch report data
-  const fetchReport = async () => {
+  const fetchReport = async (pageOverride, perPageOverride) => {
     if (!filters.date_from || !filters.date_to) {
       toast.error('Please select both from and to dates');
       return;
@@ -515,12 +654,21 @@ const Reports = () => {
 
     setLoading(true);
     try {
-      const params = {};
+      const targetPage = pageOverride !== undefined ? pageOverride : (filters.page || 1);
+      const targetPerPage = perPageOverride !== undefined ? perPageOverride : (filters.per_page || 50);
+
+      const params = {
+        page: targetPage,
+        per_page: targetPerPage,
+      };
       if (filters.date_from) params.date_from = filters.date_from;
       if (filters.date_to) params.date_to = filters.date_to;
       if (filters.status) params.status = filters.status;
       if (filters.payment_status) params.payment_status = filters.payment_status;
+      if (filters.payment_method) params.payment_method = filters.payment_method;
       if (filters.agent_id) params.agent_id = filters.agent_id;
+      if (filters.sort_by) params.sort_by = filters.sort_by;
+      if (filters.sort_order) params.sort_order = filters.sort_order;
 
       const response = await apiClient.get('/orders/reports/orders', { params });
       setReportData(response.data);
@@ -532,73 +680,37 @@ const Reports = () => {
     }
   };
 
-  // Export to Excel
-  const exportToExcel = () => {
-    if (!reportData || !reportData.orders || reportData.orders.length === 0) {
-      toast.error('No data to export');
+  // Export to Excel / CSV via Backend Streaming Endpoint
+  const exportToExcel = async () => {
+    if (!filters.date_from || !filters.date_to) {
+      toast.error('Please select both from and to dates');
       return;
     }
 
-    const excelData = reportData.orders.map((order) => {
-      const discount = order.discount !== undefined
-        ? order.discount
-        : (order.offer_discount || 0) + (order.points_discount || 0);
-      return {
-        'Order Number': order.order_number,
-        'Customer Name': order.customer?.name || '',
-        'Customer Phone': order.customer?.phone || '',
-        'Booking Date': format(parseISO(order.booking_date), 'yyyy-MM-dd'),
-        'Status': getStatusLabel(order.status),
-        'Payment Status': order.payment_status,
-        'Payment Type': order.payment_method || '',
-        'Distance (km)': order.travelled_distance,
-        'TA Amount': order.travel_allowance,
-        'Subtotal': order.subtotal_amount,
-        'Discount': discount,
-        'Total': order.total_amount,
-        'GST': order.gst_amount,
-        'Rating': order.rating || 'N/A',
-        'Agent Name': order.assigned_to?.name || '',
-        'Agent Incentive': order.agent_incentive,
-        'Five Star Incentive': order.five_star_incentive,
-        'Profit': calculateOrderProfit(order),
-      };
-    });
+    toast.info('Preparing report download...');
+    try {
+      const params = {};
+      if (filters.date_from) params.date_from = filters.date_from;
+      if (filters.date_to) params.date_to = filters.date_to;
+      if (filters.status) params.status = filters.status;
+      if (filters.payment_status) params.payment_status = filters.payment_status;
+      if (filters.payment_method) params.payment_method = filters.payment_method;
+      if (filters.agent_id) params.agent_id = filters.agent_id;
+      if (filters.sort_by) params.sort_by = filters.sort_by;
+      if (filters.sort_order) params.sort_order = filters.sort_order;
 
-    // Add summary row
-    excelData.push({});
-    excelData.push({
-      'Order Number': 'SUMMARY',
-      'Customer Name': '',
-      'Customer Phone': '',
-      'Booking Date': '',
-      'Status': '',
-      'Payment Status': '',
-      'Payment Type': '',
-      'Distance (km)': reportData.summary.total_travelled_distance,
-      'TA Amount': reportData.summary.total_travel_allowance,
-      'Subtotal': '',
-      'Discount': reportData.summary.total_discount !== undefined
-        ? reportData.summary.total_discount
-        : reportData.orders.reduce((sum, o) => sum + (o.discount !== undefined ? o.discount : (o.offer_discount || 0) + (o.points_discount || 0)), 0),
-      'Total': reportData.summary.total_amount,
-      'GST': reportData.summary.gst_amount,
-      'Rating': '',
-      'Agent Name': '',
-      'Agent Incentive': reportData.summary.total_agent_incentive,
-      'Five Star Incentive': reportData.summary.total_five_star_incentive,
-      'Profit': reportData.summary.profit !== undefined ? reportData.summary.profit : reportData.orders.reduce((sum, o) => sum + calculateOrderProfit(o), 0),
-    });
+      const response = await apiClient.get('/orders/reports/orders/export', {
+        params,
+        responseType: 'blob',
+      });
 
-    const worksheet = XLSX.utils.json_to_sheet(excelData);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Orders Report');
-
-    const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
-    const blob = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-    saveAs(blob, `orders_report_${filters.date_from}_${filters.date_to}.xlsx`);
-
-    toast.success('Report exported successfully');
+      const blob = new Blob([response.data], { type: 'text/csv' });
+      saveAs(blob, `orders_report_${filters.date_from}_to_${filters.date_to}.csv`);
+      toast.success('Report exported successfully');
+    } catch (error) {
+      console.error('Error exporting report:', error);
+      toast.error('Failed to export report data');
+    }
   };
 
   // Clear filters
@@ -608,7 +720,10 @@ const Reports = () => {
       date_to: '',
       status: '',
       payment_status: '',
+      payment_method: '',
       agent_id: '',
+      sort_by: 'booking_date',
+      sort_order: 'desc',
     });
     setReportData(null);
   };
@@ -919,14 +1034,35 @@ const Reports = () => {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-8 gap-4">
+            <div>
+              <Label htmlFor="date_preset">Date Range</Label>
+              <Select
+                value={filters.date_preset || 'custom'}
+                onValueChange={(preset) => handleDatePresetChange(preset, setFilters)}
+              >
+                <SelectTrigger id="date_preset">
+                  <SelectValue placeholder="Quick Presets" />
+                </SelectTrigger>
+                <SelectContent>
+                  {DATE_PRESETS.map((p) => (
+                    <SelectItem key={p.value} value={p.value}>
+                      {p.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
             <div>
               <Label htmlFor="date_from">From Date</Label>
               <Input
                 id="date_from"
                 type="date"
                 value={filters.date_from}
-                onChange={(e) => setFilters({ ...filters, date_from: e.target.value })}
+                onClick={(e) => e.target.showPicker && e.target.showPicker()}
+                onChange={(e) => setFilters({ ...filters, date_from: e.target.value, date_preset: 'custom' })}
+                className="cursor-pointer"
               />
             </div>
 
@@ -936,7 +1072,9 @@ const Reports = () => {
                 id="date_to"
                 type="date"
                 value={filters.date_to}
-                onChange={(e) => setFilters({ ...filters, date_to: e.target.value })}
+                onClick={(e) => e.target.showPicker && e.target.showPicker()}
+                onChange={(e) => setFilters({ ...filters, date_to: e.target.value, date_preset: 'custom' })}
+                className="cursor-pointer"
               />
             </div>
 
@@ -981,6 +1119,28 @@ const Reports = () => {
             </div>
 
             <div>
+              <Label htmlFor="payment_method">Payment Method</Label>
+              <Select
+                value={filters.payment_method || 'all'}
+                onValueChange={(value) => setFilters({ ...filters, payment_method: value === 'all' ? '' : value })}
+              >
+                <SelectTrigger id="payment_method">
+                  <SelectValue placeholder="All Payment Methods" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Methods</SelectItem>
+                  <SelectItem value="cash">Cash</SelectItem>
+                  <SelectItem value="upi">UPI</SelectItem>
+                  <SelectItem value="card">Card</SelectItem>
+                  <SelectItem value="online">Online</SelectItem>
+                  <SelectItem value="razorpay">Razorpay</SelectItem>
+                  <SelectItem value="wallet">Wallet</SelectItem>
+                  <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
               <Label htmlFor="agent_id">Agent</Label>
               <Select
                 value={filters.agent_id || 'all'}
@@ -996,6 +1156,37 @@ const Reports = () => {
                       {agent.name}
                     </SelectItem>
                   ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label htmlFor="sort_by">Sort By</Label>
+              <Select
+                value={(() => {
+                  const by = filters.sort_by === 'total' ? 'total_amount' : (filters.sort_by || 'booking_date');
+                  const order = filters.sort_order || 'desc';
+                  return `${by}_${order}`;
+                })()}
+                onValueChange={(value) => {
+                  const lastUnderscore = value.lastIndexOf('_');
+                  const by = value.substring(0, lastUnderscore);
+                  const order = value.substring(lastUnderscore + 1);
+                  setFilters({
+                    ...filters,
+                    sort_by: by,
+                    sort_order: order,
+                  });
+                }}
+              >
+                <SelectTrigger id="sort_by">
+                  <SelectValue placeholder="Sort By" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="booking_date_desc">Date: Newest First</SelectItem>
+                  <SelectItem value="booking_date_asc">Date: Oldest First</SelectItem>
+                  <SelectItem value="total_amount_desc">Total Price: High to Low</SelectItem>
+                  <SelectItem value="total_amount_asc">Total Price: Low to High</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -1018,22 +1209,15 @@ const Reports = () => {
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Orders</CardTitle>
-              <FileText className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{reportData.summary.order_count}</div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Total Amount</CardTitle>
               <IndianRupee className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
                 ₹{formatCardNumber(reportData.summary.total_amount)}
+              </div>
+              <div className="text-xs text-muted-foreground font-semibold mt-1">
+                Total Orders: {reportData.summary.order_count}
               </div>
             </CardContent>
           </Card>
@@ -1049,7 +1233,7 @@ const Reports = () => {
                   reportData.summary.total_discount !== undefined
                     ? reportData.summary.total_discount
                     : reportData.orders
-                    ? reportData.orders.reduce(
+                      ? reportData.orders.reduce(
                         (sum, o) =>
                           sum +
                           (o.discount !== undefined
@@ -1057,7 +1241,7 @@ const Reports = () => {
                             : (o.offer_discount || 0) + (o.points_discount || 0)),
                         0
                       )
-                    : 0
+                      : 0
                 )}
               </div>
             </CardContent>
@@ -1134,6 +1318,55 @@ const Reports = () => {
               </div>
             </CardContent>
           </Card>
+
+          <Card className="border-rose-200 bg-rose-50/20">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-rose-800">Cancelled Orders</CardTitle>
+              <AlertCircle className="h-4 w-4 text-rose-600" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-rose-600">
+                {reportData.summary.cancelled_count !== undefined
+                  ? reportData.summary.cancelled_count
+                  : reportData.orders
+                    ? reportData.orders.filter((o) => o.status === 'cancelled').length
+                    : 0}
+              </div>
+              <div className="text-xs text-rose-600 font-semibold mt-1">
+                Total: ₹{formatCardNumber(
+                  reportData.summary.cancelled_amount !== undefined
+                    ? reportData.summary.cancelled_amount
+                    : reportData.orders
+                      ? reportData.orders.filter((o) => o.status === 'cancelled').reduce((sum, o) => sum + Number(o.total_amount || 0), 0)
+                      : 0
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Payment Methods</CardTitle>
+              <CreditCard className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent className="pt-1">
+              <div className="space-y-1 text-xs max-h-20 overflow-y-auto pr-1">
+                {Object.entries(
+                  reportData.summary.payment_method_totals ||
+                  (reportData.orders || []).reduce((acc, o) => {
+                    const m = (o.payment_method || 'Unspecified').toUpperCase();
+                    acc[m] = (acc[m] || 0) + Number(o.total_amount || 0);
+                    return acc;
+                  }, {})
+                ).map(([method, amount]) => (
+                  <div key={method} className="flex justify-between items-center py-0.5 border-b border-gray-100 last:border-0">
+                    <span className="text-muted-foreground uppercase font-medium">{method.replace(/_/g, ' ')}:</span>
+                    <span className="font-bold text-gray-900">₹{formatCardNumber(amount)}</span>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
         </div>
       )}
 
@@ -1197,13 +1430,13 @@ const Reports = () => {
                             {format(parseISO(order.booking_date), 'MMM dd, yyyy')}
                           </td>
                           <td className="p-2">
-                            <Badge2 variant={getStatusColor(order.status)}>
-                              {getStatusLabel(order.status)}
+                            <Badge2 variant={getBadgeVariant(order.status, 'order')}>
+                              {getStatusLabel(order.status, ORDER_STATUSES)}
                             </Badge2>
                           </td>
                           <td className="p-2">
-                            <Badge2 variant={order.payment_status === 'paid' ? 'success' : 'warning'}>
-                              {order.payment_status}
+                            <Badge2 variant={getBadgeVariant(order.payment_status, 'payment')}>
+                              {getStatusLabel(order.payment_status, PAYMENT_STATUSES)}
                             </Badge2>
                           </td>
                           <td className="p-2">
@@ -1250,6 +1483,64 @@ const Reports = () => {
                     </tbody>
                   </table>
                 </div>
+
+                {/* Pagination Controls */}
+                {reportData && (reportData.total_pages > 1 || reportData.total_orders > 0) && (
+                  <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-4 pt-4 border-t border-gray-100">
+                    <div className="text-xs text-muted-foreground">
+                      Showing {((reportData.current_page - 1) * (filters.per_page || 50)) + 1} to {Math.min(reportData.current_page * (filters.per_page || 50), reportData.total_orders)} of {reportData.total_orders} orders
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-1 text-xs">
+                        <span className="text-muted-foreground">Per page:</span>
+                        <select
+                          value={filters.per_page || 50}
+                          onChange={(e) => {
+                            const newPerPage = Number(e.target.value);
+                            setFilters({ ...filters, per_page: newPerPage, page: 1 });
+                            fetchReport(1, newPerPage);
+                          }}
+                          className="border rounded px-1.5 py-1 text-xs bg-white text-gray-700"
+                        >
+                          <option value={25}>25</option>
+                          <option value={50}>50</option>
+                          <option value={100}>100</option>
+                          <option value={250}>250</option>
+                        </select>
+                      </div>
+
+                      <div className="flex items-center gap-1">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          disabled={reportData.current_page <= 1 || loading}
+                          onClick={() => {
+                            const newPage = reportData.current_page - 1;
+                            setFilters({ ...filters, page: newPage });
+                            fetchReport(newPage, filters.per_page);
+                          }}
+                        >
+                          Previous
+                        </Button>
+                        <span className="text-xs font-medium px-2">
+                          Page {reportData.current_page} of {reportData.total_pages || 1}
+                        </span>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          disabled={reportData.current_page >= reportData.total_pages || loading}
+                          onClick={() => {
+                            const newPage = reportData.current_page + 1;
+                            setFilters({ ...filters, page: newPage });
+                            fetchReport(newPage, filters.per_page);
+                          }}
+                        >
+                          Next
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
@@ -1364,7 +1655,25 @@ const Reports = () => {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-4">
+              <div>
+                <Label htmlFor="enq-date-preset">Date Range Preset</Label>
+                <Select
+                  value={enquiryFilters.date_preset || 'custom'}
+                  onValueChange={(preset) => handleDatePresetChange(preset, setEnquiryFilters)}
+                >
+                  <SelectTrigger id="enq-date-preset">
+                    <SelectValue placeholder="Quick Presets" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {DATE_PRESETS.map((p) => (
+                      <SelectItem key={p.value} value={p.value}>
+                        {p.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
               <div>
                 <Label htmlFor="enq-date-from">From Date</Label>
                 <Input
@@ -1372,7 +1681,7 @@ const Reports = () => {
                   type="date"
                   value={enquiryFilters.date_from}
                   onChange={(e) =>
-                    setEnquiryFilters({ ...enquiryFilters, date_from: e.target.value })
+                    setEnquiryFilters({ ...enquiryFilters, date_from: e.target.value, date_preset: 'custom' })
                   }
                 />
               </div>
@@ -1383,7 +1692,7 @@ const Reports = () => {
                   type="date"
                   value={enquiryFilters.date_to}
                   onChange={(e) =>
-                    setEnquiryFilters({ ...enquiryFilters, date_to: e.target.value })
+                    setEnquiryFilters({ ...enquiryFilters, date_to: e.target.value, date_preset: 'custom' })
                   }
                 />
               </div>

@@ -120,6 +120,7 @@ import {
   Route,
   Home,
   CreditCard,
+  Eye,
 } from 'lucide-react';
 import MapPreview from '@/components/MapPreview';
 import VehicleIcon from '../components/VehicleIcon';
@@ -248,6 +249,7 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
   // Cancel dialog state
   const [isCancelDialogOpen, setIsCancelDialogOpen] = useState(false);
   const [cancelReason, setCancelReason] = useState('');
+  const [selectedJourneyModal, setSelectedJourneyModal] = useState(null);
   const [customReason, setCustomReason] = useState('');
   const [cancelling, setCancelling] = useState(false);
 
@@ -1040,7 +1042,7 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
           <div className="lg:col-span-2 space-y-6">
             {/* Order Meta Strip */}
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-muted-foreground bg-gray-50 border rounded-xl px-4 py-2.5">
-              <span>Ordered <span className="font-semibold text-foreground">{formatDate(order.created_at)}</span></span>
+              <span>Ordered <span className="font-semibold text-foreground">{formatDateTime(order.created_at)}</span></span>
               <span className="text-gray-300">•</span>
               <span>Customer <button type="button" onClick={() => setIsCustomerDetailsOpen(true)} className="font-semibold text-foreground hover:text-primary hover:underline cursor-pointer">{order.customer?.name}</button></span>
               {order.converted_from_enquiry_id && (
@@ -1233,10 +1235,17 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
                 {order.status === 'completed' && !order.feedback_submitted_at && (
                   <Button
                     onClick={() => setIsFeedbackDialogOpen(true)}
-                    className="flex-1 gap-1.5 bg-blue-600 hover:bg-blue-700 text-white"
+                    className="flex-1 bg-blue-600 hover:bg-blue-700 text-white flex-col py-2 px-3 h-auto justify-center"
                   >
-                    <MessageSquare className="h-4 w-4" />
-                    Collect Customer Feedback
+                    <div className="flex items-center gap-1.5 font-semibold text-sm">
+                      <MessageSquare className="h-4 w-4" />
+                      <span>Collect Customer Feedback</span>
+                    </div>
+                    {(order.image_urls?.google_review_image || order.image_urls?.review_image || (order.image_urls?.review_images && order.image_urls.review_images.length > 0) || order.google_review_image || order.review_image) && (
+                      <span className="text-[10px] text-blue-100 font-medium">
+                        Review image available
+                      </span>
+                    )}
                   </Button>
                 )}
               </div>
@@ -1326,7 +1335,7 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
                                   <div className="font-bold text-base">{formatCurrency(item.total_price)}</div>
                                   {item.discount > 0 && (
                                     <span className="text-[10px] font-medium text-green-700 bg-green-50 border border-green-100 rounded-full px-1.5 py-0.5">
-                                      -{formatCurrency(item.price - item.total_price)} off
+                                      -{item.discount_type === 'percentage' ? `${item.discount}%` : formatCurrency(item.discount)} off
                                     </span>
                                   )}
                                 </div>
@@ -1372,7 +1381,7 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
                                   <div className="font-bold text-base">{formatCurrency(item.total_price)}</div>
                                   {item.discount > 0 && (
                                     <span className="text-[10px] font-medium text-green-700 bg-green-50 border border-green-100 rounded-full px-1.5 py-0.5">
-                                      -{formatCurrency(item.price - item.total_price)} off
+                                      -{item.discount_type === 'percentage' ? `${item.discount}%` : formatCurrency(item.discount)} off
                                     </span>
                                   )}
                                 </div>
@@ -1579,10 +1588,23 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
                     const hasToCustomer = toCustomerJourneys.length > 0;
                     const hasToHome = toHomeJourneys.length > 0;
 
+                    // Ensure To Customer row is ALWAYS shown even if zero/empty
+                    const displayJourneys = [...journeys];
+                    if (!hasToCustomer) {
+                      displayJourneys.unshift({
+                        id: 'placeholder-to-customer',
+                        trip_type: 'to_customer',
+                        distance_km: 0,
+                        amount: 0,
+                        user: order.assigned_to,
+                        isPlaceholder: true,
+                      });
+                    }
+
                     // Helper to find travel start time & duration for a journey
                     const getTravelTimeInfo = (journey) => {
-                      let startedAt = null;
-                      if (timeline && timeline.length > 0) {
+                      let startedAt = journey.started_at || null;
+                      if (!startedAt && timeline && timeline.length > 0) {
                         if (journey.trip_type === 'to_customer') {
                           const enRouteEvent = timeline.find(e =>
                             e.status === 'en_route' ||
@@ -1605,126 +1627,59 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
                           }
                         }
                       }
+                      // Fallback when start time not available: use journey.created_at or order.created_at
+                      if (!startedAt) {
+                        startedAt = journey.created_at || order?.created_at || null;
+                      }
+
+                      let endedAt = journey.traveled_at || null;
+                      // Fallback when end time not available: use work start time (in_progress event or order work start)
+                      if (!endedAt) {
+                        const workStartEvent = timeline?.find(e =>
+                          e.status === 'in_progress' ||
+                          e.event_type === 'in_progress' ||
+                          String(e.title || '').toLowerCase().includes('in progress') ||
+                          String(e.title || '').toLowerCase().includes('work started') ||
+                          String(e.description || '').toLowerCase().includes('in progress') ||
+                          String(e.description || '').toLowerCase().includes('started work')
+                        );
+                        if (workStartEvent) {
+                          endedAt = workStartEvent.created_at || workStartEvent.timestamp;
+                        } else if (order?.work_started_at || order?.service_started_at) {
+                          endedAt = order.work_started_at || order.service_started_at;
+                        }
+                      }
 
                       let durationText = null;
-                      if (startedAt && journey.traveled_at) {
+                      if (startedAt && endedAt) {
                         const startMs = new Date(startedAt).getTime();
-                        const endMs = new Date(journey.traveled_at).getTime();
+                        const endMs = new Date(endedAt).getTime();
                         if (!isNaN(startMs) && !isNaN(endMs) && endMs > startMs) {
                           const diffMins = Math.round((endMs - startMs) / 60000);
-                          if (diffMins < 60) {
-                            durationText = `${diffMins} mins`;
+                          if (diffMins <= 0) {
+                            durationText = '< 1 min';
+                          } else if (diffMins < 60) {
+                            durationText = `${diffMins} min${diffMins > 1 ? 's' : ''}`;
                           } else {
                             const hrs = Math.floor(diffMins / 60);
                             const mins = diffMins % 60;
-                            durationText = mins > 0 ? `${hrs}h ${mins}m` : `${hrs}h`;
+                            if (mins === 0) {
+                              durationText = `${hrs} hour${hrs > 1 ? 's' : ''}`;
+                            } else {
+                              durationText = `${hrs} h ${mins} m`;
+                            }
                           }
                         }
                       }
 
-                      return { startedAt, durationText };
+                      return { startedAt, endedAt, durationText };
                     };
 
                     return (
                       <div className="space-y-6">
-                        {journeys.length > 0 ? (
+                        {displayJourneys.length > 0 ? (
                           <>
-                            {/* Travel Distance Summary Table */}
-                            <div className="space-y-2">
-                              <div className="text-xs font-bold text-gray-500 uppercase tracking-wider">Distance & Travel Overview</div>
-                              <div className="border border-gray-200 rounded-xl overflow-hidden bg-white shadow-2xs">
-                                <Table>
-                                  <TableHeader className="bg-gray-50/80">
-                                    <TableRow>
-                                      <TableHead className="font-bold text-xs text-gray-700">Trip Category</TableHead>
-                                      <TableHead className="font-bold text-xs text-gray-700">Trips Logged</TableHead>
-                                      <TableHead className="font-bold text-xs text-gray-700">Distance (KM)</TableHead>
-                                      <TableHead className="font-bold text-xs text-gray-700">Allowance (₹)</TableHead>
-                                      <TableHead className="font-bold text-xs text-gray-700 text-right">Status / Notes</TableHead>
-                                    </TableRow>
-                                  </TableHeader>
-                                  <TableBody className="divide-y divide-gray-100 text-xs">
-                                    <TableRow className="hover:bg-gray-50/50">
-                                      <TableCell className="font-medium flex items-center gap-2 py-3">
-                                        <Badge2 className="bg-blue-50 text-blue-700 border-blue-200 font-bold text-xs gap-1.5 py-0.5 px-2">
-                                          <Navigation className="h-3 w-3 text-blue-600" /> To Customer
-                                        </Badge2>
-                                      </TableCell>
-                                      <TableCell className="font-semibold text-gray-800 py-3">
-                                        {toCustomerJourneys.length} trip{toCustomerJourneys.length !== 1 ? 's' : ''}
-                                      </TableCell>
-                                      <TableCell className="font-mono font-extrabold text-gray-900 py-3 text-xs">
-                                        {toCustomerDist.toFixed(2)} KM
-                                      </TableCell>
-                                      <TableCell className="font-mono font-bold text-emerald-700 py-3 text-xs">
-                                        {toCustomerJourneys.length > 0 && toCustomerJourneys.every(j => j.user?.employee_scheme === 'commission' || (j.amount || 0) === 0) ? (
-                                          <span className="text-gray-400 font-sans font-normal">N/A (Commission)</span>
-                                        ) : (
-                                          `₹${toCustomerJourneys.reduce((sum, j) => sum + (parseFloat(j.amount) || 0), 0).toFixed(2)}`
-                                        )}
-                                      </TableCell>
-                                      <TableCell className="text-right text-gray-500 py-3">
-                                        {hasToCustomer ? 'Completed' : 'No trip recorded'}
-                                      </TableCell>
-                                    </TableRow>
-
-                                    <TableRow className="hover:bg-gray-50/50">
-                                      <TableCell className="font-medium flex items-center gap-2 py-3">
-                                        <Badge2 className="bg-purple-50 text-purple-700 border-purple-200 font-bold text-xs gap-1.5 py-0.5 px-2">
-                                          <Home className="h-3 w-3 text-purple-600" /> Return (To Home)
-                                        </Badge2>
-                                      </TableCell>
-                                      <TableCell className="font-semibold text-gray-800 py-3">
-                                        {toHomeJourneys.length} trip{toHomeJourneys.length !== 1 ? 's' : ''}
-                                      </TableCell>
-                                      <TableCell className="font-mono font-extrabold text-gray-900 py-3 text-xs">
-                                        {toHomeDist.toFixed(2)} KM
-                                      </TableCell>
-                                      <TableCell className="font-mono font-bold text-emerald-700 py-3 text-xs">
-                                        {toHomeJourneys.length > 0 && toHomeJourneys.every(j => j.user?.employee_scheme === 'commission' || (j.amount || 0) === 0) ? (
-                                          <span className="text-gray-400 font-sans font-normal">N/A (Commission)</span>
-                                        ) : (
-                                          `₹${toHomeJourneys.reduce((sum, j) => sum + (parseFloat(j.amount) || 0), 0).toFixed(2)}`
-                                        )}
-                                      </TableCell>
-                                      <TableCell className="text-right text-gray-500 py-3">
-                                        {hasToHome ? 'Completed' : (hasToCustomer ? 'Agent travelled to next order' : 'Not recorded')}
-                                      </TableCell>
-                                    </TableRow>
-                                  </TableBody>
-                                  <TableFooter className="bg-primary/5 font-bold border-t border-gray-200">
-                                    <TableRow>
-                                      <TableCell className="py-3 text-xs font-bold text-gray-900">
-                                        <div className="flex items-center gap-1.5">
-                                          <Route className="h-4 w-4 text-primary" /> Total Order Travel
-                                        </div>
-                                      </TableCell>
-                                      <TableCell className="py-3 text-xs font-bold text-gray-800">
-                                        {journeys.length} total trip{journeys.length !== 1 ? 's' : ''}
-                                      </TableCell>
-                                      <TableCell className="py-3 font-mono font-black text-gray-900 text-sm">
-                                        {totalDist.toFixed(2)} KM
-                                      </TableCell>
-                                      <TableCell className="py-3 font-mono font-black text-emerald-800 text-sm">
-                                        {journeys.length > 0 && journeys.every(j => j.user?.employee_scheme === 'commission' || (j.amount || 0) === 0) ? (
-                                          <span className="text-gray-500 font-sans font-medium text-xs">N/A (Commission Scheme)</span>
-                                        ) : (
-                                          `₹${totalAllowance.toFixed(2)}`
-                                        )}
-                                      </TableCell>
-                                      <TableCell className="py-3 text-right text-xs text-primary font-semibold">
-                                        Sum of to_customer + to_home
-                                      </TableCell>
-                                    </TableRow>
-                                  </TableFooter>
-                                </Table>
-                              </div>
-                              <div className="text-[11px] text-gray-500 italic px-1">
-                                * Travel allowance is calculated only for Fixed Salary employees. Commission-based employees do not receive distance travel allowance.
-                              </div>
-                            </div>
-
-                            {/* Notice Banner if To Home trip is missing */}
+                            {/* Notice Banner if Return trip is missing */}
                             {hasToCustomer && !hasToHome && (
                               <div className="p-3.5 bg-amber-50 border border-amber-200/80 rounded-xl flex items-start gap-3 text-amber-900 text-xs font-medium">
                                 <AlertTriangle className="h-4.5 w-4.5 text-amber-600 shrink-0 mt-0.5" />
@@ -1737,10 +1692,12 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
                               </div>
                             )}
 
-                            {/* Journey Details Table */}
+                            {/* Unified Journey & Travel Table */}
                             <div className="space-y-3">
                               <div className="flex items-center justify-between">
-                                <div className="text-xs font-bold text-gray-500 uppercase tracking-wider">Detailed Journey Logs ({journeys.length})</div>
+                                <div className="text-xs font-bold text-gray-500 uppercase tracking-wider">
+                                  Journey & Travel Logs ({journeys.length})
+                                </div>
                               </div>
                               <div className="border border-gray-200 rounded-xl overflow-hidden bg-white shadow-2xs">
                                 <Table>
@@ -1749,18 +1706,58 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
                                       <TableHead className="font-bold text-xs text-gray-700">Trip Type</TableHead>
                                       <TableHead className="font-bold text-xs text-gray-700">Agent</TableHead>
                                       <TableHead className="font-bold text-xs text-gray-700">Distance (KM)</TableHead>
-                                      <TableHead className="font-bold text-xs text-gray-700">Travel Started</TableHead>
-                                      <TableHead className="font-bold text-xs text-gray-700">Travel Ended</TableHead>
-                                      <TableHead className="font-bold text-xs text-gray-700">Est. Duration</TableHead>
-                                      <TableHead className="font-bold text-xs text-gray-700">Allowance</TableHead>
-                                      <TableHead className="font-bold text-xs text-gray-700 text-right">Route</TableHead>
+                                      <TableHead className="font-bold text-xs text-gray-700">Allowance (₹)</TableHead>
+                                      <TableHead className="font-bold text-xs text-gray-700">Time / Duration</TableHead>
+                                      <TableHead className="font-bold text-xs text-gray-700 text-right">Actions</TableHead>
                                     </TableRow>
                                   </TableHeader>
-                                  <TableBody className="divide-y divide-gray-100">
-                                    {journeys.map((journey, idx) => {
-                                      const { startedAt, durationText } = getTravelTimeInfo(journey);
+                                  <TableBody className="divide-y divide-gray-100 text-xs">
+                                    {displayJourneys.map((journey, idx) => {
+                                      const { startedAt, endedAt, durationText } = getTravelTimeInfo(journey);
                                       const agentName = journey.user?.name || order.assigned_to?.name || 'Assigned Agent';
                                       const isCommissionScheme = journey.user?.employee_scheme === 'commission' || (journey.amount || 0) === 0;
+
+                                      if (journey.isPlaceholder) {
+                                        return (
+                                          <TableRow key={journey.id || idx} className="hover:bg-gray-50/50 transition-colors bg-gray-50/30">
+                                            <TableCell className="py-3">
+                                              <Badge2 className="bg-blue-50/80 text-blue-700 border-blue-200/80 font-bold text-xs gap-1.5 py-0.5 px-2">
+                                                <Navigation className="h-3 w-3 text-blue-600" /> To Customer
+                                              </Badge2>
+                                            </TableCell>
+
+                                            <TableCell className="py-3">
+                                              <div className="flex items-center gap-2">
+                                                <LetterAvatar name={agentName} size="xs" className="text-white shrink-0" />
+                                                <span className="font-semibold text-gray-800 text-xs truncate max-w-[130px]">{agentName}</span>
+                                              </div>
+                                            </TableCell>
+
+                                            <TableCell className="py-3 font-mono font-bold text-gray-400 text-xs">
+                                              0.00 KM
+                                            </TableCell>
+
+                                            <TableCell className="py-3 text-xs font-bold font-mono text-gray-400">
+                                              ₹0.00
+                                            </TableCell>
+
+                                            <TableCell className="py-3 text-xs text-amber-600 font-medium">
+                                              Not logged yet
+                                            </TableCell>
+
+                                            <TableCell className="py-3 text-right">
+                                              <Button
+                                                variant="outline"
+                                                size="sm"
+                                                className="h-8 text-xs gap-1.5 text-gray-600 border-gray-200 hover:bg-gray-50"
+                                                onClick={() => setSelectedJourneyModal({ ...journey, startedAt: null, endedAt: null, durationText: 'Not logged yet', agentName, isCommissionScheme: false })}
+                                              >
+                                                <Eye className="h-3.5 w-3.5" /> Log
+                                              </Button>
+                                            </TableCell>
+                                          </TableRow>
+                                        );
+                                      }
 
                                       return (
                                         <TableRow key={journey.id || idx} className="hover:bg-gray-50/50 transition-colors">
@@ -1779,24 +1776,12 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
                                           <TableCell className="py-3">
                                             <div className="flex items-center gap-2">
                                               <LetterAvatar name={agentName} size="xs" className="text-white shrink-0" />
-                                              <span className="font-semibold text-gray-800 text-xs truncate max-w-[120px]">{agentName}</span>
+                                              <span className="font-semibold text-gray-800 text-xs truncate max-w-[130px]">{agentName}</span>
                                             </div>
                                           </TableCell>
 
                                           <TableCell className="py-3 font-mono font-extrabold text-gray-900 text-xs">
                                             {(parseFloat(journey.distance_km) || 0).toFixed(2)} KM
-                                          </TableCell>
-
-                                          <TableCell className="py-3 text-xs text-gray-600">
-                                            {startedAt ? formatDateTime(startedAt) : (journey.traveled_at ? formatDateTime(journey.traveled_at) : 'N/A')}
-                                          </TableCell>
-
-                                          <TableCell className="py-3 text-xs text-gray-600">
-                                            {journey.traveled_at ? formatDateTime(journey.traveled_at) : 'N/A'}
-                                          </TableCell>
-
-                                          <TableCell className="py-3 text-xs font-semibold text-gray-700">
-                                            {durationText ? `⏱️ ${durationText}` : 'Completed'}
                                           </TableCell>
 
                                           <TableCell className="py-3 text-xs font-bold font-mono">
@@ -1807,20 +1792,38 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
                                             )}
                                           </TableCell>
 
-                                          <TableCell className="py-3 text-right">
-                                            {journey.from_location?.latitude > 0 && journey.to_location?.latitude > 0 ? (
-                                              <a
-                                                href={`https://www.google.com/maps/dir/?api=1&origin=${journey.from_location.latitude},${journey.from_location.longitude}&destination=${journey.to_location.latitude},${journey.to_location.longitude}`}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                className="inline-flex items-center gap-1 text-[11px] font-semibold text-primary hover:underline bg-primary/5 border border-primary/20 px-2 py-1 rounded-md"
-                                              >
-                                                <span>View Route</span>
-                                                <ExternalLink className="h-3 w-3" />
-                                              </a>
+                                          <TableCell className="py-3 text-xs">
+                                            {durationText ? (
+                                              <div className="space-y-1">
+                                                <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-primary/10 text-primary font-bold text-xs">
+                                                  ⏱️ {durationText}
+                                                </div>
+                                                {startedAt && endedAt ? (
+                                                  <div className="text-[11px] text-gray-700 font-medium">
+                                                    {formatTime(startedAt)} → {formatTime(endedAt)}
+                                                  </div>
+                                                ) : (
+                                                  <div className="text-[11px] text-gray-500">
+                                                    {endedAt ? formatDateTime(endedAt) : formatDateTime(startedAt)}
+                                                  </div>
+                                                )}
+                                              </div>
                                             ) : (
-                                              <span className="text-xs text-gray-400">N/A</span>
+                                              <div className="space-y-0.5 text-gray-600">
+                                                <div>{endedAt ? formatDateTime(endedAt) : (startedAt ? formatDateTime(startedAt) : 'N/A')}</div>
+                                              </div>
                                             )}
+                                          </TableCell>
+
+                                          <TableCell className="py-3 text-right">
+                                            <Button
+                                              variant="outline"
+                                              size="sm"
+                                              className="h-8 text-xs gap-1.5 text-primary border-primary/20 hover:bg-primary/5"
+                                              onClick={() => setSelectedJourneyModal({ ...journey, startedAt, endedAt, durationText, agentName, isCommissionScheme })}
+                                            >
+                                              <Eye className="h-3.5 w-3.5" /> Log
+                                            </Button>
                                           </TableCell>
                                         </TableRow>
                                       );
@@ -1829,12 +1832,11 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
                                   <TableFooter className="bg-gray-50/90 font-bold border-t border-gray-200">
                                     <TableRow>
                                       <TableCell colSpan={2} className="py-3 text-xs font-bold text-gray-800">
-                                        Total ({journeys.length} trips)
+                                        Total Order Travel ({journeys.length} logged trip{journeys.length !== 1 ? 's' : ''})
                                       </TableCell>
                                       <TableCell className="py-3 font-mono font-black text-gray-900 text-sm">
                                         {totalDist.toFixed(2)} KM
                                       </TableCell>
-                                      <TableCell colSpan={3} className="py-3"></TableCell>
                                       <TableCell className="py-3 font-mono font-black text-emerald-800 text-sm">
                                         {journeys.length > 0 && journeys.every(j => j.user?.employee_scheme === 'commission' || (j.amount || 0) === 0) ? (
                                           <span className="text-gray-500 font-sans font-medium text-xs">N/A (Commission Scheme)</span>
@@ -1842,7 +1844,9 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
                                           `₹${totalAllowance.toFixed(2)}`
                                         )}
                                       </TableCell>
-                                      <TableCell className="py-3"></TableCell>
+                                      <TableCell colSpan={2} className="py-3 text-right text-xs text-gray-500 font-normal italic">
+                                        * TA calculated per employee rate
+                                      </TableCell>
                                     </TableRow>
                                   </TableFooter>
                                 </Table>
@@ -1893,7 +1897,7 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
 
                 <div className="p-5 space-y-2.5">
                   {canAddPaymentMethod && (
-                    <div className="flex items-center justify-between p-3 rounded-lg bg-blue-50/70 border border-blue-100 mb-3">
+                    <div className="flex flex-col md:flex-row lg:items-center justify-between p-3 rounded-lg bg-blue-50/70 border border-blue-100 mb-3">
                       <div className="flex items-center gap-2.5">
                         <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center shrink-0">
                           <CreditCard className="h-4 w-4 text-blue-600" />
@@ -3730,6 +3734,124 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
         open={isCustomerDetailsOpen}
         onOpenChange={setIsCustomerDetailsOpen}
       />
+
+      {/* Journey Log Detail Modal */}
+      {selectedJourneyModal && (
+        <Dialog open={!!selectedJourneyModal} onOpenChange={() => setSelectedJourneyModal(null)}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-base font-bold">
+                <Car className="h-5 w-5 text-primary" />
+                Journey Log Details
+              </DialogTitle>
+              <DialogDescription>
+                Detailed travel log information for trip #{selectedJourneyModal.id}
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4 py-2">
+              {/* Header Badge & Agent */}
+              <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-100">
+                <div>
+                  <div className="text-xs text-gray-500">Trip Category</div>
+                  <div className="mt-1">
+                    {selectedJourneyModal.trip_type === 'to_customer' ? (
+                      <Badge2 className="bg-blue-50 text-blue-700 border-blue-200 font-bold text-xs gap-1.5 py-0.5 px-2">
+                        <Navigation className="h-3.5 w-3.5 text-blue-600" /> To Customer
+                      </Badge2>
+                    ) : (
+                      <Badge2 className="bg-purple-50 text-purple-700 border-purple-200 font-bold text-xs gap-1.5 py-0.5 px-2">
+                        <Home className="h-3.5 w-3.5 text-purple-600" /> To Home
+                      </Badge2>
+                    )}
+                  </div>
+                </div>
+                <div className="text-right">
+                  <div className="text-xs text-gray-500">Assigned Agent</div>
+                  <div className="font-semibold text-gray-900 text-sm flex items-center gap-1.5 justify-end mt-0.5">
+                    <LetterAvatar name={selectedJourneyModal.agentName} size="xs" />
+                    <span>{selectedJourneyModal.agentName}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Distance & Allowance Stats */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="p-3 bg-blue-50/50 border border-blue-100 rounded-lg">
+                  <div className="text-xs text-blue-600 font-medium">Distance Travelled</div>
+                  <div className="text-lg font-mono font-black text-blue-950 mt-0.5">
+                    {(parseFloat(selectedJourneyModal.distance_km) || 0).toFixed(2)} KM
+                  </div>
+                </div>
+                <div className="p-3 bg-emerald-50/50 border border-emerald-100 rounded-lg">
+                  <div className="text-xs text-emerald-600 font-medium">Travel Allowance</div>
+                  <div className="text-lg font-mono font-black text-emerald-950 mt-0.5">
+                    {selectedJourneyModal.isCommissionScheme ? (
+                      <span className="text-xs font-sans text-gray-500 font-normal">N/A (Commission)</span>
+                    ) : (
+                      `₹${(selectedJourneyModal.amount || 0).toFixed(2)}`
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Timing Information */}
+              <div className="space-y-2 border border-gray-100 rounded-lg p-3 text-xs">
+                <div className="flex justify-between py-1 border-b border-gray-100">
+                  <span className="text-gray-500">Travel Started:</span>
+                  <span className="font-medium text-gray-900">
+                    {selectedJourneyModal.startedAt ? formatDateTime(selectedJourneyModal.startedAt) : 'N/A'}
+                  </span>
+                </div>
+                <div className="flex justify-between py-1 border-b border-gray-100">
+                  <span className="text-gray-500">Travel Completed:</span>
+                  <span className="font-medium text-gray-900">
+                    {selectedJourneyModal.traveled_at ? formatDateTime(selectedJourneyModal.traveled_at) : 'N/A'}
+                  </span>
+                </div>
+                <div className="flex justify-between py-1">
+                  <span className="text-gray-500">Estimated Duration:</span>
+                  <span className="font-semibold text-primary">
+                    {selectedJourneyModal.durationText ? `⏱️ ${selectedJourneyModal.durationText}` : 'Completed'}
+                  </span>
+                </div>
+              </div>
+
+              {/* Coordinates & Route Map */}
+              {(selectedJourneyModal.from_location?.latitude > 0 || selectedJourneyModal.to_location?.latitude > 0) && (
+                <div className="space-y-2 border border-gray-100 rounded-lg p-3 text-xs bg-gray-50/30">
+                  <div className="font-semibold text-gray-700">GPS Coordinates</div>
+                  {selectedJourneyModal.from_location?.latitude > 0 && (
+                    <div className="flex justify-between text-gray-600">
+                      <span>Start Point:</span>
+                      <span className="font-mono">{selectedJourneyModal.from_location.latitude.toFixed(4)}, {selectedJourneyModal.from_location.longitude.toFixed(4)}</span>
+                    </div>
+                  )}
+                  {selectedJourneyModal.to_location?.latitude > 0 && (
+                    <div className="flex justify-between text-gray-600">
+                      <span>Destination:</span>
+                      <span className="font-mono">{selectedJourneyModal.to_location.latitude.toFixed(4)}, {selectedJourneyModal.to_location.longitude.toFixed(4)}</span>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Google Maps Route Button */}
+              {selectedJourneyModal.from_location?.latitude > 0 && selectedJourneyModal.to_location?.latitude > 0 && (
+                <a
+                  href={`https://www.google.com/maps/dir/?api=1&origin=${selectedJourneyModal.from_location.latitude},${selectedJourneyModal.from_location.longitude}&destination=${selectedJourneyModal.to_location.latitude},${selectedJourneyModal.to_location.longitude}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full flex items-center justify-center gap-2 py-2 px-4 bg-primary text-primary-foreground font-semibold text-xs rounded-lg hover:opacity-90 transition-opacity"
+                >
+                  <span>View Full Route on Google Maps</span>
+                  <ExternalLink className="h-3.5 w-3.5" />
+                </a>
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 };

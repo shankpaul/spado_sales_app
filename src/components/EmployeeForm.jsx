@@ -32,6 +32,7 @@ const EmployeeForm = ({ employee, onSubmit, onCancel }) => {
     contact_number: '',
     status: 'active',
     monthly_target_amount: '',
+    travelling_allowance: '',
     settlement_cycle: 'monthly',
   });
 
@@ -54,6 +55,7 @@ const EmployeeForm = ({ employee, onSubmit, onCancel }) => {
         contact_number: employee.contact_number || '',
         status: employee.status || 'active',
         monthly_target_amount: employee.monthly_target_amount || '',
+        travelling_allowance: employee.travelling_allowance !== undefined && employee.travelling_allowance !== null ? employee.travelling_allowance : '',
         settlement_cycle: employee.settlement_cycle || 'monthly',
       });
     }
@@ -179,6 +181,7 @@ const EmployeeForm = ({ employee, onSubmit, onCancel }) => {
       if (formData.job_title) submitData.job_title = formData.job_title.trim();
       if (formData.contact_number) submitData.contact_number = formData.contact_number.trim();
       submitData.monthly_target_amount = formData.monthly_target_amount ? parseFloat(formData.monthly_target_amount) : 0;
+      submitData.travelling_allowance = formData.travelling_allowance ? parseFloat(formData.travelling_allowance) : 0;
       
       // Add scheme-specific fields
       if (formData.scheme === 'salary' && formData.fixed_salary) {
@@ -402,6 +405,24 @@ const EmployeeForm = ({ employee, onSubmit, onCancel }) => {
         />
         {errors.five_star_incentive_percentage && (
           <p className="text-sm text-red-500">{errors.five_star_incentive_percentage}</p>
+        )}
+      </div>
+
+      {/* Travelling Allowance (₹/km) */}
+      <div className="space-y-2">
+        <Label htmlFor="travelling_allowance">Travelling Allowance (₹/km)</Label>
+        <Input
+          id="travelling_allowance"
+          name="travelling_allowance"
+          type="number"
+          step="0.01"
+          value={formData.travelling_allowance}
+          onChange={handleChange}
+          placeholder="0.00"
+          className={errors.travelling_allowance ? 'border-red-500' : ''}
+        />
+        {errors.travelling_allowance && (
+          <p className="text-sm text-red-500">{errors.travelling_allowance}</p>
         )}
       </div>
 

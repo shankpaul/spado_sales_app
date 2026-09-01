@@ -889,12 +889,14 @@ const EnquiryDetail = ({ enquiryId, onClose, onUpdate }) => {
           <Card className="p-4 md:p-6 space-y-3 md:space-y-4">
             <div className="flex items-center justify-between">
               <h2 className="text-base md:text-lg font-semibold">Customer Details</h2>
-              {customerOrdersCount !== null && (
+              {loadingCustomerStats ? (
+                <Skeleton className="h-6 w-24 rounded-full shrink-0" />
+              ) : customerOrdersCount !== null ? (
                 <Badge2 variant="secondary" className="text-xs font-semibold gap-1 bg-gray-100 text-gray-700">
                   <ShoppingCart className="h-3 w-3 text-primary" />
                   {customerOrdersCount} {customerOrdersCount === 1 ? 'Booking' : 'Bookings'}
                 </Badge2>
-              )}
+              ) : null}
             </div>
 
             <div className="flex items-start gap-2 md:gap-4">
@@ -954,12 +956,21 @@ const EnquiryDetail = ({ enquiryId, onClose, onUpdate }) => {
                         <ShoppingCart className="h-3 w-3 text-primary" />
                         Booking History
                       </span>
-                      <span className="font-bold text-primary">
-                        {loadingCustomerStats ? '...' : `${customerOrdersCount || 0} Total`}
-                      </span>
+                      {loadingCustomerStats ? (
+                        <Skeleton className="h-4 w-12 rounded" />
+                      ) : (
+                        <span className="font-bold text-primary">
+                          {customerOrdersCount || 0} Total
+                        </span>
+                      )}
                     </div>
 
-                    {lastBookingInfo ? (
+                    {loadingCustomerStats ? (
+                      <div className="pt-1.5 space-y-1.5">
+                        <Skeleton className="h-3.5 w-32 rounded" />
+                        <Skeleton className="h-3 w-24 rounded" />
+                      </div>
+                    ) : lastBookingInfo ? (
                       <div className="pt-1 text-gray-700">
                         <div className="flex items-center gap-1 font-medium text-xs">
                           <Clock className="h-3 w-3 text-emerald-600 shrink-0" />
@@ -1006,25 +1017,31 @@ const EnquiryDetail = ({ enquiryId, onClose, onUpdate }) => {
                       )}
                     </div>
 
-                    {(() => {
-                      const area = customerInfo?.area || enquiry?.area;
-                      const city = customerInfo?.city || enquiry?.city;
-                      const addressLine = customerInfo?.address_line1 || enquiry?.address;
-                      const locationStr = [addressLine, area, city].filter(Boolean).join(', ');
+                    {loadingCustomerStats ? (
+                      <div className="pt-1.5 space-y-1">
+                        <Skeleton className="h-3.5 w-full rounded" />
+                      </div>
+                    ) : (
+                      (() => {
+                        const area = customerInfo?.area || enquiry?.area;
+                        const city = customerInfo?.city || enquiry?.city;
+                        const addressLine = customerInfo?.address_line1 || enquiry?.address;
+                        const locationStr = [addressLine, area, city].filter(Boolean).join(', ');
 
-                      if (locationStr) {
+                        if (locationStr) {
+                          return (
+                            <p className="text-xs font-medium text-gray-700 leading-tight pt-0.5 truncate" title={locationStr}>
+                              {locationStr}
+                            </p>
+                          );
+                        }
                         return (
-                          <p className="text-xs font-medium text-gray-700 leading-tight pt-0.5 truncate" title={locationStr}>
-                            {locationStr}
+                          <p className="text-[11px] text-muted-foreground italic pt-0.5">
+                            No location specified
                           </p>
                         );
-                      }
-                      return (
-                        <p className="text-[11px] text-muted-foreground italic pt-0.5">
-                          No location specified
-                        </p>
-                      );
-                    })()}
+                      })()
+                    )}
                   </div>
                 </div>
               </div>

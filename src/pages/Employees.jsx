@@ -690,6 +690,10 @@ const Employees = () => {
                     <label className="text-xs text-gray-500">Monthly Target Amount</label>
                     <p className="text-sm font-medium text-primary">{formatCurrency(selectedEmployee.monthly_target_amount)}</p>
                   </div>
+                  <div>
+                    <label className="text-xs text-gray-500">Travelling Allowance</label>
+                    <p className="text-sm font-medium text-blue-600">₹{selectedEmployee.travelling_allowance || 0}/km</p>
+                  </div>
                 </div>
               </div>
 

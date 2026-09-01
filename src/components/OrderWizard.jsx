@@ -968,15 +968,15 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
 
         // Set packages with all necessary fields
         const orderPackages = order.packages?.map(pkg => {
-          const discountVal = parseFloat(pkg.discount) || 0;
+          const discountVal = parseFloat(pkg.discount) || parseFloat(pkg.discount_value) || 0;
           return {
-            package_id: String(pkg.package_id), // Convert to string for Select component
+            package_id: String(pkg.package_id || pkg.id), // Convert to string for Select component
             package_name: pkg.package_name || pkg.name,
             vehicle_type: pkg.vehicle_type,
             quantity: pkg.quantity || 1,
             unit_price: parseFloat(pkg.price) || 0,
             discount_value: discountVal,
-            discount_type: pkg.discount_type,
+            discount_type: pkg.discount_type || DISCOUNT_TYPES.FIXED,
             total_price: parseFloat(pkg.total_price) || 0,
             notes: pkg.notes || '',
             package: pkg, // Include full package details
@@ -987,14 +987,14 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
 
         // Set addons
         const orderAddons = order.addons?.map(addon => {
-          const discountVal = parseFloat(addon.discount) || 0;
+          const discountVal = parseFloat(addon.discount) || parseFloat(addon.discount_value) || 0;
           return {
-            addon_id: String(addon.addon_id), // Convert to string for Select component
-            addon_name: addon.addon_name,
+            addon_id: String(addon.addon_id || addon.id), // Convert to string for Select component
+            addon_name: addon.addon_name || addon.name,
             quantity: addon.quantity || 1,
             unit_price: parseFloat(addon.price) || 0,
             discount_value: discountVal,
-            discount_type: addon.discount_type,
+            discount_type: addon.discount_type || DISCOUNT_TYPES.FIXED,
             total_price: parseFloat(addon.total_price) || 0,
             addon: addon.addon, // Include full addon details
             enable_custom_discount: discountVal > 0,
@@ -1362,16 +1362,23 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
 
   // Calculate line total
   const calculateLineTotal = (item) => {
-    const subtotal = item.quantity * item.unit_price;
+    const qty = parseInt(item.quantity, 10) || 1;
+    const unitPrice = parseFloat(item.unit_price) || 0;
+    const subtotal = qty * unitPrice;
     let discount = 0;
 
-    if (item.discount_type === DISCOUNT_TYPES.PERCENTAGE) {
-      discount = (subtotal * item.discount_value) / 100;
-    } else {
-      discount = item.discount_value;
+    if (item.enable_custom_discount) {
+      const discountVal = parseFloat(item.discount_value) || 0;
+      const discountType = item.discount_type || DISCOUNT_TYPES.FIXED;
+
+      if (discountType === DISCOUNT_TYPES.PERCENTAGE || discountType === 'percentage') {
+        discount = (subtotal * discountVal) / 100;
+      } else {
+        discount = discountVal;
+      }
     }
 
-    return subtotal - discount;
+    return Math.max(0, subtotal - discount);
   };
 
   // Generate time options for select dropdown (6:00 AM to 8:00 PM in 30-min intervals)
@@ -1668,23 +1675,31 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
         points_redeemed: pointsToRedeem ? (parseInt(pointsToRedeem, 10) || 0) : 0,
         payment_method: paymentMethod || '',
         notes,
-        packages: packageItems.map((item) => ({
-          package_id: parseInt(item.package_id, 10),
-          // brand: item.brand,
-          // model: item.model,
-          vehicle_type: item.vehicle_type,
-          quantity: item.quantity,
-          price: item.unit_price,
-          discount_type: item.discount_type,
-          discount: item.discount_value || 0,
-        })),
-        addons: addonItems.map((item) => ({
-          addon_id: parseInt(item.addon_id, 10),
-          quantity: item.quantity,
-          price: item.unit_price,
-          discount_type: item.discount_type,
-          discount: item.discount_value || 0,
-        })),
+        packages: packageItems.map((item) => {
+          const isDiscEnabled = !!item.enable_custom_discount;
+          const discVal = isDiscEnabled ? (parseFloat(item.discount_value) || 0) : 0;
+          return {
+            package_id: parseInt(item.package_id, 10),
+            // brand: item.brand,
+            // model: item.model,
+            vehicle_type: item.vehicle_type,
+            quantity: parseInt(item.quantity, 10) || 1,
+            price: parseFloat(item.unit_price) || 0,
+            discount_type: item.discount_type || DISCOUNT_TYPES.FIXED,
+            discount: discVal,
+          };
+        }),
+        addons: addonItems.map((item) => {
+          const isDiscEnabled = !!item.enable_custom_discount;
+          const discVal = isDiscEnabled ? (parseFloat(item.discount_value) || 0) : 0;
+          return {
+            addon_id: parseInt(item.addon_id, 10),
+            quantity: parseInt(item.quantity, 10) || 1,
+            price: parseFloat(item.unit_price) || 0,
+            discount_type: item.discount_type || DISCOUNT_TYPES.FIXED,
+            discount: discVal,
+          };
+        }),
         ...address
       };
 
@@ -1775,6 +1790,7 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
+                autocomplete="off"
                 placeholder="Search by name or phone..."
                 value={selectedCustomer ? `${selectedCustomer.name} — ${selectedCustomer.phone}` : customerSearchTerm}
                 onChange={(e) => { setCustomerSearchTerm(e.target.value); setSelectedCustomer(null); }}
@@ -3131,11 +3147,10 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
                     return (
                       <label
                         key={method.value}
-                        className={`flex items-center gap-2 p-2.5 rounded-lg border cursor-pointer transition-all select-none ${
-                          isSelected
-                            ? 'border-primary bg-primary/5 text-primary font-semibold shadow-xs'
-                            : 'border-input hover:bg-accent/40 text-gray-700'
-                        }`}
+                        className={`flex items-center gap-2 p-2.5 rounded-lg border cursor-pointer transition-all select-none ${isSelected
+                          ? 'border-primary bg-primary/5 text-primary font-semibold shadow-xs'
+                          : 'border-input hover:bg-accent/40 text-gray-700'
+                          }`}
                       >
                         <input
                           type="radio"
@@ -3216,7 +3231,7 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
                   {totals.offerDiscount > 0 && (
                     <>
                       <div className="flex justify-between text-green-600">
-                        <span className="flex items-center gap-1.5">
+                        <span className="flex items-center gap-1.5 capitalize">
                           <Gift className="h-3.5 w-3.5" />
                           {selectedOffer?.name ? selectedOffer.name.slice(0, 18) + (selectedOffer.name.length > 18 ? '…' : '') : 'Offer'}
                         </span>
@@ -3264,7 +3279,7 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
                 {selectedOffer && (
                   <div className="flex items-center gap-2 text-xs bg-green-50 border border-green-200 rounded-lg px-3 py-2">
                     <Gift className="h-3.5 w-3.5 text-green-600 shrink-0" />
-                    <span className="text-green-800 font-medium truncate">{selectedOffer.name}</span>
+                    <span className="text-green-800 font-medium truncate capitalize">{selectedOffer.name}</span>
                     {isCouponVerified && <span className="shrink-0 text-green-600 font-bold">✓ Coupon</span>}
                   </div>
                 )}
