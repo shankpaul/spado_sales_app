@@ -42,6 +42,7 @@ import {
   Wallet,
   CheckCircle2,
   Building2,
+  Award,
 } from 'lucide-react';
 import usePWAInstall from '../hooks/usePWAInstall';
 import Logo from './Logo';
@@ -160,6 +161,7 @@ const Layout = ({ children }) => {
           items: [
             { name: 'All Wallets', href: '/wallets', icon: Wallet },
             { name: 'Wallet Ledger', href: '/wallet', icon: DollarSign },
+            { name: 'Partner Performance', href: '/partner-performance', icon: Award },
             { name: 'Settlements', href: '/settlements', icon: CheckCircle2 },
             { name: 'Cash Reconciliation', href: '/cash-reconciliation', icon: Building2 }
           ]

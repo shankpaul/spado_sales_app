@@ -554,23 +554,33 @@ const Users = () => {
 
       {/* User Form Sheet */}
       <Sheet open={isFormOpen} onOpenChange={setIsFormOpen}>
-        <SheetContent className="sm:max-w-2xl overflow-y-auto">
-          <SheetHeader>
-            <SheetTitle>{selectedUser ? 'Edit User' : 'Add New User'}</SheetTitle>
-            <SheetDescription>
-              {selectedUser
-                ? 'Update user information and settings'
-                : 'Add a new user to the system'}
-            </SheetDescription>
-          </SheetHeader>
-          <UserForm
-            user={selectedUser}
-            onSubmit={handleFormSubmit}
-            onCancel={() => {
-              setIsFormOpen(false);
-              setSelectedUser(null);
-            }}
-          />
+        <SheetContent className="w-full sm:max-w-2xl flex flex-col h-full p-0">
+          {/* Fixed Header */}
+          <div className="px-6 py-5 border-b border-gray-100 shrink-0 bg-white">
+            <SheetHeader className="space-y-1 pr-8 text-left">
+              <SheetTitle className="text-xl font-bold text-gray-900">
+                {selectedUser ? 'Edit User' : 'Add New User'}
+              </SheetTitle>
+              <SheetDescription className="text-sm text-gray-500">
+                {selectedUser
+                  ? 'Update user information and settings'
+                  : 'Add a new user to the system'}
+              </SheetDescription>
+            </SheetHeader>
+          </div>
+
+          {/* Form with Scrollable Body and Fixed Footer */}
+          <div className="flex-1 min-h-0 overflow-hidden">
+            <UserForm
+              key={selectedUser?.id || 'new'}
+              user={selectedUser}
+              onSubmit={handleFormSubmit}
+              onCancel={() => {
+                setIsFormOpen(false);
+                setSelectedUser(null);
+              }}
+            />
+          </div>
         </SheetContent>
       </Sheet>
 

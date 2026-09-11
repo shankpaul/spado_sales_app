@@ -30,6 +30,8 @@ import {
   DrawerHeader,
   DrawerTitle,
   DrawerDescription,
+  DrawerFooter,
+  DrawerClose,
 } from './ui/drawer';
 import {
   AlertDialog,
@@ -40,10 +42,15 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
+  AlertDialogAction as AlertDialogActionConfirm,
 } from './ui/alert-dialog';
 import { toast } from 'sonner';
 import subscriptionService from '../services/subscriptionService';
 import customerService from '../services/customerService';
+import offerService from '../services/offerService';
+import campaignService from '../services/campaignService';
+import { Badge2 } from './ui/badge2';
+import LetterAvatar from './LetterAvatar';
 import VehicleIdentifier from './VehicleIdentifier';
 import {
   STORAGE_KEYS,
@@ -73,6 +80,15 @@ import {
   Car,
   Truck,
   ArrowLeft,
+  UserPlus,
+  Gift,
+  Tag,
+  Percent,
+  Info,
+  CreditCard,
+  Check,
+  CheckCircle2,
+  Sparkles,
 } from 'lucide-react';
 import { format, addMonths } from 'date-fns';
 
@@ -122,6 +138,20 @@ const SubscriptionWizard = ({ open, onOpenChange, onSuccess, customerId = null, 
   const [paymentMethod, setPaymentMethod] = useState('');
   const [paymentStatus, setPaymentStatus] = useState('pending');
   const [notes, setNotes] = useState('');
+
+  // Offers & Coupons states
+  const [availableOffers, setAvailableOffers] = useState([]);
+  const [loadingOffers, setLoadingOffers] = useState(false);
+  const [selectedOffer, setSelectedOffer] = useState(null);
+  const [couponCode, setCouponCode] = useState('');
+  const [verifyingCoupon, setVerifyingCoupon] = useState(false);
+  const [couponError, setCouponError] = useState('');
+  const [isCouponVerified, setIsCouponVerified] = useState(false);
+  const [verifiedCouponData, setVerifiedCouponData] = useState(null);
+  const [isCustomerCouponsOpen, setIsCustomerCouponsOpen] = useState(false);
+  const [customerCoupons, setCustomerCoupons] = useState([]);
+  const [loadingCustomerCoupons, setLoadingCustomerCoupons] = useState(false);
+  const [offerDetailsDialog, setOfferDetailsDialog] = useState({ open: false, offer: null });
 
   // Schedule rule states
   const [scheduleMode, setScheduleMode] = useState('manual'); // 'manual' or 'rule-based'
@@ -203,14 +233,74 @@ const SubscriptionWizard = ({ open, onOpenChange, onSuccess, customerId = null, 
     if (open && !subscriptionId && selectedCustomer) {
       saveDraft();
     }
-  }, [selectedCustomer, vehicleType, monthsDuration, packageItems, addonItems, washingSchedules, address, paymentAmount, paymentMethod, notes]);
+  }, [selectedCustomer, vehicleType, monthsDuration, packageItems, addonItems, washingSchedules, address, paymentAmount, paymentMethod, notes, selectedOffer, couponCode, isCouponVerified]);
 
-  // Generate washing schedules when packages or duration changes
+  // Fetch available offers when step 5 is reached
   useEffect(() => {
-    if (packageItems.length > 0 && monthsDuration > 0) {
+    const fetchOffers = async () => {
+      if (currentStep !== 5) {
+        return;
+      }
+
+      if (!selectedCustomer) {
+        setAvailableOffers([]);
+        setSelectedOffer(null);
+        return;
+      }
+
+      setLoadingOffers(true);
+      try {
+        const packageIds = packageItems.map(item => parseInt(item.package_id)).filter(id => !isNaN(id));
+        const addonIds = addonItems.map(item => parseInt(item.addon_id)).filter(id => !isNaN(id));
+
+        const response = await offerService.getAvailableOffers({
+          package_ids: packageIds,
+          addon_ids: addonIds,
+          customer_id: selectedCustomer.id,
+        });
+
+        const offers = response.data || [];
+        setAvailableOffers(offers);
+
+        // Check if previously selected offer is still valid
+        if (selectedOffer) {
+          const isCouponLinked = isCouponVerified;
+          if (!isCouponLinked) {
+            const isStillValid = offers.some(offer => offer.id === selectedOffer.id);
+            if (!isStillValid) {
+              setSelectedOffer(null);
+            }
+          }
+        }
+      } catch (error) {
+        setAvailableOffers([]);
+        if (selectedOffer && !isCouponVerified) {
+          setSelectedOffer(null);
+        }
+      } finally {
+        setLoadingOffers(false);
+      }
+    };
+
+    fetchOffers();
+  }, [currentStep, selectedCustomer, packageItems, addonItems]);
+
+  // Generate washing schedules when packages, duration, or startDate changes
+  useEffect(() => {
+    if (packageItems.length > 0 && monthsDuration > 0 && !subscriptionId) {
       generateWashingSchedules();
     }
-  }, [packageItems, monthsDuration]);
+  }, [packageItems, monthsDuration, startDate, subscriptionId]);
+
+  // Ensure schedules have dates when entering Step 4
+  useEffect(() => {
+    if (currentStep === 4 && (!subscriptionId || existingSubscription?.payment_status === 'pending')) {
+      const totalWashes = calculateTotalWashes();
+      if (totalWashes > 0 && (washingSchedules.length !== totalWashes || washingSchedules.some(s => !s.date))) {
+        generateWashingSchedules();
+      }
+    }
+  }, [currentStep, subscriptionId, existingSubscription]);
 
   // Load draft from localStorage
   const loadDraft = () => {
@@ -238,6 +328,10 @@ const SubscriptionWizard = ({ open, onOpenChange, onSuccess, customerId = null, 
       if (draft.paymentAmount) setPaymentAmount(draft.paymentAmount);
       if (draft.paymentMethod) setPaymentMethod(draft.paymentMethod);
       if (draft.notes) setNotes(draft.notes);
+      if (draft.selectedOffer) setSelectedOffer(draft.selectedOffer);
+      if (draft.couponCode) setCouponCode(draft.couponCode);
+      if (draft.isCouponVerified) setIsCouponVerified(draft.isCouponVerified);
+      if (draft.verifiedCouponData) setVerifiedCouponData(draft.verifiedCouponData);
     } catch (error) {
       localStorage.removeItem(STORAGE_KEYS.SUBSCRIPTION_WIZARD_DRAFT);
     }
@@ -261,6 +355,10 @@ const SubscriptionWizard = ({ open, onOpenChange, onSuccess, customerId = null, 
         paymentAmount,
         paymentMethod,
         notes,
+        selectedOffer,
+        couponCode,
+        isCouponVerified,
+        verifiedCouponData,
         expiryDate: expiryDate.toISOString(),
       };
 
@@ -355,19 +453,81 @@ const SubscriptionWizard = ({ open, onOpenChange, onSuccess, customerId = null, 
     }, 0);
   };
 
-  // Generate washing schedules (basic - for manual mode)
-  const generateWashingSchedules = () => {
-    const totalWashes = calculateTotalWashes();
+  // Helper to safely parse local date without timezone shifts
+  const parseLocalDate = (dateStr) => {
+    if (!dateStr) return new Date();
+    if (typeof dateStr === 'string' && dateStr.includes('-')) {
+      const parts = dateStr.split('T')[0].split('-').map(Number);
+      if (parts.length === 3 && !isNaN(parts[0]) && !isNaN(parts[1]) && !isNaN(parts[2])) {
+        return new Date(parts[0], parts[1] - 1, parts[2]);
+      }
+    }
+    return new Date(dateStr);
+  };
 
-    // Only generate if empty or count changed
-    if (washingSchedules.length === 0 || washingSchedules.length !== totalWashes) {
-      const newSchedules = Array.from({ length: totalWashes }, () => ({
-        date: '',
-        time_from: '',
-        time_to: '',
-        isAutoGenerated: false,
-      }));
+  // Calculate default dates evenly spaced starting from startDate
+  const calculateDefaultScheduleDates = (totalWashes, baseStartDate, duration) => {
+    if (!totalWashes || totalWashes <= 0) return [];
+    const start = parseLocalDate(baseStartDate);
+
+    // Determine interval in days
+    let intervalDays = 7;
+    const durationMonths = Math.max(1, duration || 1);
+    const washesPerMonth = totalWashes / durationMonths;
+
+    if (washesPerMonth > 4) {
+      // More than 1 wash a week
+      intervalDays = Math.max(1, Math.floor((durationMonths * 30) / totalWashes));
+    } else if (washesPerMonth < 3 && totalWashes > 1) {
+      // e.g. 1 or 2 washes a month -> ~14 days (fortnightly)
+      intervalDays = Math.max(7, Math.floor((durationMonths * 30) / totalWashes));
+    } else {
+      // Standard weekly
+      intervalDays = 7;
+    }
+
+    const dates = [];
+    for (let i = 0; i < totalWashes; i++) {
+      const d = new Date(start.getFullYear(), start.getMonth(), start.getDate() + (i * intervalDays));
+      dates.push(format(d, 'yyyy-MM-dd'));
+    }
+    return dates;
+  };
+
+  // Generate washing schedules (with dates pre-filled for manual mode)
+  const generateWashingSchedules = (force = false) => {
+    const totalWashes = calculateTotalWashes();
+    if (totalWashes === 0) {
+      setWashingSchedules([]);
+      return;
+    }
+
+    const defaultDates = calculateDefaultScheduleDates(totalWashes, startDate, monthsDuration);
+
+    // Regenerate if empty, count changed, or forced
+    if (force || washingSchedules.length !== totalWashes) {
+      const newSchedules = Array.from({ length: totalWashes }, (_, index) => {
+        const existing = !force ? washingSchedules[index] : null;
+        return {
+          date: existing?.date || defaultDates[index] || '',
+          time_from: existing?.time_from || scheduleRule.defaultTimeFrom || '09:00',
+          time_to: existing?.time_to || scheduleRule.defaultTimeTo || '11:00',
+          isAutoGenerated: false,
+        };
+      });
       setWashingSchedules(newSchedules);
+    } else {
+      // If count matches but any dates or times are missing, populate them
+      const hasMissingInfo = washingSchedules.some(s => !s.date || !s.time_from || !s.time_to);
+      if (hasMissingInfo) {
+        const updated = washingSchedules.map((schedule, index) => ({
+          ...schedule,
+          date: schedule.date || defaultDates[index] || '',
+          time_from: schedule.time_from || scheduleRule.defaultTimeFrom || '09:00',
+          time_to: schedule.time_to || scheduleRule.defaultTimeTo || '11:00',
+        }));
+        setWashingSchedules(updated);
+      }
     }
   };
 
@@ -756,6 +916,184 @@ const SubscriptionWizard = ({ open, onOpenChange, onSuccess, customerId = null, 
     setCurrentStep(currentStep - 1);
   };
 
+  // Coupon & Offer helper functions
+  const fetchCustomerCoupons = async () => {
+    if (!selectedCustomer) return;
+    setLoadingCustomerCoupons(true);
+    try {
+      const phone = selectedCustomer.phone || '';
+      if (!phone) {
+        setCustomerCoupons([]);
+        return;
+      }
+      const response = await campaignService.getAllCoupons({ search: phone });
+      const coupons = response.data || [];
+      const activeCoupons = coupons.filter(coupon =>
+        coupon.status !== 'cancelled' &&
+        coupon.status !== 'completed' &&
+        coupon.status !== 'expired' &&
+        coupon.remaining_uses > 0
+      );
+      setCustomerCoupons(activeCoupons);
+    } catch (err) {
+      toast.error('Failed to fetch customer coupons');
+    } finally {
+      setLoadingCustomerCoupons(false);
+    }
+  };
+
+  const verifyAndApplyCoupon = async (code) => {
+    if (!code) {
+      setCouponError('Please enter a coupon code');
+      return;
+    }
+    if (!selectedCustomer) {
+      setCouponError('Please select a customer first');
+      return;
+    }
+
+    setVerifyingCoupon(true);
+    setCouponError('');
+    try {
+      const phone = selectedCustomer.phone || '';
+      const response = await campaignService.validateCoupon(
+        code.trim().toUpperCase(),
+        selectedCustomer.id,
+        phone
+      );
+
+      if (response.valid && response.data) {
+        setIsCouponVerified(true);
+        setVerifiedCouponData(response.data);
+        setCouponCode(code.trim().toUpperCase());
+        toast.success('Coupon verified successfully!');
+
+        // Auto-apply the linked offer from coupon
+        const couponData = response.data;
+        const offerId = couponData.offer_id;
+
+        if (offerId && offerId > 0) {
+          try {
+            const offerRes = await offerService.getOfferById(offerId);
+            if (offerRes && offerRes.data) {
+              setSelectedOffer(offerRes.data);
+              saveDraft();
+            } else {
+              setSelectedOffer({
+                id: offerId,
+                name: couponData.offer_name || 'Coupon Offer',
+                description: '',
+                discount_type: 'fixed',
+                discount_value: 0,
+                coupon_required: true,
+              });
+              saveDraft();
+            }
+          } catch (_) {
+            setSelectedOffer({
+              id: offerId,
+              name: couponData.offer_name || 'Coupon Offer',
+              description: '',
+              discount_type: 'fixed',
+              discount_value: 0,
+              coupon_required: true,
+            });
+            saveDraft();
+          }
+        } else {
+          toast.error('Associated offer not found for this coupon.');
+        }
+        setIsCustomerCouponsOpen(false);
+      } else {
+        setCouponError('Coupon is invalid or cannot be applied');
+      }
+    } catch (error) {
+      const msg = error.response?.data?.errors?.[0] || 'Coupon validation failed';
+      setCouponError(msg);
+      toast.error(msg);
+    } finally {
+      setVerifyingCoupon(false);
+    }
+  };
+
+  const handleVerifyCoupon = async () => {
+    await verifyAndApplyCoupon(couponCode);
+  };
+
+  const handleRemoveOffer = () => {
+    setSelectedOffer(null);
+    setCouponCode('');
+    setIsCouponVerified(false);
+    setVerifiedCouponData(null);
+    setCouponError('');
+    saveDraft();
+  };
+
+  // Render list of active coupons for selected customer
+  const renderCustomerCouponsList = () => {
+    if (loadingCustomerCoupons) {
+      return (
+        <div className="flex flex-col items-center justify-center py-8 space-y-2">
+          <Loader2 className="h-6 w-6 animate-spin text-primary" />
+          <span className="text-sm text-muted-foreground">Searching coupons...</span>
+        </div>
+      );
+    }
+
+    if (customerCoupons.length === 0) {
+      return (
+        <div className="text-center py-8 text-muted-foreground space-y-2">
+          <Gift className="h-8 w-8 mx-auto opacity-30 text-gray-500" />
+          <p className="text-sm">No active coupons found for this customer.</p>
+        </div>
+      );
+    }
+
+    return (
+      <div className="space-y-3 mt-2">
+        {customerCoupons.map((coupon) => (
+          <Card key={coupon.id} className="p-3 border hover:border-primary/45 hover:bg-primary/5 transition-all">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-1.5">
+                  <span className="font-mono font-bold text-xs bg-primary/10 text-primary px-2 py-0.5 rounded uppercase tracking-wider">
+                    {coupon.code}
+                  </span>
+                </div>
+                <p className="text-xs font-semibold text-gray-700 mt-2">
+                  Campaign: {coupon.campaign_name || 'Campaign Offer'}
+                </p>
+                {coupon.offer_name && (
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Offer: {coupon.offer_name}
+                  </p>
+                )}
+                <div className="flex items-center gap-4 mt-2 text-[11px] text-gray-500">
+                  <div>
+                    <span className="font-semibold text-gray-700">Uses Left:</span> {coupon.remaining_uses} / {coupon.allowed_uses}
+                  </div>
+                  {coupon.expiry_date && (
+                    <div>
+                      <span className="font-semibold text-gray-700">Expiry:</span> {new Date(coupon.expiry_date).toLocaleDateString()}
+                    </div>
+                  )}
+                </div>
+              </div>
+              <Button
+                type="button"
+                size="sm"
+                onClick={() => verifyAndApplyCoupon(coupon.code)}
+                className="bg-green-600 hover:bg-green-700 text-white font-semibold text-xs py-1 h-8 px-3 shrink-0 cursor-pointer"
+              >
+                Apply
+              </Button>
+            </div>
+          </Card>
+        ))}
+      </div>
+    );
+  };
+
   // Calculate totals
   const calculateTotals = () => {
     const packageTotal = packageItems.reduce((sum, item) => sum + (item.price || 0), 0);
@@ -763,8 +1101,24 @@ const SubscriptionWizard = ({ open, onOpenChange, onSuccess, customerId = null, 
     // Package prices already include quantity (monthsDuration)
     // Addon prices already include selected wash count, no multiplication needed
     const subtotal = packageTotal + addonTotal;
-    const gst = (subtotal * GST_PERCENTAGE) / 100;
-    const totalBeforeRounding = subtotal + gst;
+
+    // Calculate Offer Discount
+    let offerDiscount = 0;
+    if (selectedOffer) {
+      if (selectedOffer.discount_type === 'percentage') {
+        offerDiscount = (subtotal * selectedOffer.discount_value) / 100;
+        if (selectedOffer.max_discount_amount && offerDiscount > selectedOffer.max_discount_amount) {
+          offerDiscount = selectedOffer.max_discount_amount;
+        }
+      } else {
+        offerDiscount = selectedOffer.discount_value;
+      }
+    }
+    offerDiscount = Math.min(offerDiscount, subtotal);
+    const subtotalAfterDiscount = Math.max(0, subtotal - offerDiscount);
+
+    const gst = (subtotalAfterDiscount * GST_PERCENTAGE) / 100;
+    const totalBeforeRounding = subtotalAfterDiscount + gst;
     const roundedTotal = Math.round(totalBeforeRounding);
     const roundOff = roundedTotal - totalBeforeRounding;
 
@@ -772,10 +1126,12 @@ const SubscriptionWizard = ({ open, onOpenChange, onSuccess, customerId = null, 
       packages: packageTotal,
       addons: addonTotal,
       subtotal,
+      offerDiscount,
+      subtotalAfterDiscount,
       gst,
       gstPercentage: GST_PERCENTAGE,
       roundOff,
-      perMonth: (roundedTotal / monthsDuration),
+      perMonth: monthsDuration > 0 ? (roundedTotal / monthsDuration) : roundedTotal,
       total: roundedTotal,
     };
   };
@@ -786,14 +1142,20 @@ const SubscriptionWizard = ({ open, onOpenChange, onSuccess, customerId = null, 
 
     setLoading(true);
     try {
-      const subscriptionData = {
-        customer_id: parseInt(selectedCustomer.id, 10),
-        vehicle_type: vehicleType,
-        start_date: startDate,
-        months_duration: monthsDuration,
-        area: address.area,
-        map_url: address.map_url,
-        packages: packageItems.map(item => ({
+      const calculatedTotals = calculateTotals();
+      const offerDiscount = calculatedTotals.offerDiscount || 0;
+
+      // Distribute offer discount to package items so backend calculateSubscriptionAmount matches
+      const updatedPackages = packageItems.map((item, idx) => {
+        let additionalDiscountValue = 0;
+        if (idx === 0 && offerDiscount > 0) {
+          additionalDiscountValue = offerDiscount;
+        }
+
+        const baseDiscountValue = item.discount_value || 0;
+        const totalDiscountValue = baseDiscountValue + additionalDiscountValue;
+
+        return {
           package_id: parseInt(item.package_id, 10),
           quantity: item.quantity,
           unit_price: item.unit_price,
@@ -801,10 +1163,26 @@ const SubscriptionWizard = ({ open, onOpenChange, onSuccess, customerId = null, 
           vehicle_type: item.vehicle_type,
           discount: item.discount,
           discount_type: item.discount_type,
-          discount_value: item.discount_value,
+          discount_value: totalDiscountValue,
           notes: item.notes || null,
-        })),
+        };
+      });
 
+      // Construct notes including offer details if applied
+      let finalNotes = notes || '';
+      if (selectedOffer && offerDiscount > 0) {
+        const offerNote = `[Offer Applied: ${selectedOffer.name}${couponCode ? ` (Coupon: ${couponCode})` : ''} - Discount: ₹${offerDiscount.toFixed(2)}]`;
+        finalNotes = finalNotes ? `${finalNotes}\n${offerNote}` : offerNote;
+      }
+
+      const subscriptionData = {
+        customer_id: parseInt(selectedCustomer.id, 10),
+        vehicle_type: vehicleType,
+        start_date: startDate,
+        months_duration: monthsDuration,
+        area: address.area,
+        map_url: address.map_url,
+        packages: updatedPackages,
         addons: addonItems.map(item => ({
           addon_id: parseInt(item.addon_id, 10),
           quantity: 1, // Always 1, pricing based on wash count instead
@@ -819,7 +1197,7 @@ const SubscriptionWizard = ({ open, onOpenChange, onSuccess, customerId = null, 
         payment_amount: paymentAmount ? parseFloat(paymentAmount) : 0,
         payment_date: paymentDate || null,
         payment_method: paymentMethod,
-        notes: notes || null,
+        notes: finalNotes || null,
       };
 
       await subscriptionService.createSubscription(subscriptionData);
@@ -852,6 +1230,12 @@ const SubscriptionWizard = ({ open, onOpenChange, onSuccess, customerId = null, 
     setPaymentMethod('');
     setPaymentStatus('pending');
     setNotes('');
+    setSelectedOffer(null);
+    setCouponCode('');
+    setVerifyingCoupon(false);
+    setCouponError('');
+    setIsCouponVerified(false);
+    setVerifiedCouponData(null);
     setErrors({});
   };
 
@@ -964,43 +1348,68 @@ const SubscriptionWizard = ({ open, onOpenChange, onSuccess, customerId = null, 
             {currentStep === 1 && (
               <div className="space-y-6 px-1">
                 {/* Customer Selection */}
-                <div>
-                  <Label>Customer *</Label>
-                  {selectedCustomer ? (
-                    <Card className="p-4 mt-2">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="font-semibold">{selectedCustomer.name}</p>
-                          <p className="text-sm text-muted-foreground">{selectedCustomer.phone}</p>
-                          {selectedCustomer.area && (
-                            <p className="text-sm text-muted-foreground">{selectedCustomer.area}</p>
-                          )}
-                        </div>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setSelectedCustomer(null)}
-                        >
-                          Change
-                        </Button>
+                <div className="rounded-xl border bg-card">
+                  <div className="flex items-center justify-between px-4 pt-3.5 pb-3 border-b">
+                    <div className="flex items-center gap-2">
+                      <div className="flex items-center justify-center w-7 h-7 rounded-lg bg-primary/10">
+                        <Search className="h-4 w-4 text-primary" />
                       </div>
-                    </Card>
-                  ) : (
-                    <div className="relative mt-2">
-                      <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        ref={customerSearchRef}
-                        placeholder="Search customer by name or phone..."
-                        value={customerSearchTerm}
-                        onChange={(e) => setCustomerSearchTerm(e.target.value)}
-                        className="pl-10"
-                      />
+                      <span className="font-semibold text-sm">Select Customer</span>
+                      <span className="text-red-500 text-xs font-bold -ml-1">*</span>
+                    </div>
+
+                    {!subscriptionId && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setShowCustomerSuggestions(false);
+                          const term = (customerSearchTerm || '').trim();
+                          const isPhone = /^[\d\s+\-()]+$/.test(term);
+                          if (term) {
+                            setNewCustomerInitialData(isPhone ? { phone: term } : { name: term });
+                          } else {
+                            setNewCustomerInitialData(null);
+                          }
+                          setShowCustomerForm(true);
+                        }}
+                        className="h-7.5 px-2.5 text-xs gap-1.5 font-medium text-primary hover:text-primary hover:bg-primary/5 border-primary/25 cursor-pointer shadow-2xs"
+                      >
+                        <UserPlus className="h-3.5 w-3.5" />
+                        <span>New Customer</span>
+                      </Button>
+                    )}
+                  </div>
+
+                  <div className="p-4 space-y-3">
+                    <div className="relative" ref={customerSearchRef}>
+                      <div className="relative">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                        <Input
+                          autoComplete="off"
+                          placeholder="Search by name or phone..."
+                          value={selectedCustomer ? `${selectedCustomer.name} — ${selectedCustomer.phone}` : customerSearchTerm}
+                          onChange={(e) => {
+                            setCustomerSearchTerm(e.target.value);
+                            setSelectedCustomer(null);
+                          }}
+                          onFocus={() => {
+                            if (customerSearchTerm.length >= 2) setShowCustomerSuggestions(true);
+                          }}
+                          className="pl-10 h-11 text-sm"
+                          disabled={!!subscriptionId}
+                        />
+                        {customerSearchLoading && (
+                          <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />
+                        )}
+                      </div>
+
                       {showCustomerSuggestions && (
-                        <Card className="absolute bg-white z-10 w-full mt-1 max-h-60 overflow-y-auto shadow-lg border border-gray-100">
+                        <Card className="absolute bg-white z-50 w-full mt-1 max-h-60 overflow-y-auto shadow-lg border border-gray-100">
                           {customerSearchLoading ? (
                             <div className="p-4 text-center">
-                              <Loader2 className="h-6 w-6 animate-spin mx-auto" />
+                              <Loader2 className="h-6 w-6 animate-spin mx-auto text-primary" />
                             </div>
                           ) : customers.length > 0 ? (
                             <div className="divide-y divide-gray-50">
@@ -1029,20 +1438,26 @@ const SubscriptionWizard = ({ open, onOpenChange, onSuccess, customerId = null, 
                                   <button
                                     key={customer.id}
                                     type="button"
-                                    onClick={() => handleSelectCustomer(customer)}
-                                    className="w-full px-4 py-2.5 text-left hover:bg-secondary active:bg-secondary/80 active:scale-[0.98] transition-all flex items-center justify-between border-b last:border-b-0 border-gray-50"
+                                    onClick={() => {
+                                      handleSelectCustomer(customer);
+                                      setShowCustomerSuggestions(false);
+                                    }}
+                                    className="w-full px-4 py-2.5 text-left hover:bg-secondary active:bg-secondary/80 active:scale-[0.98] transition-all flex items-center justify-between border-b last:border-b-0 border-gray-50 cursor-pointer"
                                   >
-                                    <div>
-                                      <p className="font-semibold text-gray-900 text-sm">{customer.name}</p>
-                                      <p className="text-xs text-muted-foreground flex items-center gap-1.5 mt-0.5">{customer.phone}</p>
-                                      {customer.area && (
-                                        <p className="text-[11px] text-muted-foreground capitalize mt-0.5 flex items-center gap-1">
-                                          <MapPin className="h-3 w-3 text-gray-400" />
-                                          {customer.area}
-                                        </p>
-                                      )}
+                                    <div className="flex items-center gap-3 min-w-0">
+                                      <LetterAvatar name={customer.name} size="sm" className="shrink-0" />
+                                      <div className="min-w-0">
+                                        <p className="font-semibold text-gray-900 text-sm capitalize truncate">{customer.name}</p>
+                                        <p className="text-xs text-muted-foreground flex items-center gap-1.5 mt-0.5">{customer.phone}</p>
+                                        {customer.area && (
+                                          <p className="text-[11px] text-muted-foreground capitalize mt-0.5 flex items-center gap-1 truncate">
+                                            <MapPin className="h-3 w-3 text-gray-400 shrink-0" />
+                                            {customer.area}
+                                          </p>
+                                        )}
+                                      </div>
                                     </div>
-                                    <ChevronRight className="h-4 w-4 text-gray-400" />
+                                    <ChevronRight className="h-4 w-4 text-gray-400 shrink-0" />
                                   </button>
                                 );
 
@@ -1082,19 +1497,12 @@ const SubscriptionWizard = ({ open, onOpenChange, onSuccess, customerId = null, 
                                 size="sm"
                                 onClick={() => {
                                   setShowCustomerSuggestions(false);
-                                  // Check if search term looks like a phone number (digits, spaces, +, -, parentheses)
-                                  const phonePattern = /^[\d\s+\-()]+$/;
-                                  const isPhone = phonePattern.test(customerSearchTerm.trim());
-                                  
-                                  if (isPhone) {
-                                    // Prefill phone number
-                                    setNewCustomerInitialData({ phone: customerSearchTerm.trim() });
-                                  } else {
-                                    setNewCustomerInitialData(null);
-                                  }
+                                  const term = (customerSearchTerm || '').trim();
+                                  const isPhone = /^[\d\s+\-()]+$/.test(term);
+                                  setNewCustomerInitialData(term ? (isPhone ? { phone: term } : { name: term }) : null);
                                   setShowCustomerForm(true);
                                 }}
-                                className="gap-2"
+                                className="gap-2 cursor-pointer"
                               >
                                 <Plus className="h-4 w-4" />
                                 Create New Customer
@@ -1104,8 +1512,46 @@ const SubscriptionWizard = ({ open, onOpenChange, onSuccess, customerId = null, 
                         </Card>
                       )}
                     </div>
-                  )}
-                  {errors.customer && <p className="text-sm text-destructive mt-1">{errors.customer}</p>}
+
+                    {/* Selected Customer Inline display */}
+                    {selectedCustomer && (
+                      <div className="bg-gradient-to-br from-blue-50/90 via-indigo-50/40 to-slate-50/90 rounded-xl border border-blue-100/80 shadow-2xs mt-3 overflow-hidden transition-all duration-200">
+                        <div className="p-3.5 sm:p-4 flex items-start justify-between gap-3">
+                          <div className="flex items-center gap-3 min-w-0">
+                            <LetterAvatar name={selectedCustomer.name} size="md" className="shrink-0 font-bold shadow-xs" />
+                            <div className="min-w-0 flex-1">
+                              <p className="font-bold text-gray-900 text-sm truncate capitalize">{selectedCustomer.name}</p>
+                              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground mt-0.5">
+                                <span className="font-medium text-gray-700">{selectedCustomer.phone}</span>
+                                {selectedCustomer.area && (
+                                  <span className="flex items-center gap-1">
+                                    <MapPin className="h-3 w-3 text-gray-400" />
+                                    {selectedCustomer.area}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                          {!subscriptionId && (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                setSelectedCustomer(null);
+                                setCustomerSearchTerm('');
+                              }}
+                              className="text-xs text-muted-foreground hover:text-foreground h-8 cursor-pointer"
+                            >
+                              Change
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {errors.customer && <p className="text-xs text-destructive font-medium">{errors.customer}</p>}
+                  </div>
                 </div>
 
                 {/* Vehicle Type */}
@@ -1543,7 +1989,10 @@ const SubscriptionWizard = ({ open, onOpenChange, onSuccess, customerId = null, 
                           type="button"
                           variant={scheduleMode === 'manual' ? 'default' : 'outline'}
                           size="sm"
-                          onClick={() => setScheduleMode('manual')}
+                          onClick={() => {
+                            setScheduleMode('manual');
+                            generateWashingSchedules(false);
+                          }}
                         >
                           Manual Entry
                         </Button>
@@ -1557,6 +2006,34 @@ const SubscriptionWizard = ({ open, onOpenChange, onSuccess, customerId = null, 
                         </Button>
                       </div>
                     </div>
+
+                    {/* Manual Mode Info Banner */}
+                    {scheduleMode === 'manual' && (
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 bg-blue-50/70 border border-blue-100 rounded-lg text-xs text-blue-900">
+                        <div className="flex items-center gap-2">
+                          <CalendarIcon className="h-4 w-4 text-primary shrink-0" />
+                          <span>
+                            {startDate
+                              ? `Dates auto-filled from start date (${format(parseLocalDate(startDate), 'dd MMM yyyy')}). You can adjust any date or time individually below.`
+                              : 'Select a Start Date in Step 1 to automatically schedule dates.'}
+                          </span>
+                        </div>
+                        {startDate && (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              generateWashingSchedules(true);
+                              toast.success('Schedule dates re-filled from start date');
+                            }}
+                            className="h-7 text-xs font-semibold bg-white border-blue-200 text-primary hover:bg-blue-50 shrink-0 self-start sm:self-auto cursor-pointer"
+                          >
+                            Auto-fill Dates
+                          </Button>
+                        )}
+                      </div>
+                    )}
 
                     {/* Rule Configuration */}
                     {scheduleMode === 'rule-based' && (
@@ -1808,171 +2285,512 @@ const SubscriptionWizard = ({ open, onOpenChange, onSuccess, customerId = null, 
               </div>
             )}
 
-            {/* Step 5: Payment & Summary */}
+            {/* Step 5: Offers, Payment & Summary */}
             {currentStep === 5 && (
-              <div className="space-y-6">
-                {/* Summary */}
-                <Card className="p-6">
-                  <h3 className="text-lg font-semibold mb-4">Subscription Summary</h3>
-
-                  <div className="space-y-3">
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Customer:</span>
-                      <span className="font-medium">{selectedCustomer?.name}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Vehicle Type:</span>
-                      <span className="font-medium capitalize">{vehicleType}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Duration:</span>
-                      <span className="font-medium">{monthsDuration} month(s)</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Start Date:</span>
-                      <span className="font-medium">{startDate}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Total Washes:</span>
-                      <span className="font-medium">{washingSchedules.length}</span>
-                    </div>
-
-                    <div className="border-t pt-3 mt-3">
-                      <div className="flex justify-between text-sm">
-                        <span>Packages</span>
-                        <span>₹{totals.packages}</span>
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-5 items-start">
+                  {/* LEFT COLUMN: Offers, Coupons, Payment Method, Notes */}
+                  <div className="space-y-4">
+                    {/* Offers & Coupons Card */}
+                    <div className="rounded-xl border bg-card shadow-2xs">
+                      <div className="flex items-center justify-between gap-2 px-4 pt-3 pb-3 border-b">
+                        <div className="flex items-center gap-2">
+                          <div className="flex items-center justify-center w-7 h-7 rounded-lg bg-amber-100">
+                            <Gift className="h-4 w-4 text-amber-600" />
+                          </div>
+                          <span className="font-semibold text-sm">Offers & Coupons</span>
+                        </div>
+                        {selectedCustomer && (
+                          <Button
+                            type="button"
+                            variant="link"
+                            size="sm"
+                            className="h-auto p-0 text-xs font-semibold text-primary cursor-pointer hover:underline inline-flex items-center gap-1"
+                            onClick={() => {
+                              setIsCustomerCouponsOpen(true);
+                              fetchCustomerCoupons();
+                            }}
+                          >
+                            <Search className="h-3.5 w-3.5" />
+                            <span>Search Coupons</span>
+                          </Button>
+                        )}
                       </div>
 
-                      {addonItems.length > 0 && (
-                        <div className="mt-2 space-y-1">
-                          <div className="flex justify-between text-sm font-medium">
-                            <span>Add-ons</span>
-                            <span>₹{totals.addons}</span>
+                      <div className="p-4 space-y-3">
+                        {!selectedOffer && (
+                          <div className="rounded-lg border border-dashed border-primary/30 bg-primary/5 p-3 space-y-2">
+                            <p className="text-xs font-semibold text-primary flex items-center gap-1.5">
+                              <Tag className="h-3.5 w-3.5" />
+                              Apply Coupon Code
+                            </p>
+                            <div className="flex gap-2">
+                              <Input
+                                placeholder="Enter coupon code"
+                                value={couponCode}
+                                onChange={(e) => setCouponCode(e.target.value)}
+                                className="uppercase font-mono text-sm h-9 border-gray-300 bg-white"
+                              />
+                              <Button
+                                type="button"
+                                disabled={verifyingCoupon}
+                                onClick={handleVerifyCoupon}
+                                className="bg-primary hover:bg-primary/90 text-white font-medium h-9 shrink-0 cursor-pointer"
+                              >
+                                {verifyingCoupon ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Apply'}
+                              </Button>
+                            </div>
+                            {couponError && <p className="text-xs text-red-500 font-semibold">{couponError}</p>}
+                            <p className="text-[10px] text-muted-foreground">Have a promotional code? Enter it here to unlock rewards.</p>
                           </div>
-                          {addonItems.map((addon, idx) => {
-                            const addonDetails = addons.find(a => String(a.id) === String(addon.addon_id));
-                            const washCount = addon.applicable_wash_numbers?.length || 0;
-                            return (
-                              <div key={idx} className="flex justify-between text-xs text-muted-foreground pl-4">
-                                <span>
-                                  {addonDetails?.name || `Addon ${idx + 1}`}
-                                  {addon.application_type === 'all_washes' ? (
-                                    <span className="ml-1">(All {washCount} washes)</span>
-                                  ) : (
-                                    <span className="ml-1">(Wash #{addon.applicable_wash_numbers?.join(', #') || 'None'})</span>
+                        )}
+
+                        {loadingOffers ? (
+                          <div className="flex items-center justify-center py-6 text-sm text-muted-foreground">
+                            <Loader2 className="h-5 w-5 animate-spin text-primary mr-2" />
+                            <span>Checking available offers...</span>
+                          </div>
+                        ) : selectedOffer ? (
+                          <div className="rounded-lg border border-green-200 bg-green-50 p-3.5 space-y-2.5">
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="flex-1 min-w-0">
+                                <div className="flex flex-wrap items-center gap-1.5">
+                                  <Tag className="h-4 w-4 text-green-600 shrink-0" />
+                                  <span className="font-semibold text-green-800 text-sm capitalize">{selectedOffer.name}</span>
+                                  {selectedOffer.coupon_required && (
+                                    <span className="bg-amber-100 text-amber-800 text-[10px] px-2 py-0.5 rounded-full font-bold border border-amber-200">
+                                      Coupon Required
+                                    </span>
                                   )}
-                                </span>
-                                <span>₹{addon.price?.toFixed(2) || '0.00'}</span>
+                                  {isCouponVerified && !selectedOffer.coupon_required && (
+                                    <span className="bg-indigo-100 text-indigo-800 text-[10px] px-2 py-0.5 rounded-full font-bold border border-indigo-200">
+                                      Via Coupon
+                                    </span>
+                                  )}
+                                </div>
+                                {selectedOffer.description && (
+                                  <p className="text-xs text-green-700/80 mt-1 line-clamp-2">{selectedOffer.description}</p>
+                                )}
+                                <div className="flex items-center gap-1 mt-1.5 text-xs font-bold text-green-700">
+                                  <Percent className="h-3 w-3" />
+                                  {selectedOffer.discount_type === 'percentage' ? `${selectedOffer.discount_value}% Off` : `₹${selectedOffer.discount_value} Off`}
+                                </div>
                               </div>
+                              <button
+                                type="button"
+                                onClick={handleRemoveOffer}
+                                className="text-red-500 hover:text-red-700 cursor-pointer text-xs font-semibold shrink-0 px-2 py-1 rounded hover:bg-red-50 transition-colors"
+                              >
+                                Remove
+                              </button>
+                            </div>
+
+                            {(selectedOffer.coupon_required || isCouponVerified) && (
+                              <div className="mt-2 pt-2 border-t border-green-200">
+                                {isCouponVerified ? (
+                                  <div className="space-y-1.5">
+                                    {verifiedCouponData && (
+                                      <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[11px] text-gray-600 bg-white/60 rounded-lg p-2.5 mt-1">
+                                        <div><span className="font-semibold text-gray-700">Campaign:</span> {verifiedCouponData.campaign_name}</div>
+                                        {verifiedCouponData.partner_name && <div><span className="font-semibold text-gray-700">Partner:</span> {verifiedCouponData.partner_name}</div>}
+                                        <div><span className="font-semibold text-gray-700">Offer:</span> {verifiedCouponData.offer_name || selectedOffer?.name}</div>
+                                        <div><span className="font-semibold text-gray-700">Discount:</span> {selectedOffer?.discount_type === 'percentage' ? `${selectedOffer.discount_value}% Off` : `₹${selectedOffer?.discount_value} Off`}</div>
+                                        <div><span className="font-semibold text-gray-700">Uses Left:</span> {verifiedCouponData.remaining_uses}</div>
+                                      </div>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <div className="space-y-2">
+                                    <p className="text-xs font-semibold text-gray-700">Enter Promo Code to Unlock</p>
+                                    <div className="flex gap-2">
+                                      <Input
+                                        placeholder="e.g. PROMO2026"
+                                        value={couponCode}
+                                        onChange={(e) => setCouponCode(e.target.value)}
+                                        className="uppercase font-mono text-sm h-9 bg-white"
+                                      />
+                                      <Button
+                                        type="button"
+                                        disabled={verifyingCoupon}
+                                        onClick={handleVerifyCoupon}
+                                        className="bg-indigo-600 hover:bg-indigo-700 text-white h-9 shrink-0 cursor-pointer"
+                                      >
+                                        {verifyingCoupon ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Verify'}
+                                      </Button>
+                                    </div>
+                                    {couponError && <p className="text-xs text-red-500 font-semibold">{couponError}</p>}
+                                    <p className="text-[10px] text-gray-500">This offer requires a valid coupon code for the customer's phone.</p>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        ) : availableOffers.length > 0 ? (
+                          <div className="space-y-2">
+                            {availableOffers.map((offer) => (
+                              <Card key={offer.id} className="p-3 hover:bg-secondary/50 transition-colors border">
+                                <div className="flex items-start justify-between gap-2">
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex flex-wrap items-center gap-1.5">
+                                      <Tag className="h-4 w-4 text-primary shrink-0" />
+                                      <span className="font-medium text-sm capitalize">{offer.name}</span>
+                                      {offer.coupon_required && (
+                                        <span className="bg-amber-100 text-amber-800 border border-amber-200 text-[10px] py-0.5 px-2 rounded-full font-bold">
+                                          Coupon Required
+                                        </span>
+                                      )}
+                                      <button
+                                        type="button"
+                                        onClick={() => setOfferDetailsDialog({ open: true, offer })}
+                                        className="text-blue-500 hover:text-blue-700 p-0.5 rounded hover:bg-blue-50 transition-colors cursor-pointer"
+                                        title="View offer details"
+                                      >
+                                        <Info className="h-3.5 w-3.5" />
+                                      </button>
+                                    </div>
+                                    <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{offer.description}</p>
+                                    <Badge2 variant="success" className="mt-1.5">
+                                      {offer.discount_type === 'percentage' ? `${offer.discount_value}% Off` : `₹${offer.discount_value} Off`}
+                                    </Badge2>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setSelectedOffer(offer);
+                                      if (offer.coupon_required) {
+                                        setIsCouponVerified(false);
+                                        setCouponCode('');
+                                        setVerifiedCouponData(null);
+                                        setCouponError('');
+                                      }
+                                      saveDraft();
+                                    }}
+                                    className="bg-green-600 hover:bg-green-700 text-white text-xs font-semibold px-3 py-1.5 rounded transition-colors shrink-0 cursor-pointer"
+                                  >
+                                    Apply
+                                  </button>
+                                </div>
+                              </Card>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-xs text-muted-foreground py-2 text-center">No active offers available for this subscription.</p>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Preferred Payment Method Card */}
+                    <div className="rounded-xl border bg-card overflow-hidden shadow-2xs">
+                      <div className="flex items-center justify-between px-4 py-3 border-b bg-gray-50/60">
+                        <div className="flex items-center gap-2">
+                          <div className="flex items-center justify-center w-7 h-7 rounded-lg bg-emerald-100">
+                            <CreditCard className="h-4 w-4 text-emerald-600" />
+                          </div>
+                          <span className="font-semibold text-sm">Preferred Payment Method</span>
+                        </div>
+                        {paymentMethod && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setPaymentMethod('');
+                              saveDraft();
+                            }}
+                            className="text-xs text-red-500 hover:text-red-700 hover:bg-red-50 font-medium px-2 py-1 rounded transition-colors flex items-center gap-1 cursor-pointer"
+                          >
+                            <X className="h-3 w-3" />
+                            Remove
+                          </button>
+                        )}
+                      </div>
+                      <div className="p-4 space-y-3">
+                        <div className="grid grid-cols-2 gap-2.5">
+                          {[
+                            { value: 'cash', label: 'Cash' },
+                            { value: 'upi', label: 'UPI' },
+                          ].map((method) => {
+                            const isSelected = paymentMethod === method.value;
+                            return (
+                              <label
+                                key={method.value}
+                                className={`flex items-center gap-2 p-2.5 rounded-lg border cursor-pointer transition-all select-none ${
+                                  isSelected
+                                    ? 'border-primary bg-primary/5 text-primary font-semibold shadow-xs'
+                                    : 'border-input hover:bg-accent/40 text-gray-700'
+                                }`}
+                              >
+                                <input
+                                  type="radio"
+                                  name="subscription_preferred_payment_method"
+                                  value={method.value}
+                                  checked={isSelected}
+                                  onChange={() => {
+                                    setPaymentMethod(method.value);
+                                    saveDraft();
+                                  }}
+                                  className="h-4 w-4 text-primary accent-primary focus:ring-primary"
+                                />
+                                <span className="text-xs font-semibold">{method.label}</span>
+                              </label>
                             );
                           })}
                         </div>
-                      )}
+                        {!paymentMethod ? (
+                          <p className="text-xs text-muted-foreground italic">
+                            Optional — No payment method pre-selected for this subscription.
+                          </p>
+                        ) : (
+                          <p className="text-xs text-emerald-600 font-medium flex items-center gap-1">
+                            <Check className="h-3.5 w-3.5" />
+                            Pre-selected: <span className="font-bold uppercase">{paymentMethod}</span>
+                          </p>
+                        )}
+                      </div>
+                    </div>
 
-                      <div className="flex justify-between text-sm border-t pt-2 mt-2">
-                        <span>Subtotal</span>
-                        <span>₹{totals.subtotal.toFixed(2)}</span>
+                    {/* Payment Record (when editing existing subscription payment) */}
+                    {canEditPayment && (
+                      <Card className="p-4 rounded-xl shadow-2xs border">
+                        <h4 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                          <CreditCard className="h-4 w-4 text-primary" />
+                          Payment Record
+                        </h4>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div>
+                            <Label htmlFor="paymentAmount" className="text-xs">Payment Amount</Label>
+                            <Input
+                              id="paymentAmount"
+                              type="number"
+                              min="0"
+                              value={paymentAmount}
+                              onChange={(e) => setPaymentAmount(e.target.value)}
+                              placeholder="Enter amount"
+                              className="h-9 mt-1"
+                            />
+                          </div>
+
+                          <div>
+                            <Label htmlFor="paymentDate" className="text-xs">Payment Date</Label>
+                            <div className="mt-1">
+                              <DatePicker
+                                value={paymentDate}
+                                onChange={setPaymentDate}
+                              />
+                            </div>
+                          </div>
+
+                          <div>
+                            <Label htmlFor="paymentMethodSelect" className="text-xs">Payment Method *</Label>
+                            <Select value={paymentMethod} onValueChange={setPaymentMethod}>
+                              <SelectTrigger id="paymentMethodSelect" className="h-9 mt-1">
+                                <SelectValue placeholder="Select method" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {PAYMENT_METHODS.map((method) => (
+                                  <SelectItem key={method.value} value={method.value}>
+                                    {method.label}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            {errors.paymentMethod && (
+                              <p className="text-xs text-destructive mt-1">{errors.paymentMethod}</p>
+                            )}
+                          </div>
+
+                          <div>
+                            <Label htmlFor="paymentStatusSelect" className="text-xs">Payment Status *</Label>
+                            <Select value={paymentStatus} onValueChange={setPaymentStatus}>
+                              <SelectTrigger id="paymentStatusSelect" className="h-9 mt-1">
+                                <SelectValue placeholder="Select status" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {SUBSCRIPTION_PAYMENT_STATUSES.map((status) => (
+                                  <SelectItem key={status.value} value={status.value}>
+                                    {status.label}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            {errors.paymentStatus && (
+                              <p className="text-xs text-destructive mt-1">{errors.paymentStatus}</p>
+                            )}
+                          </div>
+                        </div>
+                      </Card>
+                    )}
+
+                    {/* Subscription Notes Card */}
+                    <div className="rounded-xl border bg-card p-4 space-y-2 shadow-2xs">
+                      <Label htmlFor="subscription_notes" className="text-xs font-semibold text-gray-700">
+                        Subscription Notes (Optional)
+                      </Label>
+                      <Textarea
+                        id="subscription_notes"
+                        value={notes}
+                        onChange={(e) => setNotes(e.target.value)}
+                        placeholder="Add any additional notes or instructions for this subscription..."
+                        rows={3}
+                        className="text-sm resize-none"
+                      />
+                    </div>
+                  </div>
+
+                  {/* RIGHT COLUMN: Sticky Subscription Summary */}
+                  <div className="space-y-4">
+                    <div className="lg:sticky lg:top-4 rounded-xl border bg-card overflow-hidden shadow-2xs">
+                      <div className="bg-gradient-to-r from-primary/90 to-primary px-4 py-3">
+                        <p className="text-white font-bold text-sm tracking-wide">Subscription Summary</p>
                       </div>
 
-                      <div className="flex justify-between text-sm">
-                        <span>GST ({totals.gstPercentage}%)</span>
-                        <span>₹{totals.gst.toFixed(2)}</span>
-                      </div>
-
-                      {totals.roundOff !== 0 && (
-                        <div className="flex justify-between text-sm">
-                          <span>Round Off</span>
-                          <span className={totals.roundOff >= 0 ? 'text-green-600' : 'text-red-600'}>
-                            {totals.roundOff >= 0 ? '+' : ''}₹{totals.roundOff.toFixed(2)}
+                      {/* Customer & Duration Meta */}
+                      <div className="p-3 bg-secondary/35 border-b space-y-1.5 text-xs">
+                        <div className="flex justify-between items-center">
+                          <span className="text-muted-foreground">Customer:</span>
+                          <span className="font-semibold text-gray-900 capitalize truncate max-w-[190px]">
+                            {selectedCustomer?.name || '—'}
                           </span>
                         </div>
-                      )}
+                        <div className="flex justify-between items-center">
+                          <span className="text-muted-foreground">Vehicle & Duration:</span>
+                          <span className="capitalize font-medium text-gray-800">
+                            {vehicleType || '—'} · {monthsDuration} {monthsDuration > 1 ? 'months' : 'month'}
+                          </span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-muted-foreground">Total Washes:</span>
+                          <span className="font-semibold text-primary">
+                            {washingSchedules.length} washes
+                          </span>
+                        </div>
+                        {startDate && (
+                          <div className="flex justify-between items-center">
+                            <span className="text-muted-foreground">Start Date:</span>
+                            <span className="font-medium text-gray-700">{startDate}</span>
+                          </div>
+                        )}
+                      </div>
 
-                      <div className="flex justify-between text-lg font-bold mt-2 text-primary border-t pt-2">
-                        <span>Total Amount <span className='text-sm text-muted-foreground'>(For {monthsDuration} month{monthsDuration > 1 ? 's' : ''})</span></span>
-                        <span>₹{totals.total.toFixed(0)}</span>
+                      <div className="p-4 space-y-3">
+                        {/* Packages List */}
+                        {packageItems.length > 0 && (
+                          <div className="space-y-1.5">
+                            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Packages</p>
+                            {packageItems.map((item, i) => {
+                              const pkg = packages.find(p => String(p.id) === String(item.package_id));
+                              return (
+                                <div key={i} className="flex items-start justify-between gap-2 text-sm">
+                                  <div className="flex-1 min-w-0">
+                                    <p className="font-medium truncate">{pkg?.name || item.package_name || 'Package'}</p>
+                                    <p className="text-[10px] text-muted-foreground capitalize">
+                                      {item.vehicle_type || vehicleType} · {monthsDuration} mo
+                                    </p>
+                                  </div>
+                                  <span className="font-semibold shrink-0">₹{(item.price || 0).toFixed(0)}</span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+
+                        {/* Add-ons List */}
+                        {addonItems.length > 0 && (
+                          <div className="space-y-1.5 pt-2 border-t">
+                            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Add-ons</p>
+                            {addonItems.map((addon, idx) => {
+                              const addonDetails = addons.find(a => String(a.id) === String(addon.addon_id));
+                              const washCount = addon.applicable_wash_numbers?.length || 0;
+                              return (
+                                <div key={idx} className="flex items-start justify-between gap-2 text-sm">
+                                  <div className="flex-1 min-w-0">
+                                    <p className="font-medium truncate">{addonDetails?.name || `Addon ${idx + 1}`}</p>
+                                    <p className="text-[10px] text-muted-foreground">
+                                      {addon.application_type === 'all_washes'
+                                        ? `All ${washCount} washes`
+                                        : `Wash #${addon.applicable_wash_numbers?.join(', #') || 'None'}`}
+                                    </p>
+                                  </div>
+                                  <span className="font-semibold shrink-0">₹{(addon.price || 0).toFixed(0)}</span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+
+                        {/* Calculation breakdown */}
+                        <div className="pt-3 border-t space-y-2 text-sm">
+                          <div className="flex justify-between text-muted-foreground">
+                            <span>Packages</span>
+                            <span>₹{totals.packages.toFixed(2)}</span>
+                          </div>
+                          {totals.addons > 0 && (
+                            <div className="flex justify-between text-muted-foreground">
+                              <span>Add-ons</span>
+                              <span>₹{totals.addons.toFixed(2)}</span>
+                            </div>
+                          )}
+                          <div className="flex justify-between font-semibold border-t pt-2">
+                            <span>Subtotal</span>
+                            <span>₹{totals.subtotal.toFixed(2)}</span>
+                          </div>
+
+                          {totals.offerDiscount > 0 && (
+                            <>
+                              <div className="flex justify-between text-green-600">
+                                <span className="flex items-center gap-1.5 capitalize">
+                                  <Gift className="h-3.5 w-3.5" />
+                                  {selectedOffer?.name ? selectedOffer.name.slice(0, 18) + (selectedOffer.name.length > 18 ? '…' : '') : 'Offer'}
+                                </span>
+                                <span className="font-semibold">−₹{totals.offerDiscount.toFixed(2)}</span>
+                              </div>
+                              <div className="flex justify-between font-semibold text-emerald-800 bg-emerald-50/70 px-2 py-1 rounded">
+                                <span>After Offer</span>
+                                <span>₹{totals.subtotalAfterDiscount.toFixed(2)}</span>
+                              </div>
+                            </>
+                          )}
+
+                          <div className="flex justify-between text-muted-foreground">
+                            <span>GST ({totals.gstPercentage}%)</span>
+                            <span>₹{totals.gst.toFixed(2)}</span>
+                          </div>
+
+                          {totals.roundOff !== 0 && (
+                            <div className="flex justify-between text-xs text-muted-foreground">
+                              <span>Round Off</span>
+                              <span className={totals.roundOff >= 0 ? 'text-green-600' : 'text-red-600'}>
+                                {totals.roundOff >= 0 ? '+' : ''}₹{totals.roundOff.toFixed(2)}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Grand Total Box */}
+                        <div className="bg-primary/5 border border-primary/20 rounded-lg p-3.5 space-y-1">
+                          <div className="flex items-center justify-between">
+                            <span className="font-bold text-sm text-gray-800">Grand Total</span>
+                            <span className="text-2xl font-black text-primary">₹{totals.total.toFixed(0)}</span>
+                          </div>
+                          <div className="flex items-center justify-between text-xs text-muted-foreground pt-1 border-t border-primary/10">
+                            <span>Monthly Average:</span>
+                            <span className="font-semibold text-gray-700">₹{totals.perMonth.toFixed(2)} / month</span>
+                          </div>
+                        </div>
+
+                        {/* Applied Offer Banner */}
+                        {selectedOffer && (
+                          <div className="flex items-center gap-2 text-xs bg-green-50 border border-green-200 rounded-lg px-3 py-2">
+                            <Gift className="h-3.5 w-3.5 text-green-600 shrink-0" />
+                            <span className="text-green-800 font-medium truncate capitalize flex-1">
+                              {selectedOffer.name}
+                            </span>
+                            {isCouponVerified && (
+                              <span className="shrink-0 text-green-600 font-bold">✓ Coupon</span>
+                            )}
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
-                </Card>
-
-                {/* Payment Details */}
-                {canEditPayment && (
-                  <Card className="p-6">
-                    <h3 className="text-lg font-semibold mb-4">Payment Details</h3>
-
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <Label htmlFor="paymentAmount">Payment Amount</Label>
-                        <Input
-                          id="paymentAmount"
-                          type="number"
-                          min="0"
-                          value={paymentAmount}
-                          onChange={(e) => setPaymentAmount(e.target.value)}
-                          placeholder="Enter amount"
-                        />
-                      </div>
-
-                      <div>
-                        <Label htmlFor="paymentDate">Payment Date</Label>
-                        <DatePicker
-                          value={paymentDate}
-                          onChange={setPaymentDate}
-                        />
-                      </div>
-
-                      <div>
-                        <Label htmlFor="paymentMethod">Payment Method *</Label>
-                        <Select value={paymentMethod} onValueChange={setPaymentMethod}>
-                          <SelectTrigger id="paymentMethod">
-                            <SelectValue placeholder="Select method" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {PAYMENT_METHODS.map((method) => (
-                              <SelectItem key={method.value} value={method.value}>
-                                {method.label}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        {errors.paymentMethod && (
-                          <p className="text-sm text-destructive mt-1">{errors.paymentMethod}</p>
-                        )}
-                      </div>
-
-                      <div>
-                        <Label htmlFor="paymentStatus">Payment Status *</Label>
-                        <Select value={paymentStatus} onValueChange={setPaymentStatus}>
-                          <SelectTrigger id="paymentStatus">
-                            <SelectValue placeholder="Select status" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {SUBSCRIPTION_PAYMENT_STATUSES.map((status) => (
-                              <SelectItem key={status.value} value={status.value}>
-                                {status.label}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        {errors.paymentStatus && (
-                          <p className="text-sm text-destructive mt-1">{errors.paymentStatus}</p>
-                        )}
-                      </div>
-                    </div>
-                  </Card>
-                )}
-
-                {/* Notes */}
-                <div>
-                  <Label htmlFor="notes">Notes (Optional)</Label>
-                  <Textarea
-                    id="notes"
-                    value={notes}
-                    onChange={(e) => setNotes(e.target.value)}
-                    placeholder="Add any additional notes..."
-                    rows={3}
-                  />
                 </div>
               </div>
             )}
@@ -2119,6 +2937,174 @@ const SubscriptionWizard = ({ open, onOpenChange, onSuccess, customerId = null, 
               setVehicleType(type);
             }}
           />
+
+          {/* Offer Details Dialog */}
+          <Dialog open={offerDetailsDialog.open} onOpenChange={(open) => setOfferDetailsDialog({ open, offer: null })}>
+            <DialogContent className="sm:max-w-lg">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <Tag className="h-5 w-5 text-primary" />
+                  Offer Details
+                </DialogTitle>
+              </DialogHeader>
+              {offerDetailsDialog.offer && (
+                <div className="space-y-4">
+                  <div>
+                    <Label className="text-sm font-semibold text-muted-foreground">Offer Name</Label>
+                    <p className="text-base font-medium mt-1">{offerDetailsDialog.offer.name}</p>
+                  </div>
+
+                  <div>
+                    <Label className="text-sm font-semibold text-muted-foreground">Description</Label>
+                    <p className="text-sm mt-1">{offerDetailsDialog.offer.description || 'No description available'}</p>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label className="text-sm font-semibold text-muted-foreground">Discount Type</Label>
+                      <p className="text-sm mt-1 capitalize">{offerDetailsDialog.offer.discount_type === 'percentage' ? 'Percentage' : 'Fixed Amount'}</p>
+                    </div>
+
+                    <div>
+                      <Label className="text-sm font-semibold text-muted-foreground">Discount Value</Label>
+                      <p className="text-lg font-bold text-primary mt-1">
+                        {offerDetailsDialog.offer.discount_type === 'percentage'
+                          ? `${offerDetailsDialog.offer.discount_value}%`
+                          : `₹${offerDetailsDialog.offer.discount_value}`}
+                      </p>
+                    </div>
+                  </div>
+
+                  {offerDetailsDialog.offer.min_order_value && (
+                    <div>
+                      <Label className="text-sm font-semibold text-muted-foreground">Minimum Order Value</Label>
+                      <p className="text-sm mt-1">₹{offerDetailsDialog.offer.min_order_value}</p>
+                    </div>
+                  )}
+
+                  {offerDetailsDialog.offer.max_discount_amount && (
+                    <div>
+                      <Label className="text-sm font-semibold text-muted-foreground">Maximum Discount Amount</Label>
+                      <p className="text-sm mt-1">₹{offerDetailsDialog.offer.max_discount_amount}</p>
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label className="text-sm font-semibold text-muted-foreground">Valid From</Label>
+                      <p className="text-sm mt-1">
+                        {offerDetailsDialog.offer.start_date
+                          ? new Date(offerDetailsDialog.offer.start_date).toLocaleDateString('en-IN', {
+                            day: 'numeric',
+                            month: 'short',
+                            year: 'numeric'
+                          })
+                          : 'N/A'}
+                      </p>
+                    </div>
+
+                    <div>
+                      <Label className="text-sm font-semibold text-muted-foreground">Valid Until</Label>
+                      <p className="text-sm mt-1">
+                        {offerDetailsDialog.offer.end_date
+                          ? new Date(offerDetailsDialog.offer.end_date).toLocaleDateString('en-IN', {
+                            day: 'numeric',
+                            month: 'short',
+                            year: 'numeric'
+                          })
+                          : 'N/A'}
+                      </p>
+                    </div>
+                  </div>
+
+                  {offerDetailsDialog.offer.applicable_vehicle_types && offerDetailsDialog.offer.applicable_vehicle_types.length > 0 && (
+                    <div>
+                      <Label className="text-sm font-semibold text-muted-foreground">Applicable Vehicle Types</Label>
+                      <div className="flex flex-wrap gap-2 mt-2">
+                        {offerDetailsDialog.offer.applicable_vehicle_types.map((type, index) => (
+                          <span key={index} className="px-2 py-1 bg-secondary text-xs rounded capitalize">
+                            {type}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {offerDetailsDialog.offer.applicable_packages && offerDetailsDialog.offer.applicable_packages.length > 0 && (
+                    <div>
+                      <Label className="text-sm font-semibold text-muted-foreground">Applicable Packages</Label>
+                      <div className="flex flex-wrap gap-2 mt-2">
+                        {offerDetailsDialog.offer.applicable_packages.map((pkg, index) => (
+                          <span key={index} className="px-2 py-1 bg-secondary text-xs rounded">
+                            {pkg.name || `Package #${pkg.id}`}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {offerDetailsDialog.offer.terms_and_conditions && (
+                    <div>
+                      <Label className="text-sm font-semibold text-muted-foreground">Terms & Conditions</Label>
+                      <p className="text-xs text-muted-foreground mt-1 whitespace-pre-line">{offerDetailsDialog.offer.terms_and_conditions}</p>
+                    </div>
+                  )}
+
+                  <div className="flex justify-end pt-4">
+                    <Button
+                      onClick={() => setOfferDetailsDialog({ open: false, offer: null })}
+                      variant="outline"
+                    >
+                      Close
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </DialogContent>
+          </Dialog>
+
+          {/* Available Customer Coupons Dialog (Desktop) */}
+          <Dialog open={!isMobile && isCustomerCouponsOpen} onOpenChange={setIsCustomerCouponsOpen}>
+            <DialogContent className="max-w-md">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <Gift className="h-5 w-5 text-primary" />
+                  Available Coupons
+                </DialogTitle>
+                <DialogDescription>
+                  Active promo coupons linked to {selectedCustomer?.name || 'this customer'}
+                </DialogDescription>
+              </DialogHeader>
+              <div className="max-h-[60vh] overflow-y-auto pr-1">
+                {renderCustomerCouponsList()}
+              </div>
+            </DialogContent>
+          </Dialog>
+
+          {/* Available Customer Coupons Drawer (Mobile) */}
+          <Drawer open={isMobile && isCustomerCouponsOpen} onOpenChange={setIsCustomerCouponsOpen}>
+            <DrawerContent>
+              <DrawerHeader className="text-left px-4">
+                <DrawerTitle className="flex items-center gap-2">
+                  <Gift className="h-5 w-5 text-primary" />
+                  Available Coupons
+                </DrawerTitle>
+                <DrawerDescription>
+                  Active promo coupons linked to {selectedCustomer?.name || 'this customer'}
+                </DrawerDescription>
+              </DrawerHeader>
+              <div className="px-4 pb-4 overflow-y-auto max-h-[55vh]">
+                {renderCustomerCouponsList()}
+              </div>
+              <DrawerFooter className="pt-3 border-t px-4 pb-6">
+                <DrawerClose asChild>
+                  <Button className="w-full">
+                    Close
+                  </Button>
+                </DrawerClose>
+              </DrawerFooter>
+            </DrawerContent>
+          </Drawer>
 
           {/* Clear Draft Confirmation Dialog */}
           <ConfirmDialog

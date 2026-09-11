@@ -92,6 +92,7 @@ import {
   Clock,
   FileText,
   User,
+  UserPlus,
   CreditCard,
 } from 'lucide-react';
 import { Badge2 } from './ui/badge2';
@@ -1778,12 +1779,37 @@ const OrderWizard = ({ open, onOpenChange, onSuccess, customerId = null, orderId
 
       {/* Customer Search */}
       <div className="rounded-xl border bg-card">
-        <div className="flex items-center gap-2 px-4 pt-4 pb-3 border-b">
-          <div className="flex items-center justify-center w-7 h-7 rounded-lg bg-primary/10">
-            <Search className="h-4 w-4 text-primary" />
+        <div className="flex items-center justify-between px-4 pt-3.5 pb-3 border-b">
+          <div className="flex items-center gap-2">
+            <div className="flex items-center justify-center w-7 h-7 rounded-lg bg-primary/10">
+              <Search className="h-4 w-4 text-primary" />
+            </div>
+            <span className="font-semibold text-sm">Select Customer</span>
+            <span className="text-red-500 text-xs font-bold -ml-1">*</span>
           </div>
-          <span className="font-semibold text-sm">Select Customer</span>
-          <span className="text-red-500 text-xs font-bold ml-0.5">*</span>
+
+          {!orderId && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setShowCustomerSuggestions(false);
+                const term = (customerSearchTerm || '').trim();
+                const isPhone = /^[\d\s+\-()]+$/.test(term);
+                if (term) {
+                  setNewCustomerInitialData(isPhone ? { phone: term } : { name: term });
+                } else {
+                  setNewCustomerInitialData(null);
+                }
+                setShowCustomerForm(true);
+              }}
+              className="h-7.5 px-2.5 text-xs gap-1.5 font-medium text-primary hover:text-primary hover:bg-primary/5 border-primary/25 cursor-pointer shadow-2xs"
+            >
+              <UserPlus className="h-3.5 w-3.5" />
+              <span>New Customer</span>
+            </Button>
+          )}
         </div>
         <div className="p-4 space-y-3">
           <div className="relative" ref={customerSearchRef}>

@@ -298,8 +298,10 @@ const UserForm = ({ user, onSubmit, onCancel }) => {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6 pt-6">
-      {/* Profile Image Upload */}
+    <form onSubmit={handleSubmit} className="flex flex-col h-full overflow-hidden">
+      {/* Scrollable Form Body */}
+      <div className="flex-1 overflow-y-auto p-6 space-y-6">
+        {/* Profile Image Upload */}
       <div className="flex flex-col items-center space-y-4 pb-6 border-b">
         <Label className="text-base font-medium">Profile Image (Optional)</Label>
         
@@ -415,7 +417,7 @@ const UserForm = ({ user, onSubmit, onCancel }) => {
             <SelectTrigger className={errors.role ? 'border-red-500' : ''}>
               <SelectValue placeholder="Select role" />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent className="z-[2000]">
               <SelectItem value="admin">Admin</SelectItem>
               <SelectItem value="agent">Agent</SelectItem>
               <SelectItem value="sales_executive">Sales Executive</SelectItem>
@@ -461,7 +463,7 @@ const UserForm = ({ user, onSubmit, onCancel }) => {
             <SelectTrigger>
               <SelectValue placeholder="Select office" />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent className="z-[2000]">
               {offices.map((office) => (
                 <SelectItem key={office.id} value={office.id.toString()}>
                   {office.name}
@@ -484,7 +486,7 @@ const UserForm = ({ user, onSubmit, onCancel }) => {
             <SelectTrigger>
               <SelectValue placeholder="Select employee (optional)" />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent className="z-[2000]">
               {employees.map((employee) => (
                 <SelectItem key={employee.id} value={employee.id.toString()}>
                   {employee.name} ({employee.employee_number})
@@ -587,12 +589,14 @@ const UserForm = ({ user, onSubmit, onCancel }) => {
         </div>
       </div>
 
-      {/* Action Buttons */}
-      <div className="flex justify-end gap-3 pt-4">
+      </div>
+
+      {/* Fixed Footer */}
+      <div className="px-6 py-4 border-t border-gray-100 bg-gray-50 flex gap-3 justify-end shrink-0">
         <Button type="button" variant="outline" onClick={onCancel} disabled={loading}>
           Cancel
         </Button>
-        <Button type="submit" disabled={loading}>
+        <Button type="submit" disabled={loading} className="min-w-[140px]">
           {loading ? (
             <>
               <Loader2 className="h-4 w-4 mr-2 animate-spin" />

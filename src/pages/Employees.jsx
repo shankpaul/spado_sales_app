@@ -15,6 +15,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogDescription,
+  DialogFooter,
 } from '../components/ui/dialog';
 import {
   AlertDialog,
@@ -66,6 +67,8 @@ import {
 } from '../components/ui/dropdown-menu';
 import { Skeleton } from '../components/ui/skeleton';
 import { Badge } from '../components/ui/badge';
+import { Badge2 } from '../components/ui/badge2';
+import LetterAvatar from '../components/LetterAvatar';
 import {
   Select,
   SelectContent,
@@ -74,6 +77,7 @@ import {
   SelectValue,
 } from '../components/ui/select';
 import EmployeeForm from '../components/EmployeeForm';
+import PartnerScoreHistoryDialog from '../components/PartnerScoreHistoryDialog';
 
 /**
  * Employees Management Page (Admin Only)
@@ -91,8 +95,29 @@ const Employees = () => {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+  const [isDeactivateOpen, setIsDeactivateOpen] = useState(false);
+  const [employeeToDeactivate, setEmployeeToDeactivate] = useState(null);
   const [selectedEmployee, setSelectedEmployee] = useState(null);
   const [actionLoading, setActionLoading] = useState(false);
+
+  // Partner Score History Dialog State (Agents only)
+  const [historyModalOpen, setHistoryModalOpen] = useState(false);
+  const [historyEmployee, setHistoryEmployee] = useState(null);
+
+  // Helper to determine if employee has an agent/commission partner role
+  const isAgentEmployee = (emp) => {
+    if (!emp) return false;
+    const role = emp.user?.role?.toLowerCase() || '';
+    const scheme = typeof emp.scheme === 'string' ? emp.scheme.toLowerCase() : emp.scheme;
+    const jobTitle = emp.job_title?.toLowerCase() || '';
+    return (
+      role === 'agent' ||
+      scheme === 'commission' ||
+      scheme === 1 ||
+      jobTitle.includes('agent') ||
+      jobTitle.includes('partner')
+    );
+  };
 
   // Fetch employees
   const fetchEmployees = async () => {
@@ -175,18 +200,60 @@ const Employees = () => {
   };
 
   // Handle activate/deactivate
-  const handleToggleStatus = async (employee) => {
+  const handleToggleStatus = (employee) => {
+    const isActive =
+      employee.status === 'active' ||
+      employee.status === 0 ||
+      employee.status === '0';
+
+    if (isActive) {
+      setEmployeeToDeactivate(employee);
+      setIsDeactivateOpen(true);
+      return;
+    }
+
+    // Direct activation
+    handleActivate(employee);
+  };
+
+  // Direct activation handler
+  const handleActivate = async (employee) => {
+    setActionLoading(true);
     try {
-      if (employee.status === 'active') {
-        await employeeService.deactivateEmployee(employee.id);
-        toast.success('Employee deactivated successfully');
-      } else {
-        await employeeService.activateEmployee(employee.id);
-        toast.success('Employee activated successfully');
-      }
+      await employeeService.activateEmployee(employee.id);
+      toast.success('Employee activated successfully');
       fetchEmployees();
+      if (selectedEmployee && selectedEmployee.id === employee.id) {
+        setSelectedEmployee((prev) =>
+          prev ? { ...prev, status: 'active' } : null
+        );
+      }
     } catch (error) {
-      toast.error('Failed to update employee status');
+      toast.error(error.response?.data?.error || 'Failed to activate employee');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // Confirm deactivation handler
+  const handleConfirmDeactivate = async () => {
+    if (!employeeToDeactivate) return;
+    setActionLoading(true);
+    try {
+      await employeeService.deactivateEmployee(employeeToDeactivate.id);
+      toast.success('Employee deactivated successfully');
+      fetchEmployees();
+      if (selectedEmployee && selectedEmployee.id === employeeToDeactivate.id) {
+        setSelectedEmployee((prev) =>
+          prev ? { ...prev, status: 'inactive' } : null
+        );
+      }
+      setIsDeactivateOpen(false);
+      setEmployeeToDeactivate(null);
+    } catch (error) {
+      toast.error(error.response?.data?.error || 'Failed to deactivate employee');
+    } finally {
+      setActionLoading(false);
     }
   };
 
@@ -210,14 +277,25 @@ const Employees = () => {
 
   // Get scheme badge color
   const getSchemeBadgeColor = (scheme) => {
-    return scheme === 'salary'
+    const s = String(scheme ?? '').toLowerCase();
+    return (s === 'salary' || s === '0' || s.includes('sal'))
       ? 'bg-blue-100 text-blue-800'
       : 'bg-green-100 text-green-800';
   };
 
   // Get scheme label
   const getSchemeLabel = (scheme) => {
-    return scheme === 'salary' ? 'Fixed Salary' : 'Commission Based';
+    const s = String(scheme ?? '').toLowerCase();
+    return (s === 'salary' || s === '0' || s.includes('sal'))
+      ? 'Fixed Salary'
+      : 'Commission Based';
+  };
+
+  // Check if scheme is salary
+  const isSalaryScheme = (scheme) => {
+    if (scheme === 0 || scheme === '0') return true;
+    if (typeof scheme === 'string') return scheme.toLowerCase().includes('sal');
+    return scheme !== 1 && scheme !== '1' && scheme !== 'commission';
   };
 
   // Format currency
@@ -389,23 +467,26 @@ const Employees = () => {
                         </TableCell>
                         <TableCell>
                           <span className="capitalize font-medium text-gray-700">
-                            {employee.scheme === 'salary' ? 'Fixed Salary' : 'Commission Only'}
+                            {getSchemeLabel(employee.scheme)}
                           </span>
                         </TableCell>
                         <TableCell>
                           <div className="space-y-1">
-                            {employee.scheme === 'salary' && (
+                            {isSalaryScheme(employee.scheme) ? (
                               <div className="font-medium text-gray-900">
                                 {formatCurrency(employee.fixed_salary)}/mo
                               </div>
-                            )}
-                            {employee.scheme === 'commission' && (
+                            ) : (
                               <div className="text-sm font-medium text-gray-900">
                                 {employee.commission_percentage}% Comm.
                               </div>
                             )}
                             <div className="text-xs text-gray-500">
-                              Work: {employee.work_incentive_percentage}% | 5★: {employee.five_star_incentive_percentage}%
+                              {isSalaryScheme(employee.scheme) ? (
+                                <>Work: {employee.work_incentive_percentage}% | 5★: {employee.five_star_incentive_percentage}%</>
+                              ) : (
+                                <>5★ Inc.: {employee.five_star_incentive_percentage}%</>
+                              )}
                             </div>
                           </div>
                         </TableCell>
@@ -436,21 +517,50 @@ const Employees = () => {
                           </div>
                         </TableCell>
                         <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" className="h-8 w-8 p-0">
-                                <span className="sr-only">Open menu</span>
-                                <MoreVertical className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="bg-white border border-gray-150 rounded-xl shadow-md">
-                              <DropdownMenuItem
-                                onClick={() => handleViewDetails(employee)}
-                                className="cursor-pointer hover:bg-gray-50"
+                          <div className="flex items-center justify-end gap-1">
+                            {isAgentEmployee(employee) && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 px-2 text-xs text-blue-700 hover:bg-blue-50 hover:text-blue-800 flex items-center gap-1 font-medium"
+                                onClick={() => {
+                                  setHistoryEmployee(employee);
+                                  setHistoryModalOpen(true);
+                                }}
+                                title="View Weekly Partner Score History"
                               >
-                                <Eye className="mr-2 h-4 w-4" />
-                                View Details
-                              </DropdownMenuItem>
+                                <Award className="h-3.5 w-3.5 text-blue-600" />
+                                Score History
+                              </Button>
+                            )}
+
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" className="h-8 w-8 p-0">
+                                  <span className="sr-only">Open menu</span>
+                                  <MoreVertical className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end" className="bg-white border border-gray-150 rounded-xl shadow-md">
+                                {isAgentEmployee(employee) && (
+                                  <DropdownMenuItem
+                                    onClick={() => {
+                                      setHistoryEmployee(employee);
+                                      setHistoryModalOpen(true);
+                                    }}
+                                    className="cursor-pointer hover:bg-blue-50 text-blue-700 font-medium"
+                                  >
+                                    <Award className="mr-2 h-4 w-4 text-blue-600" />
+                                    Partner Score History
+                                  </DropdownMenuItem>
+                                )}
+                                <DropdownMenuItem
+                                  onClick={() => handleViewDetails(employee)}
+                                  className="cursor-pointer hover:bg-gray-50"
+                                >
+                                  <Eye className="mr-2 h-4 w-4" />
+                                  View Details
+                                </DropdownMenuItem>
                               <DropdownMenuItem
                                 onClick={() => handleEdit(employee)}
                                 className="cursor-pointer hover:bg-gray-50"
@@ -482,7 +592,8 @@ const Employees = () => {
                                 Delete
                               </DropdownMenuItem>
                             </DropdownMenuContent>
-                          </DropdownMenu>
+                            </DropdownMenu>
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))
@@ -533,13 +644,13 @@ const Employees = () => {
                     <div>
                       <span className="text-gray-500 block text-xs">Scheme</span>
                       <span className="capitalize font-medium text-gray-800">
-                        {employee.scheme === 'salary' ? 'Fixed Salary' : 'Commission Only'}
+                        {getSchemeLabel(employee.scheme)}
                       </span>
                     </div>
                     <div>
                       <span className="text-gray-500 block text-xs">Compensation</span>
                       <span className="font-medium text-gray-800">
-                        {employee.scheme === 'salary'
+                        {isSalaryScheme(employee.scheme)
                           ? `${formatCurrency(employee.fixed_salary)}/mo`
                           : `${employee.commission_percentage}% Comm.`}
                       </span>
@@ -548,19 +659,40 @@ const Employees = () => {
 
                   <div className="flex items-center justify-between pt-2 border-t border-gray-100">
                     <div className="text-xs text-gray-500">
-                      Work: {employee.work_incentive_percentage}% | 5★: {employee.five_star_incentive_percentage}%
+                      {isSalaryScheme(employee.scheme) ? (
+                        <>Work: {employee.work_incentive_percentage}% | 5★: {employee.five_star_incentive_percentage}%</>
+                      ) : (
+                        <>5★ Inc.: {employee.five_star_incentive_percentage}%</>
+                      )}
                     </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-8 w-8 p-0"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleViewDetails(employee);
-                      }}
-                    >
-                      <Eye className="h-4 w-4" />
-                    </Button>
+                    <div className="flex items-center gap-1">
+                      {isAgentEmployee(employee) && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 px-2 text-xs text-blue-700 hover:bg-blue-50 flex items-center gap-1 font-medium"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setHistoryEmployee(employee);
+                            setHistoryModalOpen(true);
+                          }}
+                        >
+                          <Award className="h-3.5 w-3.5 text-blue-600" />
+                          History
+                        </Button>
+                      )}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 w-8 p-0"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleViewDetails(employee);
+                        }}
+                      >
+                        <Eye className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
                 </Card>
               ))
@@ -571,234 +703,397 @@ const Employees = () => {
 
       {/* Employee Form Sheet */}
       <Sheet open={isFormOpen} onOpenChange={setIsFormOpen}>
-        <SheetContent className="sm:max-w-2xl overflow-y-auto">
-          <SheetHeader>
-            <SheetTitle>
-              {selectedEmployee ? 'Edit Employee' : 'Add New Employee'}
-            </SheetTitle>
-            <SheetDescription>
-              {selectedEmployee
-                ? 'Update employee information and compensation details'
-                : 'Add a new employee to the system'}
-            </SheetDescription>
-          </SheetHeader>
-          <EmployeeForm
-            employee={selectedEmployee}
-            onSubmit={handleFormSubmit}
-            onCancel={() => {
-              setIsFormOpen(false);
-              setSelectedEmployee(null);
-            }}
-          />
+        <SheetContent className="w-full sm:max-w-2xl flex flex-col h-full p-0">
+          {/* Fixed Header */}
+          <div className="px-6 py-5 border-b border-gray-100 shrink-0 bg-white">
+            <SheetHeader className="space-y-1 pr-8 text-left">
+              <SheetTitle className="text-xl font-bold text-gray-900">
+                {selectedEmployee ? 'Edit Employee' : 'Add New Employee'}
+              </SheetTitle>
+              <SheetDescription className="text-sm text-gray-500">
+                {selectedEmployee
+                  ? 'Update employee information and compensation details'
+                  : 'Add a new employee to the system'}
+              </SheetDescription>
+            </SheetHeader>
+          </div>
+
+          {/* Form with Scrollable Body and Fixed Footer */}
+          <div className="flex-1 min-h-0 overflow-hidden">
+            <EmployeeForm
+              key={selectedEmployee?.id || 'new'}
+              employee={selectedEmployee}
+              onSubmit={handleFormSubmit}
+              onCancel={() => {
+                setIsFormOpen(false);
+                setSelectedEmployee(null);
+              }}
+            />
+          </div>
         </SheetContent>
       </Sheet>
 
       {/* Employee Details Dialog */}
       <Dialog open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Employee Details</DialogTitle>
-            <DialogDescription>
-              Complete information for {selectedEmployee?.name || selectedEmployee?.employee_number}
-            </DialogDescription>
-          </DialogHeader>
-
+        <DialogContent className="max-w-2xl max-h-[90vh] p-0 gap-0 overflow-hidden flex flex-col bg-white">
           {selectedEmployee && (
-            <div className="space-y-6">
-              {/* Basic Information */}
-              <div>
-                <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                  <User className="h-4 w-4" />
-                  Basic Information
-                </h3>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-xs text-gray-500">Name</label>
-                    <p className="text-sm font-medium">{selectedEmployee.name || '-'}</p>
-                  </div>
-                  <div>
-                    <label className="text-xs text-gray-500">Employee Number</label>
-                    <p className="text-sm font-medium">{selectedEmployee.employee_number}</p>
-                  </div>
-                  <div>
-                    <label className="text-xs text-gray-500">Job Title</label>
-                    <p className="text-sm font-medium">{selectedEmployee.job_title || '-'}</p>
-                  </div>
-                  <div>
-                    <label className="text-xs text-gray-500">Status</label>
-                    <div className="mt-1">
-                      <Badge
-                        className={
-                          selectedEmployee.status === 'active'
-                            ? 'bg-green-100 text-green-800'
-                            : 'bg-gray-100 text-gray-800'
+            <>
+              {/* Pinned Fixed Header */}
+              <DialogHeader className="px-6 py-4.5 border-b border-gray-100 bg-slate-50/80 backdrop-blur-sm shrink-0 pr-14 text-left">
+                <div className="flex items-center gap-3.5">
+                  <LetterAvatar
+                    name={selectedEmployee.name || selectedEmployee.employee_number}
+                    size="lg"
+                    className="h-12 w-12 text-base font-bold shadow-xs ring-2 ring-white shrink-0"
+                  />
+                  <div className="min-w-0 flex-1 space-y-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <DialogTitle className="text-lg font-bold text-gray-900 truncate">
+                        {selectedEmployee.name || 'Unnamed Employee'}
+                      </DialogTitle>
+                      <span className="font-mono text-xs font-semibold px-2 py-0.5 rounded-md bg-white text-gray-700 border border-gray-200 shadow-2xs">
+                        #{selectedEmployee.employee_number}
+                      </span>
+                      <Badge2
+                        variant={
+                          selectedEmployee.status === 'active' || selectedEmployee.status === 0 || selectedEmployee.status === '0'
+                            ? 'success'
+                            : 'secondary'
                         }
                       >
-                        {selectedEmployee.status}
-                      </Badge>
+                        {selectedEmployee.status === 'active' || selectedEmployee.status === 0 || selectedEmployee.status === '0'
+                          ? 'Active'
+                          : 'Inactive'}
+                      </Badge2>
                     </div>
-                  </div>
-                </div>
-              </div>
 
-              {/* Compensation */}
-              <div className="border-t pt-4">
-                <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                  <DollarSign className="h-4 w-4" />
-                  Compensation
-                </h3>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-xs text-gray-500">Scheme</label>
-                    <div className="mt-1">
-                      <Badge className={getSchemeBadgeColor(selectedEmployee.scheme)}>
+                    <div className="flex flex-wrap items-center gap-2 text-xs text-gray-600">
+                      {selectedEmployee.job_title && (
+                        <span className="inline-flex items-center gap-1 font-medium text-gray-700">
+                          <Briefcase className="h-3 w-3 text-gray-400" />
+                          {selectedEmployee.job_title}
+                        </span>
+                      )}
+                      {selectedEmployee.job_title && <span className="text-gray-300">•</span>}
+                      <Badge2
+                        variant={isSalaryScheme(selectedEmployee.scheme) ? 'info' : 'amber'}
+                        className="text-[11px] py-0 px-2"
+                      >
                         {getSchemeLabel(selectedEmployee.scheme)}
-                      </Badge>
+                      </Badge2>
+                      {selectedEmployee.settlement_cycle && (
+                        <>
+                          <span className="text-gray-300">•</span>
+                          <span className="uppercase font-mono text-[10px] text-gray-500 bg-white border border-gray-200 px-1.5 py-0.5 rounded shadow-2xs">
+                            {selectedEmployee.settlement_cycle} cycle
+                          </span>
+                        </>
+                      )}
                     </div>
-                  </div>
-                  {selectedEmployee.scheme === 'salary' && selectedEmployee.fixed_salary && (
-                    <div>
-                      <label className="text-xs text-gray-500">Fixed Salary</label>
-                      <p className="text-sm font-medium">{formatCurrency(selectedEmployee.fixed_salary)}</p>
-                    </div>
-                  )}
-                  {selectedEmployee.scheme === 'commission' && selectedEmployee.commission_percentage && (
-                    <div>
-                      <label className="text-xs text-gray-500">Commission Rate</label>
-                      <p className="text-sm font-medium">{selectedEmployee.commission_percentage}%</p>
-                    </div>
-                  )}
-                  {selectedEmployee.work_incentive_percentage && (
-                    <div>
-                      <label className="text-xs text-gray-500">Work Incentive</label>
-                      <p className="text-sm font-medium">{selectedEmployee.work_incentive_percentage}%</p>
-                    </div>
-                  )}
-                  {selectedEmployee.five_star_incentive_percentage && (
-                    <div>
-                      <label className="text-xs text-gray-500">5-Star Incentive</label>
-                      <p className="text-sm font-medium">{selectedEmployee.five_star_incentive_percentage}%</p>
-                    </div>
-                  )}
-                  {(selectedEmployee.work_incentive_percentage || selectedEmployee.five_star_incentive_percentage) && (
-                    <div>
-                      <label className="text-xs text-gray-500">Total Incentive</label>
-                      <p className="text-sm font-medium text-primary">{selectedEmployee.total_incentive_percentage}%</p>
-                    </div>
-                  )}
-                  <div>
-                    <label className="text-xs text-gray-500">Monthly Target Amount</label>
-                    <p className="text-sm font-medium text-primary">{formatCurrency(selectedEmployee.monthly_target_amount)}</p>
-                  </div>
-                  <div>
-                    <label className="text-xs text-gray-500">Travelling Allowance</label>
-                    <p className="text-sm font-medium text-blue-600">₹{selectedEmployee.travelling_allowance || 0}/km</p>
                   </div>
                 </div>
-              </div>
+                <DialogDescription className="sr-only">
+                  Employee profile and compensation details for {selectedEmployee.name || selectedEmployee.employee_number}
+                </DialogDescription>
+              </DialogHeader>
 
-              {/* Contact & Dates */}
-              <div className="border-t pt-4">
-                <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                  <Phone className="h-4 w-4" />
-                  Contact & Timeline
-                </h3>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-xs text-gray-500">Contact Number</label>
-                    <p className="text-sm font-medium">{selectedEmployee.contact_number || '-'}</p>
+              {/* Scrollable Dialog Body */}
+              <div className="p-6 overflow-y-auto max-h-[calc(90vh-145px)] space-y-4 text-sm bg-gray-50/40">
+                {/* Employment Information Card */}
+                <div className="bg-white rounded-xl border border-gray-200/90 p-4 shadow-xs">
+                  <div className="flex items-center justify-between pb-3 mb-3 border-b border-gray-100">
+                    <h3 className="text-xs font-semibold text-gray-700 uppercase tracking-wider flex items-center gap-1.5">
+                      <User className="h-3.5 w-3.5 text-primary" />
+                      Employment Information
+                    </h3>
                   </div>
-                  <div>
-                    <label className="text-xs text-gray-500">Joining Date</label>
-                    <p className="text-sm font-medium">
-                      {selectedEmployee.joining_date
-                        ? new Date(selectedEmployee.joining_date).toLocaleDateString('en-IN', {
-                          day: 'numeric',
-                          month: 'long',
-                          year: 'numeric'
-                        })
-                        : '-'}
-                    </p>
-                  </div>
-                  {selectedEmployee.resignation_date && (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 text-xs">
                     <div>
-                      <label className="text-xs text-gray-500">Resignation Date</label>
-                      <p className="text-sm font-medium text-red-600">
-                        {new Date(selectedEmployee.resignation_date).toLocaleDateString('en-IN', {
-                          day: 'numeric',
-                          month: 'long',
-                          year: 'numeric'
-                        })}
+                      <span className="text-gray-500 block mb-0.5">Full Name</span>
+                      <span className="font-semibold text-gray-900 text-sm">{selectedEmployee.name || '-'}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-500 block mb-0.5">Employee ID</span>
+                      <span className="font-mono font-medium text-gray-900 text-sm">{selectedEmployee.employee_number || '-'}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-500 block mb-0.5">Job Designation</span>
+                      <span className="font-medium text-gray-900 text-sm">{selectedEmployee.job_title || 'Not specified'}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-500 block mb-0.5">Joining Date</span>
+                      <span className="font-medium text-gray-900 flex items-center gap-1.5">
+                        <Calendar className="h-3.5 w-3.5 text-gray-400" />
+                        {selectedEmployee.joining_date
+                          ? new Date(selectedEmployee.joining_date).toLocaleDateString('en-IN', {
+                              day: 'numeric',
+                              month: 'short',
+                              year: 'numeric',
+                            })
+                          : '-'}
+                      </span>
+                    </div>
+                    {selectedEmployee.resignation_date && (
+                      <div>
+                        <span className="text-gray-500 block mb-0.5">Resignation Date</span>
+                        <span className="font-medium text-red-600 flex items-center gap-1.5">
+                          <Calendar className="h-3.5 w-3.5 text-red-400" />
+                          {new Date(selectedEmployee.resignation_date).toLocaleDateString('en-IN', {
+                            day: 'numeric',
+                            month: 'short',
+                            year: 'numeric',
+                          })}
+                        </span>
+                      </div>
+                    )}
+                    <div>
+                      <span className="text-gray-500 block mb-0.5">Settlement Cycle</span>
+                      <span className="capitalize font-medium text-gray-900">
+                        {selectedEmployee.settlement_cycle || 'Monthly'}
+                      </span>
+                    </div>
+                    {selectedEmployee.last_settlement_at && (
+                      <div>
+                        <span className="text-gray-500 block mb-0.5">Last Settlement</span>
+                        <span className="font-medium text-gray-700">
+                          {new Date(selectedEmployee.last_settlement_at).toLocaleDateString('en-IN', {
+                            day: 'numeric',
+                            month: 'short',
+                            year: 'numeric',
+                          })}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Compensation & Incentives Card */}
+                <div className="bg-white rounded-xl border border-gray-200/90 p-4 shadow-xs">
+                  <div className="flex items-center justify-between pb-3 mb-3 border-b border-gray-100">
+                    <h3 className="text-xs font-semibold text-gray-700 uppercase tracking-wider flex items-center gap-1.5">
+                      <DollarSign className="h-3.5 w-3.5 text-emerald-600" />
+                      Compensation & Incentives
+                    </h3>
+                    <Badge2 variant={isSalaryScheme(selectedEmployee.scheme) ? 'info' : 'amber'}>
+                      {getSchemeLabel(selectedEmployee.scheme)}
+                    </Badge2>
+                  </div>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
+                    {isSalaryScheme(selectedEmployee.scheme) ? (
+                      <div className="p-3 bg-blue-50/50 rounded-lg border border-blue-100">
+                        <span className="text-blue-700/80 block text-[11px] font-medium mb-0.5">Fixed Base Salary</span>
+                        <span className="text-base font-bold text-blue-900">
+                          {formatCurrency(selectedEmployee.fixed_salary)}
+                          <span className="text-xs font-normal text-blue-700/70">/mo</span>
+                        </span>
+                      </div>
+                    ) : (
+                      <div className="p-3 bg-amber-50/50 rounded-lg border border-amber-100">
+                        <span className="text-amber-800/80 block text-[11px] font-medium mb-0.5">Commission Rate</span>
+                        <span className="text-base font-bold text-amber-900">
+                          {selectedEmployee.commission_percentage || 0}%
+                        </span>
+                      </div>
+                    )}
+
+                    {isSalaryScheme(selectedEmployee.scheme) && Boolean(selectedEmployee.work_incentive_percentage) && (
+                      <div className="p-3 bg-slate-50 rounded-lg border border-slate-200/80">
+                        <span className="text-gray-500 block text-[11px] font-medium mb-0.5">Work Incentive</span>
+                        <span className="text-base font-bold text-gray-900">
+                          {selectedEmployee.work_incentive_percentage}%
+                        </span>
+                      </div>
+                    )}
+
+                    {Boolean(selectedEmployee.five_star_incentive_percentage) && (
+                      <div className="p-3 bg-amber-50/40 rounded-lg border border-amber-100">
+                        <span className="text-amber-800/80 block text-[11px] font-medium mb-0.5">5-Star Incentive</span>
+                        <span className="text-base font-bold text-amber-900">
+                          {selectedEmployee.five_star_incentive_percentage}%
+                        </span>
+                      </div>
+                    )}
+
+                    {((isSalaryScheme(selectedEmployee.scheme) && selectedEmployee.work_incentive_percentage) || selectedEmployee.five_star_incentive_percentage) && (
+                      <div className="p-3 bg-indigo-50/50 rounded-lg border border-indigo-100">
+                        <span className="text-indigo-700/80 block text-[11px] font-medium mb-0.5">Total Incentive</span>
+                        <span className="text-base font-bold text-indigo-900">
+                          {isSalaryScheme(selectedEmployee.scheme)
+                            ? selectedEmployee.total_incentive_percentage
+                            : selectedEmployee.five_star_incentive_percentage}%
+                        </span>
+                      </div>
+                    )}
+
+                    <div className="p-3 bg-slate-50 rounded-lg border border-slate-200/80">
+                      <span className="text-gray-500 block text-[11px] font-medium mb-0.5">Monthly Target</span>
+                      <span className="text-base font-bold text-gray-900">
+                        {formatCurrency(selectedEmployee.monthly_target_amount)}
+                      </span>
+                    </div>
+
+                    <div className="p-3 bg-slate-50 rounded-lg border border-slate-200/80">
+                      <span className="text-gray-500 block text-[11px] font-medium mb-0.5">Travelling Allowance</span>
+                      <span className="text-base font-bold text-blue-700">
+                        ₹{selectedEmployee.travelling_allowance || 0}
+                        <span className="text-xs font-normal text-gray-500">/km</span>
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Contact & Linked Account Card */}
+                <div className="bg-white rounded-xl border border-gray-200/90 p-4 shadow-xs">
+                  <div className="flex items-center justify-between pb-3 mb-3 border-b border-gray-100">
+                    <h3 className="text-xs font-semibold text-gray-700 uppercase tracking-wider flex items-center gap-1.5">
+                      <Phone className="h-3.5 w-3.5 text-blue-600" />
+                      Contact & System Account
+                    </h3>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                    <div>
+                      <span className="text-gray-500 block mb-1">Phone Number</span>
+                      {selectedEmployee.contact_number ? (
+                        <a
+                          href={`tel:${selectedEmployee.contact_number}`}
+                          className="inline-flex items-center gap-1.5 font-semibold text-sm text-primary hover:underline"
+                        >
+                          <Phone className="h-3.5 w-3.5 text-primary" />
+                          {selectedEmployee.contact_number}
+                        </a>
+                      ) : (
+                        <span className="text-gray-400 font-medium">Not provided</span>
+                      )}
+                    </div>
+
+                    {selectedEmployee.user ? (
+                      <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 sm:col-span-2 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-semibold text-gray-800 flex items-center gap-1.5">
+                            <Mail className="h-3.5 w-3.5 text-gray-500" />
+                            Linked Spado User
+                          </span>
+                          <Badge2 variant="outline" className="capitalize text-[11px]">
+                            {selectedEmployee.user.role?.replace('_', ' ') || 'User'}
+                          </Badge2>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs pt-1">
+                          <div>
+                            <span className="text-gray-500 block">Name</span>
+                            <span className="font-medium text-gray-900">{selectedEmployee.user.name || '-'}</span>
+                          </div>
+                          <div>
+                            <span className="text-gray-500 block">Email</span>
+                            <a href={`mailto:${selectedEmployee.user.email}`} className="font-medium text-primary hover:underline truncate block">
+                              {selectedEmployee.user.email || '-'}
+                            </a>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="sm:col-span-2 text-xs text-gray-400 italic">
+                        No linked Spado user account for this employee.
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Partner Performance History Banner (Agents Only) */}
+                {isAgentEmployee(selectedEmployee) && (
+                  <div className="bg-gradient-to-r from-blue-50/80 to-indigo-50/70 rounded-xl border border-blue-200/90 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+                    <div className="space-y-0.5">
+                      <div className="flex items-center gap-1.5 font-semibold text-blue-900 text-sm">
+                        <Award className="h-4 w-4 text-blue-600" />
+                        Weekly Partner Performance
+                      </div>
+                      <p className="text-xs text-blue-700/85">
+                        Review weekly scorecard, completed orders, 5-star ratings, and incentive history.
                       </p>
                     </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Linked User */}
-              {selectedEmployee.user && (
-                <div className="border-t pt-4">
-                  <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                    <Mail className="h-4 w-4" />
-                    Linked User Account
-                  </h3>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="text-xs text-gray-500">User Name</label>
-                      <p className="text-sm font-medium">{selectedEmployee.user.name}</p>
-                    </div>
-                    <div>
-                      <label className="text-xs text-gray-500">Email</label>
-                      <p className="text-sm font-medium">{selectedEmployee.user.email}</p>
-                    </div>
-                    <div>
-                      <label className="text-xs text-gray-500">Role</label>
-                      <p className="text-sm font-medium capitalize">{selectedEmployee.user.role.replace('_', ' ')}</p>
-                    </div>
+                    <Button
+                      type="button"
+                      size="sm"
+                      className="bg-blue-600 hover:bg-blue-700 text-white shrink-0 font-medium shadow-xs"
+                      onClick={() => {
+                        setHistoryEmployee(selectedEmployee);
+                        setHistoryModalOpen(true);
+                      }}
+                    >
+                      <Award className="h-3.5 w-3.5 mr-1.5" />
+                      View Score History
+                    </Button>
                   </div>
-                </div>
-              )}
-
-              {/* Actions */}
-              <div className="border-t pt-4 flex gap-2">
-                <Button
-                  onClick={() => {
-                    setIsDetailsOpen(false);
-                    handleEdit(selectedEmployee);
-                  }}
-                  className="flex-1"
-                >
-                  <Edit2 className="h-4 w-4 mr-2" />
-                  Edit Employee
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => handleToggleStatus(selectedEmployee)}
-                  className="flex-1"
-                >
-                  {selectedEmployee.status === 'active' ? (
-                    <>
-                      <UserX className="h-4 w-4 mr-2" />
-                      Deactivate
-                    </>
-                  ) : (
-                    <>
-                      <UserCheck className="h-4 w-4 mr-2" />
-                      Activate
-                    </>
-                  )}
-                </Button>
-                <Button
-                  variant="destructive"
-                  onClick={() => {
-                    setIsDetailsOpen(false);
-                    handleDeleteClick(selectedEmployee);
-                  }}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
+                )}
               </div>
-            </div>
+
+              {/* Pinned Fixed Footer */}
+              <DialogFooter className="px-6 py-3.5 border-t border-gray-200 bg-white shrink-0 flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
+                <div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200 w-full sm:w-auto"
+                    onClick={() => {
+                      setIsDetailsOpen(false);
+                      handleDeleteClick(selectedEmployee);
+                    }}
+                  >
+                    <Trash2 className="h-3.5 w-3.5 mr-1.5" />
+                    Delete Employee
+                  </Button>
+                </div>
+
+                <div className="flex items-center gap-2 justify-end">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setIsDetailsOpen(false)}
+                  >
+                    Close
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={actionLoading}
+                    onClick={() => handleToggleStatus(selectedEmployee)}
+                    className={
+                      selectedEmployee.status === 'active' || selectedEmployee.status === 0 || selectedEmployee.status === '0'
+                        ? 'text-amber-700 hover:text-amber-800 hover:bg-amber-50 border-amber-200'
+                        : 'text-emerald-700 hover:text-emerald-800 hover:bg-emerald-50 border-emerald-200'
+                    }
+                  >
+                    {selectedEmployee.status === 'active' || selectedEmployee.status === 0 || selectedEmployee.status === '0' ? (
+                      <>
+                        <UserX className="h-3.5 w-3.5 mr-1.5" />
+                        Deactivate
+                      </>
+                    ) : (
+                      <>
+                        <UserCheck className="h-3.5 w-3.5 mr-1.5" />
+                        Activate
+                      </>
+                    )}
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={() => {
+                      setIsDetailsOpen(false);
+                      handleEdit(selectedEmployee);
+                    }}
+                    className="bg-primary hover:bg-primary/90 text-white shadow-xs"
+                  >
+                    <Edit2 className="h-3.5 w-3.5 mr-1.5" />
+                    Edit Employee
+                  </Button>
+                </div>
+              </DialogFooter>
+            </>
           )}
         </DialogContent>
       </Dialog>
@@ -833,6 +1128,61 @@ const Employees = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Deactivate Confirmation Dialog */}
+      <AlertDialog open={isDeactivateOpen} onOpenChange={setIsDeactivateOpen}>
+        <AlertDialogContent className="z-[60]">
+          <AlertDialogHeader>
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-full bg-amber-100 flex items-center justify-center text-amber-600 shrink-0">
+                <UserX className="h-5 w-5" />
+              </div>
+              <div>
+                <AlertDialogTitle>Deactivate Employee</AlertDialogTitle>
+                <div className="text-xs text-gray-500 font-mono mt-0.5">
+                  {employeeToDeactivate?.name ? `${employeeToDeactivate.name} • ` : ''}#{employeeToDeactivate?.employee_number}
+                </div>
+              </div>
+            </div>
+            <AlertDialogDescription className="text-sm text-gray-600 pt-2">
+              Are you sure you want to deactivate{' '}
+              <span className="font-semibold text-gray-900">
+                {employeeToDeactivate?.name || employeeToDeactivate?.employee_number}
+              </span>
+              ? They will no longer be able to log in or be assigned to active tasks and schedules until reactivated.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="pt-2">
+            <AlertDialogCancel
+              disabled={actionLoading}
+              onClick={() => setEmployeeToDeactivate(null)}
+            >
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmDeactivate}
+              disabled={actionLoading}
+              className="bg-amber-600 hover:bg-amber-700 text-white"
+            >
+              {actionLoading ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Deactivating...
+                </>
+              ) : (
+                'Deactivate Employee'
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Partner Score History Dialog (Agent / Commission Partners) */}
+      <PartnerScoreHistoryDialog
+        open={historyModalOpen}
+        onOpenChange={setHistoryModalOpen}
+        employee={historyEmployee}
+      />
     </div>
   );
 };

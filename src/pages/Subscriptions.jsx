@@ -55,10 +55,16 @@ import {
   Car,
   Truck,
   Repeat,
+  CheckCircle2,
+  XCircle,
+  Clock,
+  ExternalLink,
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { Badge2 } from '@/components/ui/badge2';
 import LetterAvatar from '@/components/LetterAvatar';
+import VehicleIcon from '../components/VehicleIcon';
+import { formatCurrency } from '../lib/utilities';
 import { cn } from '@/lib/utils';
 import { Skeleton } from '../components/ui/skeleton';
 
@@ -442,9 +448,73 @@ const Subscriptions = () => {
 
   // Get Badge2 variant for status
   const getBadgeVariant = (status, type = 'status') => {
+    if (status === 'scheduled') return 'amber';
+
+    if (type === 'payment') {
+      if (status === 'paid') return 'success';
+      if (status === 'partial') return 'warning';
+      if (status === 'pending') return 'destructive';
+      return 'secondary';
+    }
+
+    if (type === 'status') {
+      if (status === 'active') return 'success';
+      if (status === 'scheduled') return 'amber';
+      if (status === 'paused') return 'warning';
+      if (status === 'cancelled') return 'destructive';
+      if (status === 'expired' || status === 'completed') return 'secondary';
+      return 'outline';
+    }
+
     const statusArray = type === 'payment' ? SUBSCRIPTION_PAYMENT_STATUSES : SUBSCRIPTION_STATUSES;
-    const statusObj = statusArray.find(s => s.value === status);
+    const statusObj = statusArray.find((s) => s.value === status);
     return statusObj?.variant || 'outline';
+  };
+
+  // Helper to get packages list safely
+  const getPackagesList = (sub) => {
+    if (sub.subscription_packages && sub.subscription_packages.length > 0) {
+      return sub.subscription_packages.map((p) => p.package?.name || p.name || 'Package');
+    }
+    if (sub.selected_packages && sub.selected_packages.length > 0) {
+      return sub.selected_packages.map((p) => p.name || 'Package');
+    }
+    return [];
+  };
+
+  // Render status badge with icon
+  const renderStatusBadge = (status) => {
+    const variant = getBadgeVariant(status, 'status');
+    const label = getStatusLabel(status, SUBSCRIPTION_STATUSES);
+    return (
+      <Badge2 variant={variant} className="text-xs font-semibold gap-1 py-0.5">
+        {status === 'active' && <Repeat className="h-3 w-3" />}
+        {status === 'scheduled' && <Clock className="h-3 w-3" />}
+        {status === 'paused' && <Pause className="h-3 w-3 text-yellow-600" />}
+        {status === 'cancelled' && <XCircle className="h-3 w-3" />}
+        {status === 'expired' && <Clock className="h-3 w-3" />}
+        <span>{label}</span>
+      </Badge2>
+    );
+  };
+
+  // Render payment badge
+  const renderPaymentBadge = (paymentStatus, paymentMethod) => {
+    const variant = getBadgeVariant(paymentStatus, 'payment');
+    const label = getStatusLabel(paymentStatus, SUBSCRIPTION_PAYMENT_STATUSES);
+    return (
+      <div className="flex items-center gap-1.5 flex-wrap">
+        <Badge2 variant={variant} className="text-[11px] font-semibold gap-1 py-0.5">
+          <IndianRupee className="h-3 w-3" />
+          <span>{label}</span>
+        </Badge2>
+        {paymentMethod && (
+          <span className="text-[10px] font-semibold text-gray-600 uppercase bg-gray-100 px-1.5 py-0.5 rounded border border-gray-200">
+            {paymentMethod.replace('_', ' ')}
+          </span>
+        )}
+      </div>
+    );
   };
 
   // Active filter count
@@ -642,98 +712,146 @@ const Subscriptions = () => {
         ) : (
           <>
             {/* Desktop Table */}
-            <div className="hidden md:block bg-white rounded-xl border-gray-200 overflow-hidden shadow-xs">
+            <div className="hidden md:block bg-white rounded-xl border border-gray-200 overflow-hidden shadow-xs">
               <div className="overflow-x-auto">
                 <table className="w-full text-sm text-left border-collapse">
-                  <thead className="bg-gray-50 border-b border-gray-200 text-xs text-gray-500 font-semibold uppercase tracking-wider">
+                  <thead className="bg-gray-50/80 border-b border-gray-200 text-[11px] text-gray-500 font-semibold uppercase tracking-wider">
                     <tr>
-                      <th className="px-6 py-4">Customer</th>
-                      <th className="px-6 py-4">Package</th>
-                      <th className="px-6 py-4">Duration</th>
-                      <th className="px-6 py-4">Washes</th>
-                      <th className="px-6 py-4">Status</th>
-                      <th className="px-6 py-4">Payment</th>
-                      <th className="px-6 py-4">Next Wash</th>
+                      <th className="px-5 py-3.5">Subscription</th>
+                      <th className="px-5 py-3.5">Customer</th>
+                      <th className="px-5 py-3.5">Plan & Vehicle</th>
+                      <th className="px-5 py-3.5">Duration</th>
+                      <th className="px-5 py-3.5">Next Wash</th>
+                      <th className="px-5 py-3.5">Status</th>
+                      <th className="px-5 py-3.5">Amount & Payment</th>
+                      <th className="px-4 py-3.5 text-right"></th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-150">
-                    {subscriptions.map((subscription) => (
-                      <tr
-                        key={subscription.id}
-                        className="hover:bg-gray-50/70 transition-colors cursor-pointer"
-                        onClick={() => handleViewDetails(subscription.id)}
-                      >
-                        <td className="px-6 py-4">
-                          <div className="font-semibold text-gray-900 flex items-center gap-2 capitalize">
-                            <LetterAvatar name={subscription.customer?.name} size="xs" />
-                            {subscription.customer?.name}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="flex items-center gap-2">
-                            <Package className="h-4 w-4 text-gray-400" />
-                            <div className="flex items-center gap-1">
-                              <span className="capitalize text-sm font-semibold text-gray-800">
-                                {subscription.selected_packages?.[0]?.name || 'N/A'}
-                              </span>
-                              {subscription.selected_packages?.length > 1 && (
-                                <Popover>
-                                  <PopoverTrigger asChild>
-                                    <Badge2
-                                      variant="secondary"
-                                      className="h-5 px-1.5 text-[10px] cursor-pointer hover:bg-secondary/80"
-                                      onClick={(e) => e.stopPropagation()}
-                                    >
-                                      +{subscription.subscription_packages.length - 1}
-                                    </Badge2>
-                                  </PopoverTrigger>
-                                  <PopoverContent className="w-auto p-3" align="start">
-                                    <div className="space-y-2">
-                                      <h4 className="font-medium text-xs text-muted-foreground">All Packages</h4>
-                                      <ul className="space-y-1">
-                                        {subscription.subscription_packages.map((pkg, idx) => (
-                                          <li key={idx} className="text-sm capitalize list-disc ml-4">
-                                            {pkg.name}
-                                          </li>
-                                        ))}
-                                      </ul>
-                                    </div>
-                                  </PopoverContent>
-                                </Popover>
-                              )}
+                  <tbody className="divide-y divide-gray-100">
+                    {subscriptions.map((subscription) => {
+                      const packagesList = getPackagesList(subscription);
+                      const totalAmount = (subscription.subscription_amount || 0) * (subscription.months_duration || 1);
+
+                      return (
+                        <tr
+                          key={subscription.id}
+                          className="hover:bg-gray-50/80 transition-colors cursor-pointer group"
+                          onClick={() => handleViewDetails(subscription.id)}
+                        >
+                          {/* Subscription ID & Start Date */}
+                          <td className="px-5 py-4 whitespace-nowrap">
+                            <div className="font-bold text-primary group-hover:underline text-sm tracking-tight">
+                              #SUB-{subscription.id}
                             </div>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="text-sm font-medium text-gray-800">
-                            {subscription.months_duration} month(s)
-                          </div>
-                          <div className="text-xs text-gray-500">
-                            {formatDate(subscription.start_date)}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="text-sm font-medium text-gray-700">
-                            {subscription.washing_schedules?.length || 0} scheduled
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <Badge2 variant={getBadgeVariant(subscription.status)}>
-                            {getStatusLabel(subscription.status, SUBSCRIPTION_STATUSES)}
-                          </Badge2>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <Badge2 variant={getBadgeVariant(subscription.payment_status, 'payment')}>
-                            {getStatusLabel(subscription.payment_status, SUBSCRIPTION_PAYMENT_STATUSES)}
-                          </Badge2>
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="text-sm font-medium text-gray-700">
-                            {subscription.next_wash_date ? formatDate(subscription.next_wash_date) : 'N/A'}
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
+                            <div className="text-xs text-gray-500 mt-0.5">
+                              {formatDate(subscription.start_date)}
+                            </div>
+                          </td>
+
+                          {/* Customer */}
+                          <td className="px-5 py-4">
+                            <div className="flex items-center gap-2.5">
+                              <LetterAvatar name={subscription.customer?.name} size="sm" />
+                              <div className="min-w-0">
+                                <div className="font-semibold text-gray-900 capitalize text-sm truncate">
+                                  {subscription.customer?.name}
+                                </div>
+                                {(subscription.area || subscription.customer?.phone) && (
+                                  <div className="text-xs text-muted-foreground truncate max-w-[180px]">
+                                    {subscription.area || subscription.customer?.phone}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </td>
+
+                          {/* Vehicle & Package */}
+                          <td className="px-5 py-4">
+                            <div className="space-y-1">
+                              {subscription.vehicle_type && (
+                                <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-gray-100 text-[11px] font-medium text-gray-700 capitalize">
+                                  <VehicleIcon vehicleType={subscription.vehicle_type} size={13} />
+                                  <span>{subscription.vehicle_type}</span>
+                                </div>
+                              )}
+                              <div className="flex items-center gap-1.5 text-xs font-semibold text-gray-800">
+                                <Package className="h-3.5 w-3.5 text-gray-400 shrink-0" />
+                                <span className="capitalize truncate max-w-[160px]">
+                                  {packagesList[0] || 'Standard Plan'}
+                                </span>
+                                {packagesList.length > 1 && (
+                                  <Popover>
+                                    <PopoverTrigger asChild>
+                                      <Badge2
+                                        variant="secondary"
+                                        className="h-4 px-1.5 text-[10px] cursor-pointer hover:bg-secondary/80"
+                                        onClick={(e) => e.stopPropagation()}
+                                      >
+                                        +{packagesList.length - 1}
+                                      </Badge2>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-auto p-3" align="start">
+                                      <div className="space-y-2">
+                                        <h4 className="font-semibold text-xs text-gray-700">All Packages</h4>
+                                        <ul className="space-y-1">
+                                          {packagesList.map((pkgName, idx) => (
+                                            <li key={idx} className="text-xs capitalize list-disc ml-4 text-gray-600">
+                                              {pkgName}
+                                            </li>
+                                          ))}
+                                        </ul>
+                                      </div>
+                                    </PopoverContent>
+                                  </Popover>
+                                )}
+                              </div>
+                            </div>
+                          </td>
+
+                          {/* Duration & Washes */}
+                          <td className="px-5 py-4 whitespace-nowrap">
+                            <div className="text-sm font-semibold text-gray-800">
+                              {subscription.months_duration} {subscription.months_duration === 1 ? 'month' : 'months'}
+                            </div>
+                            <div className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
+                              <span>{subscription.washing_schedules?.length || 0} washes</span>
+                            </div>
+                          </td>
+
+                          {/* Next Wash */}
+                          <td className="px-5 py-4 whitespace-nowrap">
+                            {subscription.next_wash_date ? (
+                              <Badge2 variant="amber" className="text-xs font-medium gap-1.5 py-0.5">
+                                <Calendar className="h-3.5 w-3.5 text-amber-700" />
+                                <span>{formatDate(subscription.next_wash_date)}</span>
+                              </Badge2>
+                            ) : (
+                              <span className="text-xs text-muted-foreground">None upcoming</span>
+                            )}
+                          </td>
+
+                          {/* Status Badge */}
+                          <td className="px-5 py-4 whitespace-nowrap">
+                            {renderStatusBadge(subscription.status)}
+                          </td>
+
+                          {/* Amount & Payment */}
+                          <td className="px-5 py-4 whitespace-nowrap">
+                            <div className="space-y-1">
+                              <div className="font-bold text-gray-900 text-sm">
+                                {formatCurrency(totalAmount)}
+                              </div>
+                              {renderPaymentBadge(subscription.payment_status, subscription.payment_method)}
+                            </div>
+                          </td>
+
+                          {/* Action Icon */}
+                          <td className="px-4 py-4 text-right whitespace-nowrap">
+                            <ChevronRight className="h-4 w-4 text-gray-400 group-hover:text-primary group-hover:translate-x-0.5 transition-all inline-block" />
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -741,84 +859,99 @@ const Subscriptions = () => {
 
             {/* Mobile Cards */}
             <div className="block md:hidden space-y-3">
-              {subscriptions.map((subscription) => (
-                <div
-                  key={subscription.id}
-                  className="bg-white border border-gray-100 rounded-xl p-4 space-y-4 active:scale-[0.98] active:bg-gray-50 transition-all duration-200 cursor-pointer shadow-sm"
-                  onClick={() => handleViewDetails(subscription.id)}
-                >
-                  <div className="flex items-center gap-4">
-                    <LetterAvatar name={subscription.customer?.name} size="md" />
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between">
-                        <div className="font-bold text-base truncate capitalize">
-                          {subscription.customer?.name}
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Badge2
-                            variant={getBadgeVariant(subscription.status)}
-                            className="h-5 text-[10px] px-1.5"
-                          >
-                            {getStatusLabel(subscription.status, SUBSCRIPTION_STATUSES)}
-                          </Badge2>
+              {subscriptions.map((subscription) => {
+                const packagesList = getPackagesList(subscription);
+                const totalAmount = (subscription.subscription_amount || 0) * (subscription.months_duration || 1);
+
+                return (
+                  <div
+                    key={subscription.id}
+                    className="bg-white border border-gray-200 rounded-xl p-4 space-y-3.5 active:scale-[0.99] active:bg-gray-50 transition-all duration-200 cursor-pointer shadow-xs"
+                    onClick={() => handleViewDetails(subscription.id)}
+                  >
+                    {/* Card Top Row: ID, Customer, Status Badge */}
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <LetterAvatar name={subscription.customer?.name} size="md" />
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-bold text-xs text-primary shrink-0">#SUB-{subscription.id}</span>
+                            <span className="text-gray-300">•</span>
+                            <span className="font-bold text-sm text-gray-900 capitalize truncate">
+                              {subscription.customer?.name}
+                            </span>
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-0.5 truncate">
+                            {subscription.area || subscription.customer?.phone || formatDate(subscription.start_date)}
+                          </p>
                         </div>
                       </div>
+                      {renderStatusBadge(subscription.status)}
+                    </div>
 
-                      <div className="flex items-center justify-between mt-1">
-                        <div className="flex items-center gap-2">
-                          <Package className="h-3 w-3 text-muted-foreground" />
-                          <span className="text-xs text-muted-foreground truncate max-w-[120px] capitalize">
-                            {subscription.subscription_packages?.[0]?.name || 'N/A'}
-                          </span>
+                    {/* Card Middle: Plan, Vehicle, Duration, Washes */}
+                    <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-gray-100 text-xs">
+                      {subscription.vehicle_type && (
+                        <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-gray-100 font-medium text-gray-700 capitalize text-[11px]">
+                          <VehicleIcon vehicleType={subscription.vehicle_type} size={12} />
+                          <span>{subscription.vehicle_type}</span>
                         </div>
-                        <Badge2
-                          variant={getBadgeVariant(subscription.payment_status, 'payment')}
-                          className="h-5 text-[10px] px-1.5"
-                        >
-                          {getStatusLabel(subscription.payment_status, SUBSCRIPTION_PAYMENT_STATUSES)}
+                      )}
+                      <div className="inline-flex items-center gap-1 text-gray-700 font-medium">
+                        <Package className="h-3.5 w-3.5 text-muted-foreground" />
+                        <span className="capitalize">{packagesList[0] || 'Standard Plan'}</span>
+                      </div>
+                      <span className="text-gray-300">•</span>
+                      <span className="text-muted-foreground">{subscription.months_duration} mo</span>
+                      <span className="text-gray-300">•</span>
+                      <span className="text-muted-foreground">{subscription.washing_schedules?.length || 0} washes</span>
+                    </div>
+
+                    {/* Next Wash Badge on Mobile */}
+                    {subscription.next_wash_date && (
+                      <div className="flex items-center gap-1.5 pt-1 text-xs">
+                        <span className="text-[11px] text-muted-foreground font-medium">Next Wash:</span>
+                        <Badge2 variant="amber" className="text-[10px] py-0.5 gap-1">
+                          <Calendar className="h-3 w-3 text-amber-700" />
+                          <span>{formatDate(subscription.next_wash_date)}</span>
                         </Badge2>
                       </div>
-                    </div>
-                  </div>
+                    )}
 
-                  <div className="grid grid-cols-2 gap-y-3 gap-x-4 text-xs text-muted-foreground pt-1">
-                    <div className="flex items-center gap-2">
-                      <Calendar className="h-3.5 w-3.5" />
-                      <span>{subscription.months_duration} month(s)</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <MapPin className="h-3.5 w-3.5" />
-                      <span>{subscription.washing_schedules?.length || 0} washes</span>
-                    </div>
-                  </div>
-
-                  {subscription.next_wash_date && (
-                    <div className="flex items-center justify-between mt-1 pt-3 border-t border-gray-50">
-                      <div className="text-[11px] text-muted-foreground flex items-center gap-1.5">
-                        <Calendar className="h-3 w-3" />
-                        Next: {formatDate(subscription.next_wash_date)}
+                    {/* Card Bottom: Total Amount, Payment, and Pause/Resume Toggle */}
+                    <div className="flex items-center justify-between pt-2 border-t border-gray-100 text-xs">
+                      <div>
+                        <span className="text-[10px] uppercase font-bold text-muted-foreground block leading-tight">Total</span>
+                        <span className="font-bold text-sm text-gray-900">{formatCurrency(totalAmount)}</span>
                       </div>
-                      <div className="flex gap-2">
+
+                      <div className="flex items-center gap-2">
+                        {renderPaymentBadge(subscription.payment_status, subscription.payment_method)}
+
                         {(subscription.status === 'active' || subscription.status === 'paused') && (
-                          <div
+                          <button
+                            type="button"
                             className={cn(
-                              "p-1.5 rounded-full",
-                              subscription.status === 'active' ? "bg-amber-50 text-amber-600" : "bg-green-50 text-green-600"
+                              "p-1.5 rounded-full border transition-colors ml-1",
+                              subscription.status === 'active'
+                                ? "bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100"
+                                : "bg-green-50 text-green-700 border-green-200 hover:bg-green-100"
                             )}
                             onClick={(e) => handleTogglePause(subscription, e)}
+                            title={subscription.status === 'active' ? 'Pause' : 'Resume'}
                           >
                             {subscription.status === 'active' ? (
                               <Pause className="h-3.5 w-3.5" />
                             ) : (
                               <Play className="h-3.5 w-3.5" />
                             )}
-                          </div>
+                          </button>
                         )}
                       </div>
                     </div>
-                  )}
-                </div>
-              ))}
+                  </div>
+                );
+              })}
 
               {/* Mobile Infinite Scroll Trigger */}
               {isMobile && hasMore && (

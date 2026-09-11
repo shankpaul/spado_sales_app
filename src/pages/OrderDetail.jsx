@@ -258,6 +258,7 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
   const [pendingStatus, setPendingStatus] = useState(null);
   const [changingStatus, setChangingStatus] = useState(false);
   const [paymentReceived, setPaymentReceived] = useState(false);
+  const [agentConfirmed, setAgentConfirmed] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState('');
 
   // Record payment dialog state
@@ -477,6 +478,7 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
     if (newStatus === 'completed') {
       setPendingStatus(newStatus);
       setPaymentReceived(false); // Reset checkbox
+      setAgentConfirmed(false); // Reset agent confirmation checkbox
       setIsStatusConfirmOpen(true);
       return;
     }
@@ -501,6 +503,7 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
       setTimeout(() => fetchTimeline(), 0);
       setIsStatusConfirmOpen(false);
       setPaymentReceived(false); // Reset checkbox
+      setAgentConfirmed(false); // Reset agent confirmation checkbox
       setPaymentMethod(''); // Reset payment method
     } catch (error) {
       toast.error('Failed to update status');
@@ -608,7 +611,7 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
       red: 'destructive',
       yellow: 'warning',
       purple: 'outline',
-      amber: 'warning',
+      amber: 'amber',
     };
 
     return variantMap[color] || 'default';
@@ -669,7 +672,11 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
         rating: feedbackRating,
         comments: feedbackComment
       });
-      toast.success('Customer feedback saved successfully');
+      toast.success(
+        feedbackRating >= 5
+          ? 'Customer feedback saved & 5-Star Incentive Bonus credited!'
+          : 'Customer feedback saved successfully'
+      );
       setIsFeedbackDialogOpen(false);
       setFeedbackRating(0);
       setFeedbackComment('');
@@ -844,6 +851,13 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
   const isAdmin = user?.role === 'admin';
   const isEditable = isAdmin || (order.status !== 'completed' && order.status !== 'cancelled');
   const canAddPaymentMethod = order && order.status !== 'cancelled' && order.status !== 'archived' && !order.archived && order.payment_status === 'pending';
+
+  // Helper variables for assigned partner / agent
+  const assignedAgentObj = order?.assigned_to || agents.find(a => String(a.id) === String(order?.assigned_to?.id));
+  const assignedAgentName = assignedAgentObj?.name || order?.assigned_agent_name || null;
+  const rawAgentPhone = (assignedAgentObj?.phone || '').trim();
+  const hasAgentPhone = Boolean(rawAgentPhone && rawAgentPhone.toLowerCase() !== 'undefined' && rawAgentPhone.toLowerCase() !== 'null');
+  const agentPhone = hasAgentPhone ? rawAgentPhone : null;
 
   // Get order status progress
   const getOrderProgress = () => {
@@ -2738,89 +2752,119 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
         setIsStatusConfirmOpen(open);
         if (!open) {
           setPaymentReceived(false);
+          setAgentConfirmed(false);
           setPaymentMethod(''); // Reset payment method when dialog closes
         }
       }}>
-        <AlertDialogContent>
+        <AlertDialogContent className="max-w-md sm:max-w-lg">
           <AlertDialogHeader>
             <AlertDialogTitle>Mark Order as Completed</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to mark this order as completed? This action cannot be undone and will make the order non-editable.
+            <AlertDialogDescription className="text-xs">
+              Finalize this order and process financial ledger and partner earnings.
             </AlertDialogDescription>
           </AlertDialogHeader>
 
-          <div className="py-4 space-y-4">
-            <div className="rounded-lg bg-yellow-50 border border-yellow-200 p-4">
-              <div className="flex gap-3">
-                <div className="flex-shrink-0">
-                  <XCircle className="h-5 w-5 text-yellow-600" />
+          <div className="py-2 space-y-3">
+            {/* Warning notice */}
+            <div className="rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 flex items-center gap-2 text-xs text-amber-800">
+              <XCircle className="h-4 w-4 text-amber-600 shrink-0" />
+              <span>This action finalizes the order and cannot be undone or edited.</span>
+            </div>
+
+            {/* Simplified Assigned Partner Card */}
+            {assignedAgentName ? (
+              <div className="rounded-lg border border-indigo-200 bg-indigo-50/70 p-3 flex items-center justify-between gap-3 shadow-2xs">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <LetterAvatar name={assignedAgentName} size="sm" className="text-white shrink-0 shadow-xs" />
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="font-bold text-sm text-gray-900 truncate">{assignedAgentName}</span>
+                      <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-700 border border-indigo-200">
+                        Wallet Recipient
+                      </span>
+                    </div>
+                    <p className="text-xs text-indigo-900/80 mt-0.5 truncate">
+                      Earnings & commission will be credited to this partner.
+                    </p>
+                  </div>
                 </div>
-                <div className="text-sm text-yellow-800">
-                  <p className="font-medium mb-1">Important:</p>
-                  <ul className="list-disc list-inside space-y-1">
-                    <li>You will not be able to edit this order after completion</li>
-                    <li>This action cannot be reversed</li>
-                    <li>The order will be marked as finalized</li>
-                  </ul>
-                </div>
+                {agentPhone && (
+                  <span className="text-xs text-gray-600 font-mono shrink-0 hidden sm:inline-block bg-white/80 px-2 py-0.5 rounded border border-indigo-100">
+                    {agentPhone}
+                  </span>
+                )}
+              </div>
+            ) : (
+              <div className="rounded-lg border border-amber-300 bg-amber-50 p-2.5 flex items-center gap-2 text-xs text-amber-800">
+                <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0" />
+                <span><strong>Warning:</strong> No partner assigned. Completing this order will skip wallet calculations.</span>
+              </div>
+            )}
+
+            {/* Payment Method & Order Total side-by-side */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="rounded-lg border bg-white p-2.5 flex flex-col justify-center space-y-1">
+                <Label className="text-xs font-semibold text-gray-700">Payment Method *</Label>
+                <RadioGroup
+                  value={paymentMethod}
+                  onValueChange={setPaymentMethod}
+                  className="flex gap-3"
+                  disabled={changingStatus}
+                >
+                  <div className="flex items-center gap-1.5">
+                    <RadioGroupItem value="cash" id="payment-cash" />
+                    <Label htmlFor="payment-cash" className="text-sm font-medium cursor-pointer select-none">Cash</Label>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <RadioGroupItem value="upi" id="payment-upi" />
+                    <Label htmlFor="payment-upi" className="text-sm font-medium cursor-pointer select-none">UPI</Label>
+                  </div>
+                </RadioGroup>
+              </div>
+
+              <div className="rounded-lg bg-blue-50 border border-blue-200 p-2.5 flex flex-col justify-center">
+                <span className="text-xs font-medium text-blue-800">Order Total</span>
+                <span className="text-base font-bold text-blue-900">{formatCurrency(order?.total_amount || 0)}</span>
               </div>
             </div>
 
-            <div className="rounded-lg bg-blue-50 border border-blue-200 p-4">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium text-blue-900">Order Amount:</span>
-                <span className="text-lg font-bold text-blue-900">{formatCurrency(order?.total_amount || 0)}</span>
+            {/* Confirmations in one clean container */}
+            <div className="rounded-lg border bg-white p-3 space-y-2 text-sm">
+              <div className="flex items-start gap-2.5">
+                <Checkbox
+                  id="payment-received"
+                  checked={paymentReceived}
+                  onCheckedChange={setPaymentReceived}
+                  disabled={changingStatus}
+                />
+                <label htmlFor="payment-received" className="font-medium text-gray-800 leading-snug cursor-pointer select-none">
+                  Payment of <strong>{formatCurrency(order?.total_amount || 0)}</strong> has been received
+                </label>
+              </div>
+
+              <div className="flex items-start gap-2.5 pt-2 border-t border-gray-100">
+                <Checkbox
+                  id="agent-confirmed"
+                  checked={agentConfirmed}
+                  onCheckedChange={setAgentConfirmed}
+                  disabled={changingStatus}
+                />
+                <label htmlFor="agent-confirmed" className="font-medium text-gray-800 leading-snug cursor-pointer select-none">
+                  {assignedAgentName ? (
+                    <>Confirmed assigned partner: <strong className="text-indigo-950 font-semibold">{assignedAgentName}</strong></>
+                  ) : (
+                    <span className="text-amber-800">Confirmed without assigned partner</span>
+                  )}
+                </label>
               </div>
             </div>
-
-            <div className="p-4 border rounded-lg bg-white space-y-3">
-              <Label className="text-sm font-semibold text-gray-900 block">
-                Payment Method *
-              </Label>
-              <RadioGroup
-                value={paymentMethod}
-                onValueChange={setPaymentMethod}
-                className="flex gap-4"
-                disabled={changingStatus}
-              >
-                <div className="flex items-center gap-2">
-                  <RadioGroupItem value="cash" id="payment-cash" />
-                  <Label htmlFor="payment-cash" className="text-sm font-medium cursor-pointer select-none">
-                    Cash
-                  </Label>
-                </div>
-                <div className="flex items-center gap-2">
-                  <RadioGroupItem value="upi" id="payment-upi" />
-                  <Label htmlFor="payment-upi" className="text-sm font-medium cursor-pointer select-none">
-                    UPI
-                  </Label>
-                </div>
-              </RadioGroup>
-            </div>
-
-            <div className="flex items-start gap-3 p-4 border rounded-lg bg-white">
-              <Checkbox
-                id="payment-received"
-                checked={paymentReceived}
-                onCheckedChange={setPaymentReceived}
-                disabled={changingStatus}
-              />
-              <label
-                htmlFor="payment-received"
-                className="text-sm font-medium leading-none cursor-pointer select-none"
-              >
-                I confirm that the payment of {formatCurrency(order?.total_amount || 0)} has been received for this order
-              </label>
-            </div>
-
-
           </div>
 
           <AlertDialogFooter>
             <AlertDialogCancel disabled={changingStatus}>Cancel</AlertDialogCancel>
             <Button
               onClick={() => performStatusChange(pendingStatus)}
-              disabled={changingStatus || !paymentReceived || (pendingStatus === 'completed' && !paymentMethod)}
+              disabled={changingStatus || !paymentReceived || !agentConfirmed || (pendingStatus === 'completed' && !paymentMethod)}
               className="bg-green-600 hover:bg-green-700 text-white font-medium"
             >
               {changingStatus && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
@@ -2835,79 +2879,105 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
         setIsStatusConfirmOpen(open);
         if (!open) {
           setPaymentReceived(false);
+          setAgentConfirmed(false);
           setPaymentMethod(''); // Reset payment method when drawer closes
         }
       }}>
         <DrawerContent className="max-h-[90vh]">
           <DrawerHeader className="px-4 text-left">
             <DrawerTitle>Mark Order as Completed</DrawerTitle>
-            <DrawerDescription>
-              Are you sure you want to mark this order as completed? This action cannot be undone and will make the order non-editable.
+            <DrawerDescription className="text-xs">
+              Finalize this order and process financial ledger and partner earnings.
             </DrawerDescription>
           </DrawerHeader>
 
-          <div className="px-4 pb-4 space-y-4 overflow-y-auto">
-            <div className="rounded-lg bg-yellow-50 border border-yellow-200 p-4">
-              <div className="flex gap-3">
-                <div className="flex-shrink-0">
-                  <XCircle className="h-5 w-5 text-yellow-600" />
+          <div className="px-4 pb-4 space-y-3 overflow-y-auto">
+            <div className="rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 flex items-center gap-2 text-xs text-amber-800">
+              <XCircle className="h-4 w-4 text-amber-600 shrink-0" />
+              <span>This action finalizes the order and cannot be undone or edited.</span>
+            </div>
+
+            {/* Simplified Assigned Partner Card (Mobile) */}
+            {assignedAgentName ? (
+              <div className="rounded-lg border border-indigo-200 bg-indigo-50/70 p-3 flex items-center justify-between gap-2 shadow-2xs">
+                <div className="flex items-center gap-2 min-w-0">
+                  <LetterAvatar name={assignedAgentName} size="sm" className="text-white shrink-0 shadow-xs" />
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-1 flex-wrap">
+                      <span className="font-bold text-sm text-gray-900 truncate">{assignedAgentName}</span>
+                      <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-700 border border-indigo-200">
+                        Wallet Recipient
+                      </span>
+                    </div>
+                    <p className="text-xs text-indigo-900/80 mt-0.5 truncate">
+                      Earnings & commission will be credited to this partner.
+                    </p>
+                  </div>
                 </div>
-                <div className="text-sm text-yellow-800">
-                  <p className="font-medium mb-1">Important:</p>
-                  <ul className="list-disc list-inside space-y-1">
-                    <li>You will not be able to edit this order after completion</li>
-                    <li>This action cannot be reversed</li>
-                    <li>The order will be marked as finalized</li>
-                  </ul>
-                </div>
+              </div>
+            ) : (
+              <div className="rounded-lg border border-amber-300 bg-amber-50 p-2.5 flex items-center gap-2 text-xs text-amber-800">
+                <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0" />
+                <span><strong>Warning:</strong> No partner assigned. Completing this order will skip wallet calculations.</span>
+              </div>
+            )}
+
+            {/* Payment Method & Order Total (Mobile) */}
+            <div className="grid grid-cols-2 gap-2.5">
+              <div className="rounded-lg border bg-white p-2.5 flex flex-col justify-center space-y-1">
+                <Label className="text-xs font-semibold text-gray-700">Payment Method *</Label>
+                <RadioGroup
+                  value={paymentMethod}
+                  onValueChange={setPaymentMethod}
+                  className="flex gap-3"
+                  disabled={changingStatus}
+                >
+                  <div className="flex items-center gap-1.5">
+                    <RadioGroupItem value="cash" id="mobile-payment-cash" />
+                    <Label htmlFor="mobile-payment-cash" className="text-xs font-medium cursor-pointer select-none">Cash</Label>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <RadioGroupItem value="upi" id="mobile-payment-upi" />
+                    <Label htmlFor="mobile-payment-upi" className="text-xs font-medium cursor-pointer select-none">UPI</Label>
+                  </div>
+                </RadioGroup>
+              </div>
+
+              <div className="rounded-lg bg-blue-50 border border-blue-200 p-2.5 flex flex-col justify-center">
+                <span className="text-xs font-medium text-blue-800">Order Total</span>
+                <span className="text-base font-bold text-blue-900">{formatCurrency(order?.total_amount || 0)}</span>
               </div>
             </div>
 
-            <div className="rounded-lg bg-blue-50 border border-blue-200 p-4">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium text-blue-900">Order Amount:</span>
-                <span className="text-lg font-bold text-blue-900">{formatCurrency(order?.total_amount || 0)}</span>
+            {/* Confirmations (Mobile) */}
+            <div className="rounded-lg border bg-white p-3 space-y-2 text-xs">
+              <div className="flex items-start gap-2.5">
+                <Checkbox
+                  id="mobile-payment-received"
+                  checked={paymentReceived}
+                  onCheckedChange={setPaymentReceived}
+                  disabled={changingStatus}
+                />
+                <label htmlFor="mobile-payment-received" className="font-medium text-gray-800 leading-snug cursor-pointer select-none">
+                  Payment of <strong>{formatCurrency(order?.total_amount || 0)}</strong> has been received
+                </label>
               </div>
-            </div>
 
-            <div className="p-4 border rounded-lg bg-white space-y-3">
-              <Label className="text-sm font-semibold text-gray-900 block">
-                Payment Method *
-              </Label>
-              <RadioGroup
-                value={paymentMethod}
-                onValueChange={setPaymentMethod}
-                className="flex gap-4"
-                disabled={changingStatus}
-              >
-                <div className="flex items-center gap-2">
-                  <RadioGroupItem value="cash" id="mobile-payment-cash" />
-                  <Label htmlFor="mobile-payment-cash" className="text-sm font-medium cursor-pointer select-none">
-                    Cash
-                  </Label>
-                </div>
-                <div className="flex items-center gap-2">
-                  <RadioGroupItem value="upi" id="mobile-payment-upi" />
-                  <Label htmlFor="mobile-payment-upi" className="text-sm font-medium cursor-pointer select-none">
-                    UPI
-                  </Label>
-                </div>
-              </RadioGroup>
-            </div>
-
-            <div className="flex items-start gap-3 p-4 border rounded-lg bg-white">
-              <Checkbox
-                id="mobile-payment-received"
-                checked={paymentReceived}
-                onCheckedChange={setPaymentReceived}
-                disabled={changingStatus}
-              />
-              <label
-                htmlFor="mobile-payment-received"
-                className="text-sm font-medium leading-none cursor-pointer select-none"
-              >
-                I confirm that the payment of {formatCurrency(order?.total_amount || 0)} has been received for this order
-              </label>
+              <div className="flex items-start gap-2.5 pt-2 border-t border-gray-100">
+                <Checkbox
+                  id="mobile-agent-confirmed"
+                  checked={agentConfirmed}
+                  onCheckedChange={setAgentConfirmed}
+                  disabled={changingStatus}
+                />
+                <label htmlFor="mobile-agent-confirmed" className="font-medium text-gray-800 leading-snug cursor-pointer select-none">
+                  {assignedAgentName ? (
+                    <>Confirmed assigned partner: <strong className="text-indigo-900 font-semibold">{assignedAgentName}</strong></>
+                  ) : (
+                    <span className="text-amber-800">Confirmed without assigned partner</span>
+                  )}
+                </label>
+              </div>
             </div>
 
             <div className="flex gap-2 pt-2">
@@ -2921,7 +2991,7 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
               </Button>
               <Button
                 onClick={() => performStatusChange(pendingStatus)}
-                disabled={changingStatus || !paymentReceived || (pendingStatus === 'completed' && !paymentMethod)}
+                disabled={changingStatus || !paymentReceived || !agentConfirmed || (pendingStatus === 'completed' && !paymentMethod)}
                 className="flex-1 bg-green-600 hover:bg-green-700 text-white font-medium"
               >
                 {changingStatus && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
@@ -3265,6 +3335,14 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
               <p className="text-xs text-muted-foreground mt-3 text-center">
                 Select the rating (1 to 5 stars) given by the customer for this service
               </p>
+              {feedbackRating >= 5 && (
+                <div className="mt-3 p-2.5 bg-emerald-50 border border-emerald-200 rounded-lg flex items-center gap-2 text-xs text-emerald-800">
+                  <span className="text-base">⭐</span>
+                  <div>
+                    <span className="font-semibold">5-Star Incentive:</span> Rating above 4.5 qualifies for the 5-Star incentive bonus, which will be automatically credited to the assigned partner's wallet as a bonus.
+                  </div>
+                </div>
+              )}
             </div>
 
             <div>

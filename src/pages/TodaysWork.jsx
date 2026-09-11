@@ -80,66 +80,73 @@ const TodaysWork = () => {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="bg-white  shadow-sm md:border md:shadow-none">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
+        <Card className="bg-white shadow-sm md:border md:shadow-none">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 pb-1 sm:p-6 sm:pb-2">
+            <CardTitle className="text-[11px] sm:text-xs font-bold text-muted-foreground uppercase tracking-wider truncate mr-1">
               Upcoming Tasks
             </CardTitle>
-            <div className="p-2 bg-primary/5 rounded-lg text-primary">
-              <Clock10 className="h-4 w-4" />
+            <div className="p-1.5 sm:p-2 bg-primary/5 rounded-lg text-primary shrink-0">
+              <Clock10 className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
             </div>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
             {isLoading ? (
-              <Skeleton className="h-8 w-24" />
+              <Skeleton className="h-7 sm:h-8 w-16 sm:w-24" />
             ) : (
               <div>
-                <div className="text-2xl font-bold">{totalUpcomingCount}</div>
-                <p className="text-xs text-muted-foreground mt-1">Pending assignment/in progress</p>
+                <div className="text-xl sm:text-2xl font-bold">{totalUpcomingCount}</div>
+                <p className="text-[10px] sm:text-xs text-muted-foreground mt-0.5 sm:mt-1 truncate">
+                  <span className="hidden sm:inline">Pending assignment/in progress</span>
+                  <span className="sm:hidden">Pending / in progress</span>
+                </p>
               </div>
             )}
           </CardContent>
         </Card>
 
-        <Card className="bg-white  shadow-sm md:border md:shadow-none">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+        <Card className="bg-white shadow-sm md:border md:shadow-none">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 pb-1 sm:p-6 sm:pb-2">
+            <CardTitle className="text-[11px] sm:text-xs font-bold text-muted-foreground uppercase tracking-wider truncate mr-1">
               Completed Today
             </CardTitle>
-            <div className="p-2 bg-green-50 rounded-lg text-green-600">
-              <CheckCircle2 className="h-4 w-4" />
+            <div className="p-1.5 sm:p-2 bg-green-50 rounded-lg text-green-600 shrink-0">
+              <CheckCircle2 className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
             </div>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
             {isLoading ? (
-              <Skeleton className="h-8 w-24" />
+              <Skeleton className="h-7 sm:h-8 w-16 sm:w-24" />
             ) : (
               <div>
-                <div className="text-2xl font-bold">{totalCompletedCount}</div>
-                <p className="text-xs text-muted-foreground mt-1">Successfully served today</p>
+                <div className="text-xl sm:text-2xl font-bold">{totalCompletedCount}</div>
+                <p className="text-[10px] sm:text-xs text-muted-foreground mt-0.5 sm:mt-1 truncate">
+                  <span className="hidden sm:inline">Successfully served today</span>
+                  <span className="sm:hidden">Served today</span>
+                </p>
               </div>
             )}
           </CardContent>
         </Card>
 
-        <Card className="bg-white  shadow-sm md:border md:shadow-none">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+        <Card className="bg-white shadow-sm md:border md:shadow-none">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 pb-1 sm:p-6 sm:pb-2">
+            <CardTitle className="text-[11px] sm:text-xs font-bold text-muted-foreground uppercase tracking-wider truncate mr-1">
               Today's Volume
             </CardTitle>
-            <div className="p-2 bg-indigo-50 rounded-lg text-indigo-600">
-              <TrendingUp className="h-4 w-4" />
+            <div className="p-1.5 sm:p-2 bg-indigo-50 rounded-lg text-indigo-600 shrink-0">
+              <TrendingUp className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
             </div>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
             {isLoading ? (
-              <Skeleton className="h-8 w-24" />
+              <Skeleton className="h-7 sm:h-8 w-16 sm:w-24" />
             ) : (
               <div>
-                <div className="text-2xl font-bold">{formatCurrency(totalUpcomingValue + totalCompletedValue)}</div>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {formatCurrency(totalCompletedValue)} achieved / {formatCurrency(totalUpcomingValue)} pending
+                <div className="text-xl sm:text-2xl font-bold truncate">{formatCurrency(totalUpcomingValue + totalCompletedValue)}</div>
+                <p className="text-[10px] sm:text-xs text-muted-foreground mt-0.5 sm:mt-1 truncate" title={`${formatCurrency(totalCompletedValue)} achieved / ${formatCurrency(totalUpcomingValue)} pending`}>
+                  <span className="hidden sm:inline">{formatCurrency(totalCompletedValue)} achieved / {formatCurrency(totalUpcomingValue)} pending</span>
+                  <span className="sm:hidden">{formatCurrency(totalCompletedValue)} done</span>
                 </p>
               </div>
             )}
@@ -147,28 +154,29 @@ const TodaysWork = () => {
         </Card>
 
         <Card className={cn(
-          "bg-white  shadow-sm md:border md:shadow-none transition-all",
+          "bg-white shadow-sm md:border md:shadow-none transition-all",
           pendingCount > 0 && "border-red-100 bg-red-50/10"
         )}>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
-              Today's Pending Payments
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 pb-1 sm:p-6 sm:pb-2">
+            <CardTitle className="text-[11px] sm:text-xs font-bold text-muted-foreground uppercase tracking-wider truncate mr-1">
+              Pending Payments
             </CardTitle>
             <div className={cn(
-              "p-2 rounded-lg",
+              "p-1.5 sm:p-2 rounded-lg shrink-0",
               pendingCount > 0 ? "bg-red-50 text-red-600 animate-pulse" : "bg-gray-50 text-gray-400"
             )}>
-              <IndianRupee className="h-4 w-4" />
+              <IndianRupee className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
             </div>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
             {isLoading ? (
-              <Skeleton className="h-8 w-24" />
+              <Skeleton className="h-7 sm:h-8 w-16 sm:w-24" />
             ) : (
               <div>
-                <div className={cn("text-2xl font-bold", pendingCount > 0 && "text-red-600")}>{pendingCount}</div>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {pendingCount > 0 ? `${formatCurrency(pendingValue)} outstanding` : 'All payments collected'}
+                <div className={cn("text-xl sm:text-2xl font-bold", pendingCount > 0 && "text-red-600")}>{pendingCount}</div>
+                <p className="text-[10px] sm:text-xs text-muted-foreground mt-0.5 sm:mt-1 truncate">
+                  <span className="hidden sm:inline">{pendingCount > 0 ? `${formatCurrency(pendingValue)} outstanding` : 'All payments collected'}</span>
+                  <span className="sm:hidden">{pendingCount > 0 ? `${formatCurrency(pendingValue)} due` : 'All collected'}</span>
                 </p>
               </div>
             )}

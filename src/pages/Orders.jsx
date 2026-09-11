@@ -518,7 +518,7 @@ const Orders = () => {
       red: 'destructive',
       yellow: 'warning',
       purple: 'outline',
-      amber: 'warning',
+      amber: 'amber',
     };
 
     return variantMap[color] || 'secondary';

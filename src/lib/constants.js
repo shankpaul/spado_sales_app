@@ -108,6 +108,7 @@ export const HTTP_STATUS = {
 // Order Status Constants
 export const ORDER_STATUSES = [
   { value: 'draft', label: 'Draft', color: 'gray' },
+  { value: 'scheduled', label: 'Scheduled', color: 'amber' },
   { value: 'confirmed', label: 'Confirmed', color: 'blue' },
   { value: 'completed', label: 'Completed', color: 'green' },
   { value: 'cancelled', label: 'Cancelled', color: 'red' },
@@ -197,10 +198,11 @@ export const getStatusLabel = (status, statusArray = ORDER_STATUSES) => {
 
 // Subscription Status Constants
 export const SUBSCRIPTION_STATUSES = [
-  { value: 'active', label: 'Active', variant: 'default', color: 'green' },
-  { value: 'paused', label: 'Paused', variant: 'secondary', color: 'yellow' },
+  { value: 'active', label: 'Active', variant: 'success', color: 'green' },
+  { value: 'scheduled', label: 'Scheduled', variant: 'amber', color: 'amber' },
+  { value: 'paused', label: 'Paused', variant: 'warning', color: 'yellow' },
   { value: 'cancelled', label: 'Cancelled', variant: 'destructive', color: 'red' },
-  { value: 'expired', label: 'Expired', variant: 'outline', color: 'gray' },
+  { value: 'expired', label: 'Expired', variant: 'secondary', color: 'gray' },
 ];
 
 // Payment Method Constants
@@ -213,9 +215,9 @@ export const PAYMENT_METHODS = [
 
 // Subscription Payment Status Constants
 export const SUBSCRIPTION_PAYMENT_STATUSES = [
-  { value: 'pending', label: 'Unpaid', variant: 'secondary', color: 'yellow' },
-  { value: 'partial', label: 'Partial', variant: 'outline', color: 'orange' },
-  { value: 'paid', label: 'Paid', variant: 'default', color: 'green' },
+  { value: 'pending', label: 'Unpaid', variant: 'destructive', color: 'red' },
+  { value: 'partial', label: 'Partial', variant: 'warning', color: 'orange' },
+  { value: 'paid', label: 'Paid', variant: 'success', color: 'green' },
 ];
 
 /**
