@@ -84,6 +84,7 @@ import { formatDate, formatDateTime, formatBookingTime } from '../lib/utilities'
 import { sanitizeImageUrl, isValidUrl } from '../lib/security';
 import { Badge2 } from '@/components/ui/badge2';
 import LetterAvatar from '@/components/LetterAvatar';
+import VehicleIcon from '@/components/VehicleIcon';
 import CustomerContact from '@/components/CustomerContact';
 import CustomerDetails from '../components/CustomerDetails';
 import VoiceNoteRecorder from '@/components/VoiceNoteRecorder';
@@ -177,7 +178,18 @@ const EnquiryDetail = ({ enquiryId, onClose, onUpdate }) => {
             const sortedOrders = [...ordersList].sort((a, b) =>
               new Date(b.booking_date || b.created_at) - new Date(a.booking_date || a.created_at)
             );
-            setLastBookingInfo(sortedOrders[0]);
+            let latestOrder = sortedOrders[0];
+            if (!latestOrder.packages?.length && !latestOrder.order_packages?.length && !latestOrder.vehicle_type && latestOrder.id) {
+              try {
+                const fullOrder = await orderService.getOrderById(latestOrder.id);
+                if (fullOrder) {
+                  latestOrder = fullOrder;
+                }
+              } catch (err) {
+                // Ignore fallback to list order
+              }
+            }
+            setLastBookingInfo(latestOrder);
           } else {
             setLastBookingInfo(null);
           }
@@ -195,6 +207,32 @@ const EnquiryDetail = ({ enquiryId, onClose, onUpdate }) => {
       setLastBookingInfo(null);
     }
   }, [enquiry?.id, enquiry?.customer_id, enquiry?.customer?.id, enquiry?.contact_phone]);
+
+  // Extract vehicle types from last booking
+  const getLastBookedVehicles = (order) => {
+    if (!order) return [];
+    const vehicles = [];
+    if (order.packages && Array.isArray(order.packages)) {
+      order.packages.forEach((pkg) => {
+        const vt = pkg.vehicle_type || pkg.package?.vehicle_type;
+        if (vt && !vehicles.includes(vt.toLowerCase())) {
+          vehicles.push(vt.toLowerCase());
+        }
+      });
+    }
+    if (order.order_packages && Array.isArray(order.order_packages)) {
+      order.order_packages.forEach((pkg) => {
+        const vt = pkg.vehicle_type || pkg.package?.vehicle_type;
+        if (vt && !vehicles.includes(vt.toLowerCase())) {
+          vehicles.push(vt.toLowerCase());
+        }
+      });
+    }
+    if (order.vehicle_type && !vehicles.includes(order.vehicle_type.toLowerCase())) {
+      vehicles.push(order.vehicle_type.toLowerCase());
+    }
+    return vehicles;
+  };
 
   // Requirements edit dialog state (matching New Enquiry fields)
   const [isRequirementsDialogOpen, setIsRequirementsDialogOpen] = useState(false);
@@ -971,7 +1009,7 @@ const EnquiryDetail = ({ enquiryId, onClose, onUpdate }) => {
                         <Skeleton className="h-3 w-24 rounded" />
                       </div>
                     ) : lastBookingInfo ? (
-                      <div className="pt-1 text-gray-700">
+                      <div className="pt-1 text-gray-700 space-y-1">
                         <div className="flex items-center gap-1 font-medium text-xs">
                           <Clock className="h-3 w-3 text-emerald-600 shrink-0" />
                           <span>Last Booked:</span>
@@ -982,6 +1020,27 @@ const EnquiryDetail = ({ enquiryId, onClose, onUpdate }) => {
                             Slot: {formatBookingTime(lastBookingInfo.booking_time_from, lastBookingInfo.booking_time_to)}
                           </p>
                         )}
+                        {(() => {
+                          const lastVehicles = getLastBookedVehicles(lastBookingInfo);
+                          if (!lastVehicles || lastVehicles.length === 0) return null;
+                          return (
+                            <div className="flex items-center gap-1.5 pl-4 pt-0.5 text-xs">
+                              <span className="text-[11px] text-muted-foreground">Vehicle:</span>
+                              <div className="flex flex-wrap items-center gap-1">
+                                {lastVehicles.map((vType, idx) => (
+                                  <Badge2
+                                    key={idx}
+                                    variant="info"
+                                    className="text-[10px] py-0 px-1.5 gap-1 font-medium capitalize"
+                                  >
+                                    <VehicleIcon vehicleType={vType} size={12} className="text-blue-700 shrink-0" />
+                                    <span>{vType}</span>
+                                  </Badge2>
+                                ))}
+                              </div>
+                            </div>
+                          );
+                        })()}
                       </div>
                     ) : (customerInfo?.last_booked_at || enquiry?.customer?.last_booked_at) ? (
                       <div className="pt-1 text-gray-700">

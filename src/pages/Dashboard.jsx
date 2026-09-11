@@ -311,7 +311,7 @@ const Dashboard = () => {
 
     return (
       <div className="space-y-6">
-        <div className="grid grid-cols-2 gap-3 md:gap-5 lg:grid-cols-5">
+        <div className="grid grid-cols-2 gap-3 md:gap-5 lg:grid-cols-4">
           <StatCard
             title="Monthly Revenue"
             value={dashboardStats ? formatCurrency(dashboardStats.revenue.current) : '--'}
@@ -327,14 +327,6 @@ const Dashboard = () => {
             icon={<IndianRupee className="h-4 w-4 text-primary-600" />}
             isLoading={statsLoading}
             onClick={() => navigate('/orders')}
-          />
-          <StatCard
-            title="Total Customers"
-            value={dashboardStats ? dashboardStats.total_customers.current.toString() : '--'}
-            change={dashboardStats ? formatPercentage(dashboardStats.total_customers.change_percentage) : '--'}
-            icon={<Users className="h-4 w-4 text-primary-600" />}
-            isLoading={statsLoading}
-            onClick={() => navigate('/customers')}
           />
           <StatCard
             title="Today's Bookings"

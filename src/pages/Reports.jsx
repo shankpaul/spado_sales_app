@@ -29,6 +29,9 @@ import {
   Line,
   BarChart,
   Bar,
+  PieChart,
+  Pie,
+  Cell,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -36,6 +39,7 @@ import {
   Legend,
   ResponsiveContainer,
 } from 'recharts';
+import VehicleIcon from '../components/VehicleIcon';
 import * as XLSX from 'xlsx';
 import { saveAs } from 'file-saver';
 import employeeService from '../services/employeeService';
@@ -69,6 +73,10 @@ import {
   Layers,
   Map,
   CreditCard,
+  Package,
+  Boxes,
+  Sparkles,
+  Percent,
 } from 'lucide-react';
 import { format, parseISO, differenceInDays, eachDayOfInterval, eachWeekOfInterval, eachMonthOfInterval, startOfWeek, startOfMonth, endOfWeek, endOfMonth, subDays, subMonths, startOfYear, endOfYear } from 'date-fns';
 import { getStatusLabel, getStatusColor, ORDER_STATUSES, SELECTABLE_ORDER_STATUSES, PAYMENT_STATUSES } from '../lib/constants';
@@ -321,6 +329,302 @@ const Reports = () => {
     }
   };
 
+  // Package, Add-on & Vehicle Usage Report State
+  const [serviceFilters, setServiceFilters] = useState({
+    date_preset: 'this_month',
+    date_from: format(startOfMonth(new Date()), 'yyyy-MM-dd'),
+    date_to: format(endOfMonth(new Date()), 'yyyy-MM-dd'),
+    status: 'all',
+    vehicle_type: 'all',
+    metric_mode: 'volume', // 'volume' or 'revenue'
+  });
+  const [serviceUsageData, setServiceUsageData] = useState(null);
+  const [serviceLoading, setServiceLoading] = useState(false);
+  const [serviceActiveTab, setServiceActiveTab] = useState('packages');
+
+  const VEHICLE_COLORS = {
+    hatchback: '#3b82f6',
+    sedan: '#10b981',
+    suv: '#f59e0b',
+    luxury: '#8b5cf6',
+    other: '#94a3b8',
+  };
+
+  const processServiceUsageData = (orders, filters) => {
+    let filteredOrders = orders;
+    if (filters.status && filters.status !== 'all') {
+      filteredOrders = filteredOrders.filter(
+        (o) => (o.status || '').toLowerCase() === filters.status.toLowerCase()
+      );
+    }
+
+    const normalizeVehicle = (v) => {
+      if (!v) return 'other';
+      const s = String(v).toLowerCase();
+      if (s.includes('hatch')) return 'hatchback';
+      if (s.includes('sedan')) return 'sedan';
+      if (s.includes('suv')) return 'suv';
+      if (s.includes('lux')) return 'luxury';
+      return s;
+    };
+
+    let totalOrdersCount = filteredOrders.length;
+    let totalPackageCount = 0;
+    let totalPackageRevenue = 0;
+    let totalAddonCount = 0;
+    let totalAddonRevenue = 0;
+    let ordersWithAddonsCount = 0;
+
+    const packageMap = {};
+    const addonMap = {};
+    const vehicleMap = {
+      hatchback: { type: 'hatchback', label: 'Hatchback', count: 0, revenue: 0, packages: {} },
+      sedan: { type: 'sedan', label: 'Sedan', count: 0, revenue: 0, packages: {} },
+      suv: { type: 'suv', label: 'SUV', count: 0, revenue: 0, packages: {} },
+      luxury: { type: 'luxury', label: 'Luxury', count: 0, revenue: 0, packages: {} },
+      other: { type: 'other', label: 'Other', count: 0, revenue: 0, packages: {} },
+    };
+
+    const trendMap = {};
+
+    filteredOrders.forEach((order) => {
+      const orderDateStr = order.booking_date || order.created_at;
+      const formattedDate = orderDateStr
+        ? format(parseISO(orderDateStr), 'dd MMM')
+        : 'Unknown';
+
+      if (!trendMap[formattedDate]) {
+        trendMap[formattedDate] = {
+          date: formattedDate,
+          rawDate: orderDateStr ? new Date(orderDateStr) : new Date(0),
+          packages: 0,
+          addons: 0,
+          revenue: 0,
+        };
+      }
+
+      const orderAddons = order.addons || order.order_addons || [];
+      if (orderAddons.length > 0) {
+        ordersWithAddonsCount++;
+      }
+
+      const orderPackages = order.packages || order.order_packages || [];
+      orderPackages.forEach((pkg) => {
+        const pkgName = pkg.package_name || pkg.name || pkg.package?.name || 'Standard Wash';
+        const rawVehicle = pkg.vehicle_type || pkg.package?.vehicle_type || order.vehicle_type;
+        const vKey = normalizeVehicle(rawVehicle);
+        const qty = parseInt(pkg.quantity || 1, 10);
+        const price = parseFloat(pkg.total_price || pkg.price * qty || 0);
+
+        if (filters.vehicle_type && filters.vehicle_type !== 'all') {
+          if (vKey !== filters.vehicle_type) return;
+        }
+
+        totalPackageCount += qty;
+        totalPackageRevenue += price;
+
+        trendMap[formattedDate].packages += qty;
+        trendMap[formattedDate].revenue += price;
+
+        if (!packageMap[pkgName]) {
+          packageMap[pkgName] = {
+            name: pkgName,
+            count: 0,
+            revenue: 0,
+            vehicleBreakdown: { hatchback: 0, sedan: 0, suv: 0, luxury: 0, other: 0 },
+            revenueByVehicle: { hatchback: 0, sedan: 0, suv: 0, luxury: 0, other: 0 },
+          };
+        }
+        packageMap[pkgName].count += qty;
+        packageMap[pkgName].revenue += price;
+        const validVKey = vehicleMap[vKey] ? vKey : 'other';
+        packageMap[pkgName].vehicleBreakdown[validVKey] = (packageMap[pkgName].vehicleBreakdown[validVKey] || 0) + qty;
+        packageMap[pkgName].revenueByVehicle[validVKey] = (packageMap[pkgName].revenueByVehicle[validVKey] || 0) + price;
+
+        vehicleMap[validVKey].count += qty;
+        vehicleMap[validVKey].revenue += price;
+        vehicleMap[validVKey].packages[pkgName] = (vehicleMap[validVKey].packages[pkgName] || 0) + qty;
+      });
+
+      orderAddons.forEach((addon) => {
+        const addonName = addon.addon_name || addon.name || addon.addon?.name || 'Add-on Service';
+        const qty = parseInt(addon.quantity || 1, 10);
+        const price = parseFloat(addon.total_price || addon.price * qty || 0);
+
+        totalAddonCount += qty;
+        totalAddonRevenue += price;
+
+        trendMap[formattedDate].addons += qty;
+        trendMap[formattedDate].revenue += price;
+
+        if (!addonMap[addonName]) {
+          addonMap[addonName] = {
+            name: addonName,
+            count: 0,
+            revenue: 0,
+          };
+        }
+        addonMap[addonName].count += qty;
+        addonMap[addonName].revenue += price;
+      });
+    });
+
+    const packagesList = Object.values(packageMap).sort((a, b) => b.count - a.count);
+    const addonsList = Object.values(addonMap).sort((a, b) => b.count - a.count);
+
+    const vehiclesList = Object.values(vehicleMap)
+      .filter((v) => v.count > 0 || ['hatchback', 'sedan', 'suv', 'luxury'].includes(v.type))
+      .map((v) => {
+        let topPkg = '-';
+        let maxCount = 0;
+        Object.entries(v.packages).forEach(([pName, count]) => {
+          if (count > maxCount) {
+            maxCount = count;
+            topPkg = pName;
+          }
+        });
+        return {
+          ...v,
+          share: totalPackageCount > 0 ? ((v.count / totalPackageCount) * 100).toFixed(1) : '0.0',
+          topPackage: topPkg,
+        };
+      });
+
+    const crossAnalysisData = packagesList.slice(0, 8).map((pkg) => ({
+      name: pkg.name.length > 16 ? pkg.name.substring(0, 14) + '...' : pkg.name,
+      fullName: pkg.name,
+      Hatchback: filters.metric_mode === 'revenue' ? pkg.revenueByVehicle.hatchback : pkg.vehicleBreakdown.hatchback,
+      Sedan: filters.metric_mode === 'revenue' ? pkg.revenueByVehicle.sedan : pkg.vehicleBreakdown.sedan,
+      SUV: filters.metric_mode === 'revenue' ? pkg.revenueByVehicle.suv : pkg.vehicleBreakdown.suv,
+      Luxury: filters.metric_mode === 'revenue' ? pkg.revenueByVehicle.luxury : pkg.vehicleBreakdown.luxury,
+      total: filters.metric_mode === 'revenue' ? pkg.revenue : pkg.count,
+    }));
+
+    const trendList = Object.values(trendMap).sort((a, b) => a.rawDate - b.rawDate);
+    const topPackage = packagesList[0] || null;
+    const topVehicle = [...vehiclesList].sort((a, b) => b.count - a.count)[0] || null;
+
+    const attachmentRate = totalOrdersCount > 0
+      ? ((ordersWithAddonsCount / totalOrdersCount) * 100).toFixed(1)
+      : '0.0';
+    const avgAddonsPerOrder = totalOrdersCount > 0
+      ? (totalAddonCount / totalOrdersCount).toFixed(2)
+      : '0.00';
+
+    return {
+      summary: {
+        totalOrdersCount,
+        totalPackageCount,
+        totalPackageRevenue,
+        totalAddonCount,
+        totalAddonRevenue,
+        totalCombinedRevenue: totalPackageRevenue + totalAddonRevenue,
+        ordersWithAddonsCount,
+        attachmentRate,
+        avgAddonsPerOrder,
+        topPackage,
+        topVehicle,
+      },
+      packagesList,
+      addonsList,
+      vehiclesList,
+      crossAnalysisData,
+      trendList,
+    };
+  };
+
+  const fetchServiceUsageReport = async (overrideFilters = null) => {
+    setServiceLoading(true);
+    const activeFilters = overrideFilters || serviceFilters;
+    try {
+      const params = {
+        per_page: 2000,
+        page: 1,
+      };
+      if (activeFilters.date_from) params.date_from = activeFilters.date_from;
+      if (activeFilters.date_to) params.date_to = activeFilters.date_to;
+      if (activeFilters.status && activeFilters.status !== 'all') {
+        params.status = activeFilters.status;
+      }
+
+      const response = await apiClient.get('/orders/reports/orders', { params });
+      const orders = response.data?.orders || [];
+      const stats = processServiceUsageData(orders, activeFilters);
+      setServiceUsageData(stats);
+    } catch (error) {
+      console.error('Error fetching service usage report:', error);
+      toast.error('Failed to load service usage report');
+    } finally {
+      setServiceLoading(false);
+    }
+  };
+
+  const handleExportServiceUsageReport = () => {
+    if (!serviceUsageData || !serviceUsageData.summary) {
+      toast.error('No service usage data available to export');
+      return;
+    }
+
+    const { summary, packagesList, addonsList, vehiclesList } = serviceUsageData;
+
+    const summarySheetData = [
+      { Metric: 'Date Range', Value: `${serviceFilters.date_from} to ${serviceFilters.date_to}` },
+      { Metric: 'Order Status Filter', Value: serviceFilters.status.toUpperCase() },
+      { Metric: 'Total Orders', Value: summary.totalOrdersCount },
+      { Metric: 'Total Packages Booked', Value: summary.totalPackageCount },
+      { Metric: 'Total Package Revenue (₹)', Value: summary.totalPackageRevenue },
+      { Metric: 'Total Add-ons Attached', Value: summary.totalAddonCount },
+      { Metric: 'Total Add-on Revenue (₹)', Value: summary.totalAddonRevenue },
+      { Metric: 'Combined Service Revenue (₹)', Value: summary.totalCombinedRevenue },
+      { Metric: 'Add-on Attachment Rate (%)', Value: `${summary.attachmentRate}%` },
+      { Metric: 'Average Add-ons / Order', Value: summary.avgAddonsPerOrder },
+      { Metric: 'Top Package', Value: summary.topPackage?.name || 'N/A' },
+      { Metric: 'Top Vehicle Category', Value: summary.topVehicle?.label || 'N/A' },
+    ];
+
+    const packagesSheetData = packagesList.map((pkg) => ({
+      'Package Name': pkg.name,
+      'Total Quantity Sold': pkg.count,
+      'Total Revenue (₹)': pkg.revenue,
+      'Hatchback Qty': pkg.vehicleBreakdown.hatchback,
+      'Sedan Qty': pkg.vehicleBreakdown.sedan,
+      'SUV Qty': pkg.vehicleBreakdown.suv,
+      'Luxury Qty': pkg.vehicleBreakdown.luxury,
+      'Share of Washes (%)': summary.totalPackageCount > 0 ? ((pkg.count / summary.totalPackageCount) * 100).toFixed(1) : 0,
+    }));
+
+    const addonsSheetData = addonsList.map((addon) => ({
+      'Add-on Name': addon.name,
+      'Total Attachments': addon.count,
+      'Total Revenue (₹)': addon.revenue,
+      'Attachment Rate (%)': summary.totalOrdersCount > 0 ? ((addon.count / summary.totalOrdersCount) * 100).toFixed(1) : 0,
+    }));
+
+    const vehiclesSheetData = vehiclesList.map((v) => ({
+      'Vehicle Category': v.label,
+      'Total Washes': v.count,
+      'Total Revenue (₹)': v.revenue,
+      'Share of Washes (%)': `${v.share}%`,
+      'Top Preferred Package': v.topPackage,
+    }));
+
+    const wb = XLSX.utils.book_new();
+    const wsSummary = XLSX.utils.json_to_sheet(summarySheetData);
+    const wsPackages = XLSX.utils.json_to_sheet(packagesSheetData);
+    const wsAddons = XLSX.utils.json_to_sheet(addonsSheetData);
+    const wsVehicles = XLSX.utils.json_to_sheet(vehiclesSheetData);
+
+    XLSX.utils.book_append_sheet(wb, wsSummary, 'Summary');
+    XLSX.utils.book_append_sheet(wb, wsPackages, 'Packages Usage');
+    XLSX.utils.book_append_sheet(wb, wsAddons, 'Add-ons Usage');
+    XLSX.utils.book_append_sheet(wb, wsVehicles, 'Vehicle Breakdown');
+
+    const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+    const blob = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    saveAs(blob, `service_usage_report_${serviceFilters.date_from}_to_${serviceFilters.date_to}.xlsx`);
+    toast.success('Service usage report exported successfully');
+  };
+
   // Auto-fetch report data on mount or when selectedReport changes via URL query param
   useEffect(() => {
     if (selectedReport === 'orders_map' && !ordersMapData) {
@@ -331,6 +635,8 @@ const Reports = () => {
       fetchRepeatCustomersReport();
     } else if (selectedReport === 'peak_demand' && !peakDemandData) {
       fetchPeakDemandReport();
+    } else if (selectedReport === 'service_usage' && !serviceUsageData) {
+      fetchServiceUsageReport();
     }
   }, [selectedReport]);
 
@@ -370,14 +676,14 @@ const Reports = () => {
     const detailSheet = XLSX.utils.json_to_sheet(customerRows);
 
     XLSX.utils.book_append_sheet(workbook, summarySheet, 'Summary');
-    XLSX.utils.book_append_sheet(workbook, detailSheet, 'Repeat Customers');
+    XLSX.utils.book_append_sheet(workbook, detailSheet, repeatFilters.min_orders === 1 ? 'Booked Customers' : 'Repeat Customers');
 
     const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
     const blob = new Blob([excelBuffer], {
       type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     });
     saveAs(blob, `repeat_customers_report_${repeatFilters.date_from || 'all'}_to_${repeatFilters.date_to || 'all'}.xlsx`);
-    toast.success('Repeat Customers report exported successfully');
+    toast.success(repeatFilters.min_orders === 1 ? 'Booked Customers report exported successfully' : 'Repeat Customers report exported successfully');
   };
 
   const handleViewEodDetails = (report) => {
@@ -469,7 +775,8 @@ const Reports = () => {
     const agentIncentive = Number(order.agent_incentive || 0);
     const ta = Number(order.travel_allowance || 0);
     const fiveStarIncentive = Number(order.five_star_incentive || 0);
-    return total - agentIncentive - ta - fiveStarIncentive;
+    const performanceBonus = Number(order.performance_bonus || 0);
+    return total - agentIncentive - ta - fiveStarIncentive - performanceBonus;
   };
 
   const formatHoursWorked = (hours) => {
@@ -1001,6 +1308,27 @@ const Reports = () => {
             </p>
           </CardContent>
         </Card>
+
+        {/* Package, Add-on & Vehicle Usage Report Card */}
+        <Card
+          className="cursor-pointer hover:shadow-lg transition-shadow border-blue-100/80 hover:border-blue-300"
+          onClick={() => {
+            setSelectedReport('service_usage');
+            fetchServiceUsageReport();
+          }}
+        >
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <CardTitle className="mt-4">Packages & Vehicles Usage</CardTitle>
+              <Layers className="h-6 w-6 text-primary" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <p className="text-muted-foreground">
+              Analyze package popularity, add-on attachment rates, vehicle type breakdown (Hatchback/Sedan/SUV/Luxury), and cross-service patterns with interactive charts.
+            </p>
+          </CardContent>
+        </Card>
       </div>
     </>
   );
@@ -1297,6 +1625,18 @@ const Reports = () => {
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Performance Bonus</CardTitle>
+              <Award className="h-4 w-4 text-emerald-600" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-emerald-600">
+                ₹{formatCardNumber(reportData.summary.total_performance_bonus || 0)}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Total Distance</CardTitle>
               <MapPin className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
@@ -1411,6 +1751,7 @@ const Reports = () => {
                         <th className="text-left p-2">Agent</th>
                         <th className="text-right p-2">Agent Inc.</th>
                         <th className="text-right p-2">5★ Inc.</th>
+                        <th className="text-right p-2">Perf Bonus</th>
                         <th className="text-right p-2">Profit</th>
                       </tr>
                     </thead>
@@ -1474,6 +1815,9 @@ const Reports = () => {
                           <td className="text-right p-2">₹{order.agent_incentive.toFixed(2)}</td>
                           <td className="text-right p-2 text-yellow-600">
                             ₹{order.five_star_incentive.toFixed(2)}
+                          </td>
+                          <td className="text-right p-2 text-emerald-600 font-medium">
+                            ₹{(order.performance_bonus !== undefined && order.performance_bonus !== null ? order.performance_bonus : 0).toFixed(2)}
                           </td>
                           <td className="text-right p-2 text-green-600 font-medium">
                             ₹{calculateOrderProfit(order).toFixed(2)}
@@ -2445,6 +2789,7 @@ const Reports = () => {
                   <SelectValue placeholder="Select min orders" />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="1">1+ Orders (Booked Customers)</SelectItem>
                   <SelectItem value="2">2+ Orders (Repeat)</SelectItem>
                   <SelectItem value="3">3+ Orders</SelectItem>
                   <SelectItem value="5">5+ Orders (VIP)</SelectItem>
@@ -2461,7 +2806,9 @@ const Reports = () => {
                 variant="outline"
                 onClick={() => {
                   setRepeatFilters({ date_from: '', date_to: '', min_orders: 2, page: 1, per_page: 50 });
+                  setTimeout(fetchRepeatCustomersReport, 0);
                 }}
+                disabled={repeatLoading}
               >
                 Reset
               </Button>
@@ -2470,47 +2817,60 @@ const Reports = () => {
         </CardContent>
       </Card>
 
-      {/* Loading Skeleton */}
+      {/* Analytics Summary Cards */}
       {repeatLoading && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {[1, 2, 3, 4].map((i) => (
-            <Skeleton key={i} className="h-28 w-full rounded-xl" />
+            <Card key={i} className="p-6">
+              <Skeleton className="h-4 w-1/2 mb-4" />
+              <Skeleton className="h-8 w-3/4 mb-2" />
+              <Skeleton className="h-3 w-full" />
+            </Card>
           ))}
         </div>
       )}
 
-      {/* KPI Cards */}
       {!repeatLoading && repeatReportData && repeatReportData.summary && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Repeat Customers</CardTitle>
+              <CardTitle className="text-sm font-medium">
+                {repeatFilters.min_orders === 1 ? 'Booked Customers' : 'Repeat Customers'}
+              </CardTitle>
               <Users className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{repeatReportData.summary.repeat_customers_count}</div>
               <p className="text-xs text-muted-foreground mt-1">
-                Out of {repeatReportData.summary.total_customers} total distinct customers
+                {repeatFilters.min_orders === 1
+                  ? 'All customers who placed at least 1 order'
+                  : `Out of ${repeatReportData.summary.total_customers} total distinct customers`}
               </p>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Repeat Customer Rate</CardTitle>
+              <CardTitle className="text-sm font-medium">
+                {repeatFilters.min_orders === 1 ? 'Booked Customer Rate' : 'Repeat Customer Rate'}
+              </CardTitle>
               <TrendingUp className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-emerald-600">
                 {repeatReportData.summary.repeat_customer_rate}%
               </div>
-              <p className="text-xs text-muted-foreground mt-1">Customer retention metric</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                {repeatFilters.min_orders === 1 ? 'Booked conversion rate' : 'Customer retention metric'}
+              </p>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Repeat Revenue</CardTitle>
+              <CardTitle className="text-sm font-medium">
+                {repeatFilters.min_orders === 1 ? 'Total Booked Revenue' : 'Repeat Revenue'}
+              </CardTitle>
               <IndianRupee className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
@@ -2518,7 +2878,7 @@ const Reports = () => {
                 ₹{formatCardNumber(repeatReportData.summary.repeat_orders_revenue)}
               </div>
               <p className="text-xs text-muted-foreground mt-1">
-                From {repeatReportData.summary.repeat_orders_count} orders placed by repeat customers
+                From {repeatReportData.summary.repeat_orders_count} orders placed by {repeatFilters.min_orders === 1 ? 'booked' : 'repeat'} customers
               </p>
             </CardContent>
           </Card>
@@ -2542,12 +2902,16 @@ const Reports = () => {
       {!repeatLoading && repeatReportData && repeatReportData.customers && (
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle>Repeat Customers Directory ({repeatReportData.total_repeat_customers})</CardTitle>
+            <CardTitle>
+              {repeatFilters.min_orders === 1 ? 'Booked Customers Directory' : 'Repeat Customers Directory'} ({repeatReportData.total_repeat_customers})
+            </CardTitle>
           </CardHeader>
           <CardContent>
             {repeatReportData.customers.length === 0 ? (
               <div className="text-center py-12 text-muted-foreground">
-                No repeat customers found matching the selected criteria.
+                {repeatFilters.min_orders === 1
+                  ? 'No booked customers found matching the selected criteria.'
+                  : 'No repeat customers found matching the selected criteria.'}
               </div>
             ) : (
               <div className="overflow-x-auto">
@@ -2574,8 +2938,8 @@ const Reports = () => {
                           {c.customer_email && <div className="text-muted-foreground">{c.customer_email}</div>}
                         </td>
                         <td className="px-4 py-3 text-center">
-                          <Badge2 variant="outline" className="font-bold text-primary">
-                            {c.total_orders} Orders
+                          <Badge2 variant={c.total_orders > 1 ? 'outline' : 'secondary'} className="font-bold text-primary">
+                            {c.total_orders} {c.total_orders === 1 ? 'Order' : 'Orders'}
                           </Badge2>
                         </td>
                         <td className="px-4 py-3 text-right font-semibold text-emerald-600">
@@ -3450,6 +3814,862 @@ const Reports = () => {
     );
   };
 
+  // Package, Add-on & Vehicle Usage Report View
+  const renderServiceUsageReport = () => {
+    const isVolume = serviceFilters.metric_mode === 'volume';
+
+    const formatVal = (val, isCur = false) => {
+      if (val === undefined || val === null) return '-';
+      if (isCur) return `₹${Number(val).toLocaleString('en-IN')}`;
+      return Number(val).toLocaleString('en-IN');
+    };
+
+    const summary = serviceUsageData?.summary || {};
+    const packagesList = serviceUsageData?.packagesList || [];
+    const addonsList = serviceUsageData?.addonsList || [];
+    const vehiclesList = serviceUsageData?.vehiclesList || [];
+
+    // Chart data for packages
+    const packagesChartData = packagesList.slice(0, 7).map((pkg) => ({
+      ...pkg,
+      displayName: pkg.name.length > 18 ? pkg.name.substring(0, 16) + '...' : pkg.name,
+    }));
+
+    // Chart data for addons
+    const addonsChartData = addonsList.slice(0, 7).map((addon) => ({
+      ...addon,
+      displayName: addon.name.length > 18 ? addon.name.substring(0, 16) + '...' : addon.name,
+    }));
+
+    // Pie data for vehicles
+    const vehiclesPieData = vehiclesList.filter((v) => (isVolume ? v.count > 0 : v.revenue > 0));
+
+    return (
+      <div className="space-y-6">
+        {/* Top Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="rounded-full shrink-0"
+              onClick={() => setSelectedReport(null)}
+            >
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+            <div>
+              <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-gray-900 flex items-center gap-2">
+                <Layers className="h-6 w-6 text-primary" />
+                Package, Add-on & Vehicle Usage Report
+              </h1>
+              <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
+                Detailed utilization analytics of packages, add-on attachments, and vehicle type demand.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2 sm:self-auto">
+            {/* Metric Mode Toggle */}
+            <div className="flex items-center p-1 bg-slate-100 rounded-lg border border-slate-200 shadow-2xs">
+              <button
+                type="button"
+                onClick={() => setServiceFilters((prev) => ({ ...prev, metric_mode: 'volume' }))}
+                className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${
+                  serviceFilters.metric_mode === 'volume'
+                    ? 'bg-white text-primary shadow-xs'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                Volume (Units)
+              </button>
+              <button
+                type="button"
+                onClick={() => setServiceFilters((prev) => ({ ...prev, metric_mode: 'revenue' }))}
+                className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${
+                  serviceFilters.metric_mode === 'revenue'
+                    ? 'bg-white text-emerald-700 shadow-xs'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                Revenue (₹)
+              </button>
+            </div>
+
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleExportServiceUsageReport}
+              disabled={serviceLoading || !serviceUsageData}
+              className="gap-1.5 text-xs font-semibold"
+            >
+              <Download className="h-3.5 w-3.5" />
+              Export Excel
+            </Button>
+          </div>
+        </div>
+
+        {/* Filter Controls Card */}
+        <Card className="shadow-xs border-slate-200">
+          <CardHeader className="pb-3 border-b bg-slate-50/50">
+            <CardTitle className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+              <Filter className="h-3.5 w-3.5 text-primary" />
+              Report Filters & Parameters
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3.5">
+              {/* Date Presets */}
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">Date Range Preset</Label>
+                <Select
+                  value={serviceFilters.date_preset}
+                  onValueChange={(val) => handleDatePresetChange(val, setServiceFilters)}
+                >
+                  <SelectTrigger className="h-9 text-xs">
+                    <SelectValue placeholder="Select preset" />
+                  </SelectTrigger>
+                  <SelectContent className="z-[2000]">
+                    {DATE_PRESETS.map((p) => (
+                      <SelectItem key={p.value} value={p.value} className="text-xs">
+                        {p.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Date From */}
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">From Date</Label>
+                <Input
+                  type="date"
+                  value={serviceFilters.date_from}
+                  onChange={(e) =>
+                    setServiceFilters((prev) => ({
+                      ...prev,
+                      date_from: e.target.value,
+                      date_preset: 'custom',
+                    }))
+                  }
+                  className="h-9 text-xs"
+                />
+              </div>
+
+              {/* Date To */}
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">To Date</Label>
+                <Input
+                  type="date"
+                  value={serviceFilters.date_to}
+                  onChange={(e) =>
+                    setServiceFilters((prev) => ({
+                      ...prev,
+                      date_to: e.target.value,
+                      date_preset: 'custom',
+                    }))
+                  }
+                  className="h-9 text-xs"
+                />
+              </div>
+
+              {/* Order Status */}
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">Order Status</Label>
+                <Select
+                  value={serviceFilters.status}
+                  onValueChange={(val) => setServiceFilters((prev) => ({ ...prev, status: val }))}
+                >
+                  <SelectTrigger className="h-9 text-xs">
+                    <SelectValue placeholder="All Statuses" />
+                  </SelectTrigger>
+                  <SelectContent className="z-[2000]">
+                    <SelectItem value="all" className="text-xs">All Statuses (Active)</SelectItem>
+                    <SelectItem value="completed" className="text-xs">Completed Only</SelectItem>
+                    <SelectItem value="confirmed" className="text-xs">Confirmed</SelectItem>
+                    <SelectItem value="in_progress" className="text-xs">In Progress</SelectItem>
+                    <SelectItem value="tentative" className="text-xs">Tentative</SelectItem>
+                    <SelectItem value="cancelled" className="text-xs">Cancelled</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Vehicle Type Filter */}
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">Vehicle Type</Label>
+                <Select
+                  value={serviceFilters.vehicle_type}
+                  onValueChange={(val) => setServiceFilters((prev) => ({ ...prev, vehicle_type: val }))}
+                >
+                  <SelectTrigger className="h-9 text-xs">
+                    <SelectValue placeholder="All Vehicles" />
+                  </SelectTrigger>
+                  <SelectContent className="z-[2000]">
+                    <SelectItem value="all" className="text-xs">All Vehicle Types</SelectItem>
+                    <SelectItem value="hatchback" className="text-xs">Hatchback</SelectItem>
+                    <SelectItem value="sedan" className="text-xs">Sedan</SelectItem>
+                    <SelectItem value="suv" className="text-xs">SUV</SelectItem>
+                    <SelectItem value="luxury" className="text-xs">Luxury</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between pt-3.5 mt-3.5 border-t border-slate-100">
+              <span className="text-xs text-muted-foreground">
+                Showing data for{' '}
+                <span className="font-semibold text-slate-800">
+                  {serviceFilters.date_from ? format(parseISO(serviceFilters.date_from), 'dd MMM yyyy') : '-'}
+                </span>{' '}
+                to{' '}
+                <span className="font-semibold text-slate-800">
+                  {serviceFilters.date_to ? format(parseISO(serviceFilters.date_to), 'dd MMM yyyy') : '-'}
+                </span>
+                {serviceFilters.status !== 'all' && ` • Status: ${serviceFilters.status}`}
+                {serviceFilters.vehicle_type !== 'all' && ` • Vehicle: ${serviceFilters.vehicle_type}`}
+              </span>
+
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    const defaultFrom = format(startOfMonth(new Date()), 'yyyy-MM-dd');
+                    const defaultTo = format(endOfMonth(new Date()), 'yyyy-MM-dd');
+                    const resetFilters = {
+                      date_preset: 'this_month',
+                      date_from: defaultFrom,
+                      date_to: defaultTo,
+                      status: 'all',
+                      vehicle_type: 'all',
+                      metric_mode: 'volume',
+                    };
+                    setServiceFilters(resetFilters);
+                    fetchServiceUsageReport(resetFilters);
+                  }}
+                  className="h-8 text-xs"
+                >
+                  Reset
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={() => fetchServiceUsageReport()}
+                  disabled={serviceLoading}
+                  className="h-8 text-xs gap-1.5 bg-primary text-white"
+                >
+                  {serviceLoading ? (
+                    <>
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      Loading...
+                    </>
+                  ) : (
+                    <>
+                      <Filter className="h-3.5 w-3.5" />
+                      Apply Filters
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Loading State */}
+        {serviceLoading && (
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+              {[...Array(5)].map((_, i) => (
+                <Skeleton key={i} className="h-24 rounded-xl" />
+              ))}
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <Skeleton className="h-72 rounded-xl" />
+              <Skeleton className="h-72 rounded-xl" />
+            </div>
+          </div>
+        )}
+
+        {/* Content State */}
+        {!serviceLoading && serviceUsageData && (
+          <>
+            {/* KPI Summary Cards */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5">
+              {/* Card 1: Total Packages Sold */}
+              <Card className="shadow-xs border-blue-100 bg-gradient-to-br from-blue-50/50 to-white">
+                <CardContent className="p-4 space-y-1">
+                  <div className="flex items-center justify-between text-muted-foreground">
+                    <span className="text-xs font-semibold text-blue-900/80">Packages Sold</span>
+                    <Package className="h-4 w-4 text-blue-600" />
+                  </div>
+                  <div className="text-2xl font-bold text-gray-900">
+                    {formatVal(summary.totalPackageCount)}
+                  </div>
+                  <p className="text-[11px] text-blue-700 font-medium">
+                    {formatVal(summary.totalPackageRevenue, true)} revenue
+                  </p>
+                </CardContent>
+              </Card>
+
+              {/* Card 2: Total Add-ons Attached */}
+              <Card className="shadow-xs border-purple-100 bg-gradient-to-br from-purple-50/50 to-white">
+                <CardContent className="p-4 space-y-1">
+                  <div className="flex items-center justify-between text-muted-foreground">
+                    <span className="text-xs font-semibold text-purple-900/80">Add-ons Attached</span>
+                    <Boxes className="h-4 w-4 text-purple-600" />
+                  </div>
+                  <div className="text-2xl font-bold text-gray-900">
+                    {formatVal(summary.totalAddonCount)}
+                  </div>
+                  <p className="text-[11px] text-purple-700 font-medium">
+                    {formatVal(summary.totalAddonRevenue, true)} revenue
+                  </p>
+                </CardContent>
+              </Card>
+
+              {/* Card 3: Add-on Attachment Rate */}
+              <Card className="shadow-xs border-emerald-100 bg-gradient-to-br from-emerald-50/50 to-white">
+                <CardContent className="p-4 space-y-1">
+                  <div className="flex items-center justify-between text-muted-foreground">
+                    <span className="text-xs font-semibold text-emerald-900/80">Attachment Rate</span>
+                    <Percent className="h-4 w-4 text-emerald-600" />
+                  </div>
+                  <div className="text-2xl font-bold text-gray-900">
+                    {summary.attachmentRate}%
+                  </div>
+                  <p className="text-[11px] text-emerald-700 font-medium">
+                    {summary.avgAddonsPerOrder} avg add-ons / order
+                  </p>
+                </CardContent>
+              </Card>
+
+              {/* Card 4: Top Package */}
+              <Card className="shadow-xs border-amber-100 bg-gradient-to-br from-amber-50/50 to-white">
+                <CardContent className="p-4 space-y-1">
+                  <div className="flex items-center justify-between text-muted-foreground">
+                    <span className="text-xs font-semibold text-amber-900/80">Top Package</span>
+                    <Award className="h-4 w-4 text-amber-600" />
+                  </div>
+                  <div className="text-lg font-bold text-gray-900 truncate" title={summary.topPackage?.name}>
+                    {summary.topPackage?.name || 'None'}
+                  </div>
+                  <p className="text-[11px] text-amber-700 font-medium">
+                    {formatVal(summary.topPackage?.count || 0)} units ({formatVal(summary.topPackage?.revenue || 0, true)})
+                  </p>
+                </CardContent>
+              </Card>
+
+              {/* Card 5: Top Vehicle Category */}
+              <Card className="shadow-xs border-rose-100 bg-gradient-to-br from-rose-50/50 to-white col-span-2 sm:col-span-1">
+                <CardContent className="p-4 space-y-1">
+                  <div className="flex items-center justify-between text-muted-foreground">
+                    <span className="text-xs font-semibold text-rose-900/80">Top Vehicle Type</span>
+                    <Car className="h-4 w-4 text-rose-600" />
+                  </div>
+                  <div className="text-2xl font-bold text-gray-900 capitalize">
+                    {summary.topVehicle?.label || 'None'}
+                  </div>
+                  <p className="text-[11px] text-rose-700 font-medium">
+                    {summary.topVehicle?.share || 0}% of all bookings
+                  </p>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Charts Section: 2 Columns */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+              {/* Chart 1: Top Packages */}
+              <Card className="shadow-xs border-slate-200">
+                <CardHeader className="pb-2 border-b bg-slate-50/40 flex flex-row items-center justify-between">
+                  <div>
+                    <CardTitle className="text-sm font-bold text-slate-800 flex items-center gap-1.5">
+                      <Package className="h-4 w-4 text-primary" />
+                      Top Packages ({isVolume ? 'Units Sold' : 'Revenue ₹'})
+                    </CardTitle>
+                    <p className="text-xs text-muted-foreground">Ranked by overall order frequency</p>
+                  </div>
+                </CardHeader>
+                <CardContent className="pt-4">
+                  {packagesChartData.length > 0 ? (
+                    <ResponsiveContainer width="100%" height={290}>
+                      <BarChart
+                        data={packagesChartData}
+                        layout="vertical"
+                        margin={{ top: 10, right: 30, left: 10, bottom: 5 }}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                        <XAxis
+                          type="number"
+                          tickFormatter={(val) => (isVolume ? val : `₹${val >= 1000 ? `${(val / 1000).toFixed(0)}k` : val}`)}
+                          tick={{ fontSize: 11 }}
+                        />
+                        <YAxis
+                          type="category"
+                          dataKey="displayName"
+                          width={110}
+                          tick={{ fontSize: 11 }}
+                        />
+                        <Tooltip
+                          formatter={(value) => [isVolume ? `${value} units` : `₹${Number(value).toLocaleString('en-IN')}`, isVolume ? 'Sold' : 'Revenue']}
+                          labelFormatter={(_, arr) => arr?.[0]?.payload?.name || ''}
+                        />
+                        <Bar
+                          dataKey={isVolume ? 'count' : 'revenue'}
+                          fill="#0284c7"
+                          radius={[0, 4, 4, 0]}
+                        />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <p className="text-center py-12 text-sm text-muted-foreground">No package data found.</p>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Chart 2: Vehicle Type Distribution (Donut) */}
+              <Card className="shadow-xs border-slate-200">
+                <CardHeader className="pb-2 border-b bg-slate-50/40 flex flex-row items-center justify-between">
+                  <div>
+                    <CardTitle className="text-sm font-bold text-slate-800 flex items-center gap-1.5">
+                      <Car className="h-4 w-4 text-emerald-600" />
+                      Vehicle Type Breakdown ({isVolume ? 'Units' : 'Revenue ₹'})
+                    </CardTitle>
+                    <p className="text-xs text-muted-foreground">Share of customer vehicles serviced</p>
+                  </div>
+                </CardHeader>
+                <CardContent className="pt-4">
+                  {vehiclesPieData.length > 0 ? (
+                    <div className="flex flex-col sm:flex-row items-center justify-around gap-4">
+                      <ResponsiveContainer width={240} height={260}>
+                        <PieChart>
+                          <Pie
+                            data={vehiclesPieData}
+                            dataKey={isVolume ? 'count' : 'revenue'}
+                            nameKey="label"
+                            cx="50%"
+                            cy="50%"
+                            innerRadius={55}
+                            outerRadius={85}
+                            paddingAngle={3}
+                          >
+                            {vehiclesPieData.map((entry) => (
+                              <Cell
+                                key={entry.type}
+                                fill={VEHICLE_COLORS[entry.type] || VEHICLE_COLORS.other}
+                              />
+                            ))}
+                          </Pie>
+                          <Tooltip
+                            formatter={(value) => [
+                              isVolume ? `${value} washes` : `₹${Number(value).toLocaleString('en-IN')}`,
+                              isVolume ? 'Volume' : 'Revenue',
+                            ]}
+                          />
+                        </PieChart>
+                      </ResponsiveContainer>
+
+                      <div className="space-y-2 text-xs flex-1 max-w-[220px]">
+                        {vehiclesList.map((v) => (
+                          <div key={v.type} className="flex items-center justify-between py-1 border-b border-slate-100 last:border-0">
+                            <div className="flex items-center gap-2">
+                              <span
+                                className="h-3 w-3 rounded-full shrink-0"
+                                style={{ backgroundColor: VEHICLE_COLORS[v.type] || VEHICLE_COLORS.other }}
+                              />
+                              <span className="font-semibold text-slate-800 capitalize">{v.label}</span>
+                            </div>
+                            <div className="text-right">
+                              <span className="font-bold text-slate-900">
+                                {isVolume ? `${v.count}` : `₹${v.revenue.toLocaleString('en-IN')}`}
+                              </span>
+                              <span className="text-[10px] text-muted-foreground ml-1">({v.share}%)</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-center py-12 text-sm text-muted-foreground">No vehicle data found.</p>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Chart 3: Add-on Attachment Usage */}
+              <Card className="shadow-xs border-slate-200">
+                <CardHeader className="pb-2 border-b bg-slate-50/40 flex flex-row items-center justify-between">
+                  <div>
+                    <CardTitle className="text-sm font-bold text-slate-800 flex items-center gap-1.5">
+                      <Boxes className="h-4 w-4 text-purple-600" />
+                      Add-on Attachments ({isVolume ? 'Quantity' : 'Revenue ₹'})
+                    </CardTitle>
+                    <p className="text-xs text-muted-foreground">Most popular extra services added to orders</p>
+                  </div>
+                </CardHeader>
+                <CardContent className="pt-4">
+                  {addonsChartData.length > 0 ? (
+                    <ResponsiveContainer width="100%" height={290}>
+                      <BarChart
+                        data={addonsChartData}
+                        margin={{ top: 10, right: 20, left: 10, bottom: 25 }}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                        <XAxis
+                          dataKey="displayName"
+                          tick={{ fontSize: 11 }}
+                          angle={-15}
+                          textAnchor="end"
+                          interval={0}
+                        />
+                        <YAxis
+                          tickFormatter={(val) => (isVolume ? val : `₹${val >= 1000 ? `${(val / 1000).toFixed(0)}k` : val}`)}
+                          tick={{ fontSize: 11 }}
+                        />
+                        <Tooltip
+                          formatter={(value) => [
+                            isVolume ? `${value} attached` : `₹${Number(value).toLocaleString('en-IN')}`,
+                            isVolume ? 'Units' : 'Revenue',
+                          ]}
+                          labelFormatter={(_, arr) => arr?.[0]?.payload?.name || ''}
+                        />
+                        <Bar
+                          dataKey={isVolume ? 'count' : 'revenue'}
+                          fill="#8b5cf6"
+                          radius={[4, 4, 0, 0]}
+                        />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <p className="text-center py-12 text-sm text-muted-foreground">No add-ons used in this period.</p>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Chart 4: Cross-Analysis (Packages by Vehicle Type) */}
+              <Card className="shadow-xs border-slate-200">
+                <CardHeader className="pb-2 border-b bg-slate-50/40 flex flex-row items-center justify-between">
+                  <div>
+                    <CardTitle className="text-sm font-bold text-slate-800 flex items-center gap-1.5">
+                      <TrendingUp className="h-4 w-4 text-amber-600" />
+                      Cross-Analysis: Packages by Vehicle Type
+                    </CardTitle>
+                    <p className="text-xs text-muted-foreground">Which vehicle categories select which package</p>
+                  </div>
+                </CardHeader>
+                <CardContent className="pt-4">
+                  {serviceUsageData.crossAnalysisData && serviceUsageData.crossAnalysisData.length > 0 ? (
+                    <ResponsiveContainer width="100%" height={290}>
+                      <BarChart
+                        data={serviceUsageData.crossAnalysisData}
+                        margin={{ top: 10, right: 20, left: 10, bottom: 25 }}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                        <XAxis
+                          dataKey="name"
+                          tick={{ fontSize: 11 }}
+                          angle={-15}
+                          textAnchor="end"
+                          interval={0}
+                        />
+                        <YAxis tick={{ fontSize: 11 }} />
+                        <Tooltip
+                          formatter={(value, name) => [
+                            isVolume ? `${value} units` : `₹${Number(value).toLocaleString('en-IN')}`,
+                            name,
+                          ]}
+                          labelFormatter={(_, arr) => arr?.[0]?.payload?.fullName || ''}
+                        />
+                        <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '10px' }} />
+                        <Bar dataKey="Hatchback" stackId="a" fill={VEHICLE_COLORS.hatchback} />
+                        <Bar dataKey="Sedan" stackId="a" fill={VEHICLE_COLORS.sedan} />
+                        <Bar dataKey="SUV" stackId="a" fill={VEHICLE_COLORS.suv} />
+                        <Bar dataKey="Luxury" stackId="a" fill={VEHICLE_COLORS.luxury} radius={[4, 4, 0, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <p className="text-center py-12 text-sm text-muted-foreground">No cross-analysis data available.</p>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Chart 5: Service Usage Timeline */}
+            <Card className="shadow-xs border-slate-200">
+              <CardHeader className="pb-2 border-b bg-slate-50/40">
+                <CardTitle className="text-sm font-bold text-slate-800 flex items-center gap-1.5">
+                  <Clock className="h-4 w-4 text-blue-600" />
+                  Service Volume Timeline
+                </CardTitle>
+                <p className="text-xs text-muted-foreground">Daily/weekly package and add-on volume trends</p>
+              </CardHeader>
+              <CardContent className="pt-4">
+                {serviceUsageData.trendList && serviceUsageData.trendList.length > 0 ? (
+                  <ResponsiveContainer width="100%" height={260}>
+                    <BarChart
+                      data={serviceUsageData.trendList}
+                      margin={{ top: 10, right: 20, left: 10, bottom: 10 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                      <XAxis dataKey="date" tick={{ fontSize: 11 }} />
+                      <YAxis tick={{ fontSize: 11 }} />
+                      <Tooltip />
+                      <Legend wrapperStyle={{ fontSize: '11px' }} />
+                      <Bar dataKey="packages" name="Packages (Washes)" fill="#0284c7" radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="addons" name="Add-ons Attached" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <p className="text-center py-8 text-sm text-muted-foreground">No timeline trend data available.</p>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Detailed Breakdown Tabs */}
+            <Card className="shadow-xs border-slate-200">
+              <CardHeader className="pb-0 border-b">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3">
+                  <div>
+                    <CardTitle className="text-base font-bold text-slate-900">
+                      Detailed Breakdown Tables
+                    </CardTitle>
+                    <p className="text-xs text-muted-foreground">Tabular service, add-on, and vehicle metrics</p>
+                  </div>
+                </div>
+              </CardHeader>
+
+              <CardContent className="p-0">
+                <Tabs value={serviceActiveTab} onValueChange={setServiceActiveTab} className="w-full">
+                  <div className="px-6 pt-3 border-b bg-slate-50/50">
+                    <TabsList className="bg-slate-200/70 p-0.5 h-9">
+                      <TabsTrigger value="packages" className="text-xs font-semibold px-4">
+                        Packages ({packagesList.length})
+                      </TabsTrigger>
+                      <TabsTrigger value="addons" className="text-xs font-semibold px-4">
+                        Add-ons ({addonsList.length})
+                      </TabsTrigger>
+                      <TabsTrigger value="vehicles" className="text-xs font-semibold px-4">
+                        Vehicle Types ({vehiclesList.length})
+                      </TabsTrigger>
+                    </TabsList>
+                  </div>
+
+                  {/* Tab 1: Packages */}
+                  <TabsContent value="packages" className="p-0 m-0">
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-xs text-left">
+                        <thead className="bg-slate-50 border-b text-muted-foreground font-semibold uppercase tracking-wider text-[11px]">
+                          <tr>
+                            <th className="px-6 py-3">Package Name</th>
+                            <th className="px-4 py-3 text-center">Hatchback</th>
+                            <th className="px-4 py-3 text-center">Sedan</th>
+                            <th className="px-4 py-3 text-center">SUV</th>
+                            <th className="px-4 py-3 text-center">Luxury</th>
+                            <th className="px-4 py-3 text-right">Total Units</th>
+                            <th className="px-4 py-3 text-right">Total Revenue (₹)</th>
+                            <th className="px-6 py-3 text-right">Volume Share</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {packagesList.length === 0 ? (
+                            <tr>
+                              <td colSpan={8} className="text-center py-8 text-muted-foreground">
+                                No package usage found for the selected filters.
+                              </td>
+                            </tr>
+                          ) : (
+                            packagesList.map((pkg, idx) => {
+                              const share = summary.totalPackageCount > 0
+                                ? ((pkg.count / summary.totalPackageCount) * 100).toFixed(1)
+                                : 0;
+                              return (
+                                <tr key={idx} className="hover:bg-slate-50/60 transition-colors">
+                                  <td className="px-6 py-3 font-semibold text-slate-900 flex items-center gap-2">
+                                    <span className="w-5 h-5 rounded-full bg-blue-50 text-blue-700 text-[10px] font-bold flex items-center justify-center shrink-0">
+                                      {idx + 1}
+                                    </span>
+                                    {pkg.name}
+                                  </td>
+                                  <td className="px-4 py-3 text-center text-slate-600 font-medium">
+                                    {pkg.vehicleBreakdown.hatchback || 0}
+                                  </td>
+                                  <td className="px-4 py-3 text-center text-slate-600 font-medium">
+                                    {pkg.vehicleBreakdown.sedan || 0}
+                                  </td>
+                                  <td className="px-4 py-3 text-center text-slate-600 font-medium">
+                                    {pkg.vehicleBreakdown.suv || 0}
+                                  </td>
+                                  <td className="px-4 py-3 text-center text-slate-600 font-medium">
+                                    {pkg.vehicleBreakdown.luxury || 0}
+                                  </td>
+                                  <td className="px-4 py-3 text-right font-bold text-slate-900">
+                                    {formatVal(pkg.count)}
+                                  </td>
+                                  <td className="px-4 py-3 text-right font-semibold text-emerald-700">
+                                    {formatVal(pkg.revenue, true)}
+                                  </td>
+                                  <td className="px-6 py-3 text-right">
+                                    <div className="flex items-center justify-end gap-2">
+                                      <span className="font-semibold text-slate-700">{share}%</span>
+                                      <div className="w-16 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                                        <div
+                                          className="h-full bg-primary rounded-full"
+                                          style={{ width: `${Math.min(share, 100)}%` }}
+                                        />
+                                      </div>
+                                    </div>
+                                  </td>
+                                </tr>
+                              );
+                            })
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </TabsContent>
+
+                  {/* Tab 2: Add-ons */}
+                  <TabsContent value="addons" className="p-0 m-0">
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-xs text-left">
+                        <thead className="bg-slate-50 border-b text-muted-foreground font-semibold uppercase tracking-wider text-[11px]">
+                          <tr>
+                            <th className="px-6 py-3">Add-on Service Name</th>
+                            <th className="px-6 py-3 text-right">Attached Units</th>
+                            <th className="px-6 py-3 text-right">Total Revenue (₹)</th>
+                            <th className="px-6 py-3 text-right">Attachment Rate</th>
+                            <th className="px-6 py-3 text-right">Revenue Share</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {addonsList.length === 0 ? (
+                            <tr>
+                              <td colSpan={5} className="text-center py-8 text-muted-foreground">
+                                No add-on services recorded for the selected filters.
+                              </td>
+                            </tr>
+                          ) : (
+                            addonsList.map((addon, idx) => {
+                              const attachRate = summary.totalOrdersCount > 0
+                                ? ((addon.count / summary.totalOrdersCount) * 100).toFixed(1)
+                                : 0;
+                              const revShare = summary.totalAddonRevenue > 0
+                                ? ((addon.revenue / summary.totalAddonRevenue) * 100).toFixed(1)
+                                : 0;
+                              return (
+                                <tr key={idx} className="hover:bg-slate-50/60 transition-colors">
+                                  <td className="px-6 py-3 font-semibold text-slate-900 flex items-center gap-2">
+                                    <span className="w-5 h-5 rounded-full bg-purple-50 text-purple-700 text-[10px] font-bold flex items-center justify-center shrink-0">
+                                      {idx + 1}
+                                    </span>
+                                    {addon.name}
+                                  </td>
+                                  <td className="px-6 py-3 text-right font-bold text-slate-900">
+                                    {formatVal(addon.count)}
+                                  </td>
+                                  <td className="px-6 py-3 text-right font-semibold text-purple-700">
+                                    {formatVal(addon.revenue, true)}
+                                  </td>
+                                  <td className="px-6 py-3 text-right font-semibold text-slate-700">
+                                    {attachRate}%
+                                  </td>
+                                  <td className="px-6 py-3 text-right">
+                                    <div className="flex items-center justify-end gap-2">
+                                      <span className="font-semibold text-slate-700">{revShare}%</span>
+                                      <div className="w-16 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                                        <div
+                                          className="h-full bg-purple-600 rounded-full"
+                                          style={{ width: `${Math.min(revShare, 100)}%` }}
+                                        />
+                                      </div>
+                                    </div>
+                                  </td>
+                                </tr>
+                              );
+                            })
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </TabsContent>
+
+                  {/* Tab 3: Vehicle Types */}
+                  <TabsContent value="vehicles" className="p-0 m-0">
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-xs text-left">
+                        <thead className="bg-slate-50 border-b text-muted-foreground font-semibold uppercase tracking-wider text-[11px]">
+                          <tr>
+                            <th className="px-6 py-3">Vehicle Category</th>
+                            <th className="px-6 py-3 text-right">Total Washes</th>
+                            <th className="px-6 py-3 text-right">Total Revenue (₹)</th>
+                            <th className="px-6 py-3 text-right">Share of Washes</th>
+                            <th className="px-6 py-3">Top Preferred Package</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {vehiclesList.length === 0 ? (
+                            <tr>
+                              <td colSpan={5} className="text-center py-8 text-muted-foreground">
+                                No vehicle data found for the selected filters.
+                              </td>
+                            </tr>
+                          ) : (
+                            vehiclesList.map((v, idx) => (
+                              <tr key={idx} className="hover:bg-slate-50/60 transition-colors">
+                                <td className="px-6 py-3.5 font-bold text-slate-900 capitalize flex items-center gap-2">
+                                  <div
+                                    className="p-1.5 rounded-lg border flex items-center justify-center shrink-0"
+                                    style={{
+                                      backgroundColor: `${VEHICLE_COLORS[v.type] || '#94a3b8'}15`,
+                                      borderColor: `${VEHICLE_COLORS[v.type] || '#94a3b8'}30`,
+                                    }}
+                                  >
+                                    <VehicleIcon
+                                      vehicleType={v.type}
+                                      size={18}
+                                      className="shrink-0"
+                                      style={{ color: VEHICLE_COLORS[v.type] || '#94a3b8' }}
+                                    />
+                                  </div>
+                                  <span>{v.label}</span>
+                                </td>
+                                <td className="px-6 py-3.5 text-right font-bold text-slate-900 text-sm">
+                                  {formatVal(v.count)}
+                                </td>
+                                <td className="px-6 py-3.5 text-right font-semibold text-emerald-700">
+                                  {formatVal(v.revenue, true)}
+                                </td>
+                                <td className="px-6 py-3.5 text-right">
+                                  <div className="flex items-center justify-end gap-2">
+                                    <span className="font-bold text-slate-800">{v.share}%</span>
+                                    <div className="w-16 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                                      <div
+                                        className="h-full rounded-full"
+                                        style={{
+                                          backgroundColor: VEHICLE_COLORS[v.type] || '#94a3b8',
+                                          width: `${Math.min(v.share, 100)}%`,
+                                        }}
+                                      />
+                                    </div>
+                                  </div>
+                                </td>
+                                <td className="px-6 py-3.5 font-medium text-slate-700">
+                                  <span className="px-2.5 py-1 rounded bg-slate-100 border border-slate-200 text-xs font-semibold">
+                                    {v.topPackage}
+                                  </span>
+                                </td>
+                              </tr>
+                            ))
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </TabsContent>
+                </Tabs>
+              </CardContent>
+            </Card>
+          </>
+        )}
+      </div>
+    );
+  };
+
   return (
     <div className="container mx-auto p-6 space-y-6">
       {!selectedReport && renderReportSelection()}
@@ -3460,6 +4680,7 @@ const Reports = () => {
       {selectedReport === 'orders_map' && renderOrdersMapReport()}
       {selectedReport === 'enquiries_map' && renderEnquiriesMapReport()}
       {selectedReport === 'peak_demand' && renderPeakDemandReport()}
+      {selectedReport === 'service_usage' && renderServiceUsageReport()}
     </div>
   );
 };

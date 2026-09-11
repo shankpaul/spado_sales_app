@@ -9,8 +9,64 @@ import {
   SelectTrigger,
   SelectValue,
 } from './ui/select';
-import { Loader2 } from 'lucide-react';
+import { Loader2, User, DollarSign, Award, Calendar } from 'lucide-react';
 import { toast } from 'sonner';
+
+// Helper to normalize compensation scheme from various backend/legacy representations
+export const normalizeScheme = (scheme, employeeObj = null) => {
+  if (scheme === 1 || scheme === '1') return 'commission';
+  if (scheme === 0 || scheme === '0') return 'salary';
+  if (typeof scheme === 'string') {
+    const s = scheme.trim().toLowerCase();
+    if (s.includes('comm')) return 'commission';
+    if (s.includes('sal')) return 'salary';
+  }
+  if (employeeObj) {
+    if (employeeObj.employee_scheme) return normalizeScheme(employeeObj.employee_scheme);
+    if (employeeObj.compensation_scheme) return normalizeScheme(employeeObj.compensation_scheme);
+    if (employeeObj.commission_percentage && !employeeObj.fixed_salary) return 'commission';
+  }
+  return 'salary';
+};
+
+// Helper to normalize status
+export const normalizeStatus = (status) => {
+  if (status === 1 || status === '1') return 'resigned';
+  if (status === 0 || status === '0') return 'active';
+  if (typeof status === 'string') {
+    const s = status.trim().toLowerCase();
+    if (s.includes('resig') || s.includes('inact')) return 'resigned';
+    if (s.includes('act')) return 'active';
+  }
+  return 'active';
+};
+
+// Helper to normalize settlement cycle
+export const normalizeSettlementCycle = (cycle) => {
+  if (typeof cycle === 'string') {
+    const c = cycle.trim().toLowerCase();
+    if (['daily', 'weekly', 'monthly'].includes(c)) return c;
+  }
+  return 'monthly';
+};
+
+const getInitialFormData = (emp) => ({
+  name: emp?.name || '',
+  employee_number: emp?.employee_number || '',
+  job_title: emp?.job_title || '',
+  scheme: normalizeScheme(emp?.scheme, emp),
+  fixed_salary: emp?.fixed_salary !== undefined && emp?.fixed_salary !== null ? emp.fixed_salary : '',
+  commission_percentage: emp?.commission_percentage !== undefined && emp?.commission_percentage !== null ? emp.commission_percentage : '',
+  work_incentive_percentage: emp?.work_incentive_percentage !== undefined && emp?.work_incentive_percentage !== null ? emp.work_incentive_percentage : '',
+  five_star_incentive_percentage: emp?.five_star_incentive_percentage !== undefined && emp?.five_star_incentive_percentage !== null ? emp.five_star_incentive_percentage : '',
+  joining_date: emp?.joining_date ? String(emp.joining_date).split('T')[0] : '',
+  resignation_date: emp?.resignation_date ? String(emp.resignation_date).split('T')[0] : '',
+  contact_number: emp?.contact_number || '',
+  status: normalizeStatus(emp?.status),
+  monthly_target_amount: emp?.monthly_target_amount !== undefined && emp?.monthly_target_amount !== null ? emp.monthly_target_amount : '',
+  travelling_allowance: emp?.travelling_allowance !== undefined && emp?.travelling_allowance !== null ? emp.travelling_allowance : '',
+  settlement_cycle: normalizeSettlementCycle(emp?.settlement_cycle),
+});
 
 /**
  * Employee Form Component
@@ -18,46 +74,14 @@ import { toast } from 'sonner';
  */
 const EmployeeForm = ({ employee, onSubmit, onCancel }) => {
   const [loading, setLoading] = useState(false);
-  const [formData, setFormData] = useState({
-    name: '',
-    employee_number: '',
-    job_title: '',
-    scheme: 'salary',
-    fixed_salary: '',
-    commission_percentage: '',
-    work_incentive_percentage: '',
-    five_star_incentive_percentage: '',
-    joining_date: '',
-    resignation_date: '',
-    contact_number: '',
-    status: 'active',
-    monthly_target_amount: '',
-    travelling_allowance: '',
-    settlement_cycle: 'monthly',
-  });
+  const [formData, setFormData] = useState(() => getInitialFormData(employee));
 
   const [errors, setErrors] = useState({});
 
   // Pre-fill form if editing
   useEffect(() => {
     if (employee) {
-      setFormData({
-        name: employee.name || '',
-        employee_number: employee.employee_number || '',
-        job_title: employee.job_title || '',
-        scheme: employee.scheme || 'salary',
-        fixed_salary: employee.fixed_salary || '',
-        commission_percentage: employee.commission_percentage || '',
-        work_incentive_percentage: employee.work_incentive_percentage || '',
-        five_star_incentive_percentage: employee.five_star_incentive_percentage || '',
-        joining_date: employee.joining_date || '',
-        resignation_date: employee.resignation_date || '',
-        contact_number: employee.contact_number || '',
-        status: employee.status || 'active',
-        monthly_target_amount: employee.monthly_target_amount || '',
-        travelling_allowance: employee.travelling_allowance !== undefined && employee.travelling_allowance !== null ? employee.travelling_allowance : '',
-        settlement_cycle: employee.settlement_cycle || 'monthly',
-      });
+      setFormData(getInitialFormData(employee));
     }
   }, [employee]);
 
@@ -86,6 +110,7 @@ const EmployeeForm = ({ employee, onSubmit, onCancel }) => {
       // Clear opposite scheme field
       fixed_salary: value === 'commission' ? '' : prev.fixed_salary,
       commission_percentage: value === 'salary' ? '' : prev.commission_percentage,
+      work_incentive_percentage: value === 'commission' ? '' : prev.work_incentive_percentage,
     }));
   };
 
@@ -94,7 +119,15 @@ const EmployeeForm = ({ employee, onSubmit, onCancel }) => {
     setFormData((prev) => ({
       ...prev,
       status: value,
+      resignation_date: value === 'resigned' ? prev.resignation_date : '',
     }));
+    if (value !== 'resigned') {
+      setErrors((prev) => {
+        const newErrors = { ...prev };
+        delete newErrors.resignation_date;
+        return newErrors;
+      });
+    }
   };
 
   // Validate form
@@ -130,7 +163,7 @@ const EmployeeForm = ({ employee, onSubmit, onCancel }) => {
     }
 
     // Validate percentages
-    if (formData.work_incentive_percentage) {
+    if (formData.scheme === 'salary' && formData.work_incentive_percentage) {
       const work = parseFloat(formData.work_incentive_percentage);
       if (isNaN(work) || work < 0 || work > 100) {
         newErrors.work_incentive_percentage = 'Work incentive must be between 0 and 100';
@@ -144,9 +177,16 @@ const EmployeeForm = ({ employee, onSubmit, onCancel }) => {
       }
     }
 
-    // Date validations
-    if (formData.joining_date && formData.resignation_date) {
-      if (new Date(formData.resignation_date) < new Date(formData.joining_date)) {
+    // Date validations: Joining date is mandatory
+    if (!formData.joining_date) {
+      newErrors.joining_date = 'Joining date is required';
+    }
+
+    // Resignation date is mandatory only when status is resigned
+    if (formData.status === 'resigned') {
+      if (!formData.resignation_date) {
+        newErrors.resignation_date = 'Resignation date is required when status is resigned';
+      } else if (formData.joining_date && new Date(formData.resignation_date) < new Date(formData.joining_date)) {
         newErrors.resignation_date = 'Resignation date must be after joining date';
       }
     }
@@ -192,8 +232,14 @@ const EmployeeForm = ({ employee, onSubmit, onCancel }) => {
       }
 
       // Add incentive percentages
-      if (formData.work_incentive_percentage) {
-        submitData.work_incentive_percentage = parseFloat(formData.work_incentive_percentage);
+      if (formData.scheme === 'salary') {
+        if (formData.work_incentive_percentage) {
+          submitData.work_incentive_percentage = parseFloat(formData.work_incentive_percentage);
+        } else {
+          submitData.work_incentive_percentage = 0;
+        }
+      } else if (formData.scheme === 'commission') {
+        submitData.work_incentive_percentage = 0;
       }
       if (formData.five_star_incentive_percentage) {
         submitData.five_star_incentive_percentage = parseFloat(formData.five_star_incentive_percentage);
@@ -201,7 +247,11 @@ const EmployeeForm = ({ employee, onSubmit, onCancel }) => {
 
       // Add dates
       if (formData.joining_date) submitData.joining_date = formData.joining_date;
-      if (formData.resignation_date) submitData.resignation_date = formData.resignation_date;
+      if (formData.status === 'resigned' && formData.resignation_date) {
+        submitData.resignation_date = formData.resignation_date;
+      } else {
+        submitData.resignation_date = null;
+      }
 
       await onSubmit(submitData);
     } catch (error) {
@@ -233,273 +283,326 @@ const EmployeeForm = ({ employee, onSubmit, onCancel }) => {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6 pt-6">
-      {/* Name */}
-      <div className="space-y-2">
-        <Label htmlFor="name">
-          Employee Name <span className="text-red-500">*</span>
-        </Label>
-        <Input
-          id="name"
-          name="name"
-          type="text"
-          value={formData.name}
-          onChange={handleChange}
-          placeholder="John Doe"
-          className={errors.name ? 'border-red-500' : ''}
-        />
-        {errors.name && <p className="text-sm text-red-500">{errors.name}</p>}
-      </div>
+    <form onSubmit={handleSubmit} className="flex flex-col h-full overflow-hidden">
+      {/* Scrollable Form Body */}
+      <div className="flex-1 overflow-y-auto p-6 space-y-6">
 
-      {/* Employee Number */}
-      <div className="space-y-2">
-        <Label htmlFor="employee_number">Employee Number</Label>
-        <Input
-          id="employee_number"
-          name="employee_number"
-          type="text"
-          value={formData.employee_number}
-          onChange={handleChange}
-          disabled={!!employee}
-          placeholder={employee ? "" : "Leave blank to auto-generate"}
-          className={employee ? "bg-gray-100" : ""}
-        />
-      </div>
+        {/* Section 1: Basic Information */}
+        <div className="space-y-4">
+          <div className="flex items-center gap-2 pb-2 border-b border-gray-100">
+            <User className="h-4 w-4 text-blue-600" />
+            <h3 className="text-sm font-semibold text-gray-900">Basic Information</h3>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {/* Name */}
+            <div className="space-y-2">
+              <Label htmlFor="name">
+                Employee Name <span className="text-red-500">*</span>
+              </Label>
+              <Input
+                id="name"
+                name="name"
+                type="text"
+                value={formData.name}
+                onChange={handleChange}
+                placeholder="John Doe"
+                className={errors.name ? 'border-red-500' : ''}
+              />
+              {errors.name && <p className="text-sm text-red-500">{errors.name}</p>}
+            </div>
 
-      {/* Job Title */}
-      <div className="space-y-2">
-        <Label htmlFor="job_title">Job Title</Label>
-        <Input
-          id="job_title"
-          name="job_title"
-          type="text"
-          value={formData.job_title}
-          onChange={handleChange}
-          placeholder="Senior Field Agent"
-        />
-      </div>
+            {/* Employee Number */}
+            <div className="space-y-2">
+              <Label htmlFor="employee_number">Employee Number</Label>
+              <Input
+                id="employee_number"
+                name="employee_number"
+                type="text"
+                value={formData.employee_number}
+                onChange={handleChange}
+                disabled={!!employee}
+                placeholder={employee ? "" : "Leave blank to auto-generate"}
+                className={employee ? "bg-gray-100" : ""}
+              />
+            </div>
 
-      {/* Monthly Target Amount */}
-      <div className="space-y-2">
-        <Label htmlFor="monthly_target_amount">Monthly Target Amount (₹)</Label>
-        <Input
-          id="monthly_target_amount"
-          name="monthly_target_amount"
-          type="number"
-          step="0.01"
-          value={formData.monthly_target_amount}
-          onChange={handleChange}
-          placeholder="0"
-        />
-      </div>
+            {/* Job Title */}
+            <div className="space-y-2">
+              <Label htmlFor="job_title">Job Title</Label>
+              <Input
+                id="job_title"
+                name="job_title"
+                type="text"
+                value={formData.job_title}
+                onChange={handleChange}
+                placeholder="Senior Field Agent"
+              />
+            </div>
 
-      {/* Scheme */}
-      <div className="space-y-2">
-        <Label htmlFor="scheme">
-          Compensation Scheme <span className="text-red-500">*</span>
-        </Label>
-        <Select value={formData.scheme} onValueChange={handleSchemeChange}>
-          <SelectTrigger className={errors.scheme ? 'border-red-500' : ''}>
-            <SelectValue placeholder="Select scheme" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="salary">Fixed Salary</SelectItem>
-            <SelectItem value="commission">Commission Based</SelectItem>
-          </SelectContent>
-        </Select>
-        {errors.scheme && <p className="text-sm text-red-500">{errors.scheme}</p>}
-      </div>
+            {/* Contact Number */}
+            <div className="space-y-2">
+              <Label htmlFor="contact_number">Contact Number</Label>
+              <Input
+                id="contact_number"
+                name="contact_number"
+                type="tel"
+                value={formData.contact_number}
+                onChange={handleChange}
+                placeholder="+91 9876543210"
+              />
+            </div>
 
-      {/* Settlement Cycle */}
-      <div className="space-y-2">
-        <Label htmlFor="settlement_cycle">Settlement Payout Cycle</Label>
-        <Select
-          value={formData.settlement_cycle}
-          onValueChange={(val) => setFormData(prev => ({ ...prev, settlement_cycle: val }))}
-        >
-          <SelectTrigger id="settlement_cycle">
-            <SelectValue placeholder="Select cycle" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="daily">Daily</SelectItem>
-            <SelectItem value="weekly">Weekly</SelectItem>
-            <SelectItem value="monthly">Monthly</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-
-      {/* Fixed Salary (only for salary scheme) */}
-      {formData.scheme === 'salary' && (
-        <div className="space-y-2">
-          <Label htmlFor="fixed_salary">
-            Fixed Salary (₹) <span className="text-red-500">*</span>
-          </Label>
-          <Input
-            id="fixed_salary"
-            name="fixed_salary"
-            type="number"
-            step="0.01"
-            value={formData.fixed_salary}
-            onChange={handleChange}
-            placeholder="50000"
-            className={errors.fixed_salary ? 'border-red-500' : ''}
-          />
-          {errors.fixed_salary && (
-            <p className="text-sm text-red-500">{errors.fixed_salary}</p>
-          )}
+            {/* Status */}
+            <div className="space-y-2 sm:col-span-2">
+              <Label htmlFor="status">
+                Status <span className="text-red-500">*</span>
+              </Label>
+              <Select value={formData.status} onValueChange={handleStatusChange}>
+                <SelectTrigger id="status">
+                  <SelectValue placeholder="Select status" />
+                </SelectTrigger>
+                <SelectContent className="z-[2000]">
+                  <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="resigned">Resigned</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
         </div>
-      )}
 
-      {/* Commission Percentage (only for commission scheme) */}
-      {formData.scheme === 'commission' && (
-        <div className="space-y-2">
-          <Label htmlFor="commission_percentage">
-            Commission Percentage (%) <span className="text-red-500">*</span>
-          </Label>
-          <Input
-            id="commission_percentage"
-            name="commission_percentage"
-            type="number"
-            step="0.01"
-            value={formData.commission_percentage}
-            onChange={handleChange}
-            placeholder="5.0"
-            className={errors.commission_percentage ? 'border-red-500' : ''}
-          />
-          {errors.commission_percentage && (
-            <p className="text-sm text-red-500">{errors.commission_percentage}</p>
-          )}
+        {/* Section 2: Compensation & Settlement */}
+        <div className="space-y-4">
+          <div className="flex items-center gap-2 pb-2 border-b border-gray-100">
+            <DollarSign className="h-4 w-4 text-emerald-600" />
+            <h3 className="text-sm font-semibold text-gray-900">Compensation & Settlement</h3>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {/* Scheme */}
+            <div className="space-y-2">
+              <Label htmlFor="scheme">
+                Compensation Scheme <span className="text-red-500">*</span>
+              </Label>
+              <Select value={formData.scheme} onValueChange={handleSchemeChange}>
+                <SelectTrigger id="scheme" className={errors.scheme ? 'border-red-500' : ''}>
+                  <SelectValue placeholder="Select scheme" />
+                </SelectTrigger>
+                <SelectContent className="z-[2000]">
+                  <SelectItem value="salary">Fixed Salary</SelectItem>
+                  <SelectItem value="commission">Commission Based</SelectItem>
+                </SelectContent>
+              </Select>
+              {errors.scheme && <p className="text-sm text-red-500">{errors.scheme}</p>}
+            </div>
+
+            {/* Settlement Cycle */}
+            <div className="space-y-2">
+              <Label htmlFor="settlement_cycle">Settlement Payout Cycle</Label>
+              <Select
+                value={formData.settlement_cycle}
+                onValueChange={(val) => setFormData(prev => ({ ...prev, settlement_cycle: val }))}
+              >
+                <SelectTrigger id="settlement_cycle">
+                  <SelectValue placeholder="Select cycle" />
+                </SelectTrigger>
+                <SelectContent className="z-[2000]">
+                  <SelectItem value="daily">Daily</SelectItem>
+                  <SelectItem value="weekly">Weekly</SelectItem>
+                  <SelectItem value="monthly">Monthly</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Fixed Salary (only for salary scheme) */}
+            {formData.scheme === 'salary' && (
+              <div className="space-y-2">
+                <Label htmlFor="fixed_salary">
+                  Fixed Salary (₹) <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  id="fixed_salary"
+                  name="fixed_salary"
+                  type="number"
+                  step="0.01"
+                  value={formData.fixed_salary}
+                  onChange={handleChange}
+                  placeholder="50000"
+                  className={errors.fixed_salary ? 'border-red-500' : ''}
+                />
+                {errors.fixed_salary && (
+                  <p className="text-sm text-red-500">{errors.fixed_salary}</p>
+                )}
+              </div>
+            )}
+
+            {/* Commission Percentage (only for commission scheme) */}
+            {formData.scheme === 'commission' && (
+              <div className="space-y-2">
+                <Label htmlFor="commission_percentage">
+                  Commission Percentage (%) <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  id="commission_percentage"
+                  name="commission_percentage"
+                  type="number"
+                  step="0.01"
+                  value={formData.commission_percentage}
+                  onChange={handleChange}
+                  placeholder="5.0"
+                  className={errors.commission_percentage ? 'border-red-500' : ''}
+                />
+                {errors.commission_percentage && (
+                  <p className="text-sm text-red-500">{errors.commission_percentage}</p>
+                )}
+              </div>
+            )}
+
+            {/* Monthly Target Amount */}
+            <div className="space-y-2">
+              <Label htmlFor="monthly_target_amount">Monthly Target Amount (₹)</Label>
+              <Input
+                id="monthly_target_amount"
+                name="monthly_target_amount"
+                type="number"
+                step="0.01"
+                value={formData.monthly_target_amount}
+                onChange={handleChange}
+                placeholder="0"
+              />
+            </div>
+          </div>
         </div>
-      )}
 
-      {/* Work Incentive Percentage */}
-      <div className="space-y-2">
-        <Label htmlFor="work_incentive_percentage">Work Incentive (%)</Label>
-        <Input
-          id="work_incentive_percentage"
-          name="work_incentive_percentage"
-          type="number"
-          step="0.01"
-          value={formData.work_incentive_percentage}
-          onChange={handleChange}
-          placeholder="2.0"
-          className={errors.work_incentive_percentage ? 'border-red-500' : ''}
-        />
-        {errors.work_incentive_percentage && (
-          <p className="text-sm text-red-500">{errors.work_incentive_percentage}</p>
-        )}
-      </div>
+        {/* Section 3: Incentives & Allowances */}
+        <div className="space-y-4">
+          <div className="flex items-center gap-2 pb-2 border-b border-gray-100">
+            <Award className="h-4 w-4 text-purple-600" />
+            <h3 className="text-sm font-semibold text-gray-900">Incentives & Allowances</h3>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {/* Work Incentive Percentage (only for salary scheme) */}
+            {formData.scheme === 'salary' && (
+              <div className="space-y-2">
+                <Label htmlFor="work_incentive_percentage">Work Incentive (%)</Label>
+                <Input
+                  id="work_incentive_percentage"
+                  name="work_incentive_percentage"
+                  type="number"
+                  step="0.01"
+                  value={formData.work_incentive_percentage}
+                  onChange={handleChange}
+                  placeholder="2.0"
+                  className={errors.work_incentive_percentage ? 'border-red-500' : ''}
+                />
+                {errors.work_incentive_percentage && (
+                  <p className="text-sm text-red-500">{errors.work_incentive_percentage}</p>
+                )}
+              </div>
+            )}
 
-      {/* Five Star Incentive Percentage */}
-      <div className="space-y-2">
-        <Label htmlFor="five_star_incentive_percentage">5-Star Incentive (%)</Label>
-        <Input
-          id="five_star_incentive_percentage"
-          name="five_star_incentive_percentage"
-          type="number"
-          step="0.01"
-          value={formData.five_star_incentive_percentage}
-          onChange={handleChange}
-          placeholder="1.5"
-          className={errors.five_star_incentive_percentage ? 'border-red-500' : ''}
-        />
-        {errors.five_star_incentive_percentage && (
-          <p className="text-sm text-red-500">{errors.five_star_incentive_percentage}</p>
-        )}
-      </div>
+            {/* Five Star Incentive Percentage */}
+            <div className="space-y-2">
+              <Label htmlFor="five_star_incentive_percentage">5-Star Incentive (%)</Label>
+              <Input
+                id="five_star_incentive_percentage"
+                name="five_star_incentive_percentage"
+                type="number"
+                step="0.01"
+                value={formData.five_star_incentive_percentage}
+                onChange={handleChange}
+                placeholder="1.5"
+                className={errors.five_star_incentive_percentage ? 'border-red-500' : ''}
+              />
+              {errors.five_star_incentive_percentage && (
+                <p className="text-sm text-red-500">{errors.five_star_incentive_percentage}</p>
+              )}
+            </div>
 
-      {/* Travelling Allowance (₹/km) */}
-      <div className="space-y-2">
-        <Label htmlFor="travelling_allowance">Travelling Allowance (₹/km)</Label>
-        <Input
-          id="travelling_allowance"
-          name="travelling_allowance"
-          type="number"
-          step="0.01"
-          value={formData.travelling_allowance}
-          onChange={handleChange}
-          placeholder="0.00"
-          className={errors.travelling_allowance ? 'border-red-500' : ''}
-        />
-        {errors.travelling_allowance && (
-          <p className="text-sm text-red-500">{errors.travelling_allowance}</p>
-        )}
-      </div>
+            {/* Travelling Allowance (₹/km) */}
+            <div className={`space-y-2 ${formData.scheme === 'commission' ? '' : 'sm:col-span-2'}`}>
+              <Label htmlFor="travelling_allowance">Travelling Allowance (₹/km)</Label>
+              <Input
+                id="travelling_allowance"
+                name="travelling_allowance"
+                type="number"
+                step="0.01"
+                value={formData.travelling_allowance}
+                onChange={handleChange}
+                placeholder="0.00"
+                className={errors.travelling_allowance ? 'border-red-500' : ''}
+              />
+              {errors.travelling_allowance && (
+                <p className="text-sm text-red-500">{errors.travelling_allowance}</p>
+              )}
+            </div>
+          </div>
+        </div>
 
-      {/* Joining Date */}
-      <div className="space-y-2">
-        <Label htmlFor="joining_date">Joining Date</Label>
-        <Input
-          id="joining_date"
-          name="joining_date"
-          type="date"
-          value={formData.joining_date}
-          onChange={handleChange}
-        />
-      </div>
+        {/* Section 4: Employment Timeline */}
+        <div className="space-y-4">
+          <div className="flex items-center gap-2 pb-2 border-b border-gray-100">
+            <Calendar className="h-4 w-4 text-amber-600" />
+            <h3 className="text-sm font-semibold text-gray-900">Employment Timeline</h3>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {/* Joining Date */}
+            <div className={`space-y-2 ${formData.status === 'resigned' ? '' : 'sm:col-span-2'}`}>
+              <Label htmlFor="joining_date">
+                Joining Date <span className="text-red-500">*</span>
+              </Label>
+              <Input
+                id="joining_date"
+                name="joining_date"
+                type="date"
+                value={formData.joining_date}
+                onChange={handleChange}
+                className={errors.joining_date ? 'border-red-500' : ''}
+              />
+              {errors.joining_date && (
+                <p className="text-sm text-red-500">{errors.joining_date}</p>
+              )}
+            </div>
 
-      {/* Resignation Date */}
-      <div className="space-y-2">
-        <Label htmlFor="resignation_date">Resignation Date</Label>
-        <Input
-          id="resignation_date"
-          name="resignation_date"
-          type="date"
-          value={formData.resignation_date}
-          onChange={handleChange}
-          className={errors.resignation_date ? 'border-red-500' : ''}
-        />
-        {errors.resignation_date && (
-          <p className="text-sm text-red-500">{errors.resignation_date}</p>
-        )}
-      </div>
+            {/* Resignation Date - show only when status is resigned */}
+            {formData.status === 'resigned' && (
+              <div className="space-y-2">
+                <Label htmlFor="resignation_date">
+                  Resignation Date <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  id="resignation_date"
+                  name="resignation_date"
+                  type="date"
+                  value={formData.resignation_date}
+                  onChange={handleChange}
+                  className={errors.resignation_date ? 'border-red-500' : ''}
+                />
+                {errors.resignation_date && (
+                  <p className="text-sm text-red-500">{errors.resignation_date}</p>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
 
-      {/* Contact Number */}
-      <div className="space-y-2">
-        <Label htmlFor="contact_number">Contact Number</Label>
-        <Input
-          id="contact_number"
-          name="contact_number"
-          type="tel"
-          value={formData.contact_number}
-          onChange={handleChange}
-          placeholder="+91 9876543210"
-        />
       </div>
-
-      {/* Status */}
-      <div className="space-y-2">
-        <Label htmlFor="status">
-          Status <span className="text-red-500">*</span>
-        </Label>
-        <Select value={formData.status} onValueChange={handleStatusChange}>
-          <SelectTrigger>
-            <SelectValue placeholder="Select status" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="active">Active</SelectItem>
-            <SelectItem value="resigned">Resigned</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-
-      {/* Action Buttons */}
-      <div className="flex gap-3 pt-4">
-        <Button type="submit" disabled={loading} className="flex-1">
-          {loading ? (
-            <>
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              Saving...
-            </>
-          ) : (
-            <>{employee ? 'Update Employee' : 'Create Employee'}</>
-          )}
-        </Button>
-        <Button type="button" variant="outline" onClick={onCancel} disabled={loading}>
-          Cancel
-        </Button>
-      </div>
-    </form>
+ 
+       {/* Fixed Footer */}
+       <div className="px-6 py-4 border-t border-gray-100 bg-gray-50 flex gap-3 justify-end shrink-0">
+         <Button type="button" variant="outline" onClick={onCancel} disabled={loading}>
+           Cancel
+         </Button>
+         <Button type="submit" disabled={loading} className="min-w-[140px]">
+           {loading ? (
+             <>
+               <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+               Saving...
+             </>
+           ) : (
+             <>{employee ? 'Update Employee' : 'Create Employee'}</>
+           )}
+         </Button>
+       </div>
+     </form>
   );
 };
 
