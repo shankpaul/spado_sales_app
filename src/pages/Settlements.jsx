@@ -40,6 +40,7 @@ const Settlements = () => {
   const [settlementForm, setSettlementForm] = useState({
     notes: '',
     reference_number: '',
+    allow_negative_recovery: false,
   });
   const [submittingSettlement, setSubmittingSettlement] = useState(false);
 
@@ -107,7 +108,7 @@ const Settlements = () => {
       toast.success('Settlement processed successfully!');
       setSelectedEmployeeId(null);
       setPreview(null);
-      setSettlementForm({ notes: '', reference_number: '' });
+      setSettlementForm({ notes: '', reference_number: '', allow_negative_recovery: false });
       fetchDueSettlements();
 
       // Open print view
@@ -226,11 +227,15 @@ const Settlements = () => {
                       <td className="py-3.5 px-4 text-right text-rose-600 font-medium">
                         -₹{Math.abs(emp.penalties || 0).toFixed(2)}
                       </td>
-                      <td className="py-3.5 px-4 text-right font-bold text-base text-gray-900 whitespace-nowrap">
+                      <td className={`py-3.5 px-4 text-right font-bold text-base whitespace-nowrap ${emp.net_payable < 0 ? 'text-rose-600' : 'text-gray-900'}`}>
                         ₹{(emp.net_payable || 0).toFixed(2)}
                       </td>
                       <td className="py-3.5 px-4 text-center whitespace-nowrap">
-                        {emp.settlement_due ? (
+                        {emp.net_payable < 0 ? (
+                          <span className="px-2.5 py-1 bg-rose-50 text-rose-700 border border-rose-200 text-xs font-semibold rounded-full inline-flex items-center gap-1">
+                            Carry Forward (Debt)
+                          </span>
+                        ) : emp.settlement_due ? (
                           <span className="px-2.5 py-1 bg-amber-100 text-amber-800 text-xs font-semibold rounded-full inline-flex items-center gap-1">
                             <AlertCircle className="h-3 w-3" /> Due
                           </span>
@@ -243,10 +248,15 @@ const Settlements = () => {
                       <td className="py-3.5 px-4 text-right whitespace-nowrap">
                         <Button
                           size="sm"
-                          onClick={() => handleOpenSettlementModal(emp.employee_id)}
-                          className="bg-emerald-600 hover:bg-emerald-700 text-white font-medium shadow-sm"
+                          onClick={() => {
+                            setSettlementForm({ notes: '', reference_number: '', allow_negative_recovery: false });
+                            handleOpenSettlementModal(emp.employee_id);
+                          }}
+                          className={emp.net_payable < 0
+                            ? "bg-gray-100 hover:bg-gray-200 text-gray-700 border border-gray-300 font-medium text-xs shadow-none"
+                            : "bg-emerald-600 hover:bg-emerald-700 text-white font-medium shadow-sm"}
                         >
-                          Create Settlement
+                          {emp.net_payable < 0 ? 'Review Debt' : 'Create Settlement'}
                         </Button>
                       </td>
                     </tr>
@@ -412,10 +422,42 @@ const Settlements = () => {
                   <hr className="my-2 border-gray-200" />
 
                   <div className="flex justify-between items-center text-base font-bold text-gray-900 pt-1">
-                    <span>Net Payable Payout:</span>
-                    <span className="text-xl text-emerald-600 font-extrabold">₹{(preview.net_payable || 0).toFixed(2)}</span>
+                    <span>{preview.net_payable < 0 ? 'Net Recoverable from Agent:' : 'Net Payable Payout:'}</span>
+                    <span className={`text-xl font-extrabold ${preview.net_payable < 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
+                      ₹{(preview.net_payable || 0).toFixed(2)}
+                    </span>
                   </div>
                 </div>
+
+                {preview.net_payable < 0 && (
+                  <div className="space-y-3">
+                    <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-800 text-xs space-y-1">
+                      <div className="font-semibold flex items-center gap-1.5">
+                        <AlertCircle className="h-4 w-4 text-amber-600 flex-shrink-0" />
+                        Negative Net Balance (Debt Policy)
+                      </div>
+                      <p>
+                        The agent owes <strong>₹{Math.abs(preview.net_payable).toFixed(2)}</strong> to the company.
+                        By default, this balance <strong>carries forward</strong> to future cycles to be automatically deducted from future earnings.
+                      </p>
+                    </div>
+
+                    <div className="bg-rose-50 border border-rose-200 rounded-xl p-3">
+                      <label className="flex items-start gap-2.5 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={settlementForm.allow_negative_recovery}
+                          onChange={(e) => setSettlementForm(prev => ({ ...prev, allow_negative_recovery: e.target.checked }))}
+                          className="mt-0.5 h-4 w-4 text-rose-600 rounded border-gray-300 focus:ring-rose-500"
+                        />
+                        <div className="text-xs text-rose-900 leading-tight">
+                          <span className="font-semibold block mb-0.5">Confirm Offline Debt Recovery</span>
+                          I confirm that this ₹{Math.abs(preview.net_payable).toFixed(2)} debt was collected from the agent offline, and authorize resetting the unsettled ledger to ₹0.
+                        </div>
+                      </label>
+                    </div>
+                  </div>
+                )}
 
                 <div>
                   <label className="block text-xs font-semibold text-gray-700 uppercase mb-1">Payment Reference # / TxID</label>
@@ -449,10 +491,12 @@ const Settlements = () => {
                   </Button>
                   <Button
                     type="submit"
-                    disabled={submittingSettlement}
-                    className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold"
+                    disabled={submittingSettlement || (preview.net_payable < 0 && !settlementForm.allow_negative_recovery)}
+                    className={preview.net_payable < 0
+                      ? "bg-rose-600 hover:bg-rose-700 text-white font-semibold disabled:opacity-50"
+                      : "bg-emerald-600 hover:bg-emerald-700 text-white font-semibold disabled:opacity-50"}
                   >
-                    {submittingSettlement ? 'Processing...' : 'Confirm & Save Settlement'}
+                    {submittingSettlement ? 'Processing...' : (preview.net_payable < 0 ? 'Confirm Debt Recovery Settlement' : 'Confirm & Save Settlement')}
                   </Button>
                 </div>
               </form>

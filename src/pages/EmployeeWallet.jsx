@@ -121,7 +121,7 @@ const EmployeeWallet = () => {
 
   const handleManualSubmit = async (e) => {
     e.preventDefault();
-    if (!manualForm.employee_id || !manualForm.amount || parseFloat(manualForm.amount) <= 0) {
+    if (!manualForm.employee_id || !manualForm.amount || parseFloat(manualForm.amount) === 0) {
       toast.error('Please enter valid employee and amount');
       return;
     }
@@ -246,6 +246,11 @@ const EmployeeWallet = () => {
             {summary.settlement_due && (
               <span className="px-2.5 py-1 bg-amber-100 text-amber-800 text-xs font-semibold rounded-full flex items-center gap-1">
                 <AlertCircle className="h-3 w-3" /> Settlement Due
+              </span>
+            )}
+            {summary.net_payable < 0 && (
+              <span className="px-2.5 py-1 bg-rose-50 text-rose-700 border border-rose-200 text-xs font-semibold rounded-full flex items-center gap-1">
+                Carrying Forward Debt
               </span>
             )}
           </div>
