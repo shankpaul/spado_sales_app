@@ -72,11 +72,19 @@ const orderService = {
    * @param {string} id - Order ID
    * @param {string} status - New status (draft, booked, completed, cancelled)
    * @param {string} paymentMethod - Optional payment method (cash, upi)
+   * @param {number|null} receivedAmount - Optional received payment amount from customer
+   * @param {number|null} tip - Optional tip amount
    */
-  updateOrderStatus: async (id, status, paymentMethod = '') => {
+  updateOrderStatus: async (id, status, paymentMethod = '', receivedAmount = null, tip = null) => {
     const payload = { status };
     if (paymentMethod) {
       payload.payment_method = paymentMethod;
+    }
+    if (receivedAmount !== null && receivedAmount !== undefined) {
+      payload.received_amount = receivedAmount;
+    }
+    if (tip !== null && tip !== undefined) {
+      payload.tip = tip;
     }
     const response = await apiClient.patch(`/orders/${id}/status`, payload);
     return response.data;

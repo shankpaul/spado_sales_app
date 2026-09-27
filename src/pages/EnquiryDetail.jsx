@@ -152,9 +152,10 @@ const EnquiryDetail = ({ enquiryId, onClose, onUpdate }) => {
 
   useEffect(() => {
     const custId = enquiry?.customer?.id || enquiry?.customer_id;
-    const phone = enquiry?.contact_phone;
+    const rawPhone = enquiry?.contact_phone || enquiry?.customer?.phone || '';
+    const cleanPhone = rawPhone ? rawPhone.replace(/\D/g, '').slice(-10) : '';
 
-    if (custId || phone) {
+    if (custId || cleanPhone || rawPhone) {
       setLoadingCustomerStats(true);
 
       const fetchCustomerData = async () => {
@@ -168,10 +169,20 @@ const EnquiryDetail = ({ enquiryId, onClose, onUpdate }) => {
           setCustomerInfo(cData);
 
           // Fetch orders to calculate total bookings and last booking date/time
-          const ordersRes = await orderService.getAllOrders(
-            custId ? { customer_id: custId, per_page: 50 } : { search: phone, per_page: 50 }
-          );
-          const ordersList = ordersRes?.orders || ordersRes || [];
+          let ordersList = [];
+          if (custId) {
+            try {
+              const ordersRes = await orderService.getAllOrders({ customer_id: custId, per_page: 50 });
+              ordersList = ordersRes?.orders || ordersRes || [];
+            } catch (e) { }
+          }
+          if ((!ordersList || ordersList.length === 0) && (cleanPhone || rawPhone)) {
+            try {
+              const ordersRes = await orderService.getAllOrders({ search: cleanPhone || rawPhone, per_page: 50 });
+              ordersList = ordersRes?.orders || ordersRes || [];
+            } catch (e) { }
+          }
+
           setCustomerOrdersCount(ordersList.length);
 
           if (ordersList.length > 0) {
@@ -179,11 +190,11 @@ const EnquiryDetail = ({ enquiryId, onClose, onUpdate }) => {
               new Date(b.booking_date || b.created_at) - new Date(a.booking_date || a.created_at)
             );
             let latestOrder = sortedOrders[0];
-            if (!latestOrder.packages?.length && !latestOrder.order_packages?.length && !latestOrder.vehicle_type && latestOrder.id) {
+            if (latestOrder && latestOrder.id) {
               try {
-                const fullOrder = await orderService.getOrderById(latestOrder.id);
-                if (fullOrder) {
-                  latestOrder = fullOrder;
+                const fullOrderRes = await orderService.getOrderById(latestOrder.id);
+                if (fullOrderRes) {
+                  latestOrder = fullOrderRes.order || fullOrderRes;
                 }
               } catch (err) {
                 // Ignore fallback to list order
@@ -206,31 +217,37 @@ const EnquiryDetail = ({ enquiryId, onClose, onUpdate }) => {
       setCustomerOrdersCount(0);
       setLastBookingInfo(null);
     }
-  }, [enquiry?.id, enquiry?.customer_id, enquiry?.customer?.id, enquiry?.contact_phone]);
+  }, [enquiry?.id, enquiry?.customer_id, enquiry?.customer?.id, enquiry?.contact_phone, enquiry?.customer?.phone]);
 
   // Extract vehicle types from last booking
   const getLastBookedVehicles = (order) => {
     if (!order) return [];
+    const target = order.order || order;
     const vehicles = [];
-    if (order.packages && Array.isArray(order.packages)) {
-      order.packages.forEach((pkg) => {
-        const vt = pkg.vehicle_type || pkg.package?.vehicle_type;
-        if (vt && !vehicles.includes(vt.toLowerCase())) {
-          vehicles.push(vt.toLowerCase());
+
+    const addV = (v) => {
+      if (v && typeof v === 'string') {
+        const cleanV = v.trim().toLowerCase();
+        if (cleanV && !vehicles.includes(cleanV)) {
+          vehicles.push(cleanV);
         }
+      }
+    };
+
+    if (target.packages && Array.isArray(target.packages)) {
+      target.packages.forEach((pkg) => {
+        addV(pkg.vehicle_type);
+        addV(pkg.package?.vehicle_type);
       });
     }
-    if (order.order_packages && Array.isArray(order.order_packages)) {
-      order.order_packages.forEach((pkg) => {
-        const vt = pkg.vehicle_type || pkg.package?.vehicle_type;
-        if (vt && !vehicles.includes(vt.toLowerCase())) {
-          vehicles.push(vt.toLowerCase());
-        }
+    if (target.order_packages && Array.isArray(target.order_packages)) {
+      target.order_packages.forEach((pkg) => {
+        addV(pkg.vehicle_type);
+        addV(pkg.package?.vehicle_type);
       });
     }
-    if (order.vehicle_type && !vehicles.includes(order.vehicle_type.toLowerCase())) {
-      vehicles.push(order.vehicle_type.toLowerCase());
-    }
+    addV(target.vehicle_type);
+
     return vehicles;
   };
 
@@ -1064,16 +1081,21 @@ const EnquiryDetail = ({ enquiryId, onClose, onUpdate }) => {
                         <MapPin className="h-3 w-3 text-rose-500" />
                         Customer Location
                       </span>
-                      {(customerInfo?.map_link || enquiry?.map_link) && (
-                        <a
-                          href={customerInfo?.map_link || enquiry?.map_link}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-[11px] font-medium text-primary hover:underline flex items-center gap-0.5"
-                        >
-                          Map <ExternalLink className="h-2.5 w-2.5" />
-                        </a>
-                      )}
+                      {(() => {
+                        const targetOrder = lastBookingInfo?.order || lastBookingInfo;
+                        const mapUrl = targetOrder?.address?.map_link || targetOrder?.map_link || customerInfo?.map_link || enquiry?.map_link;
+                        if (!mapUrl) return null;
+                        return (
+                          <a
+                            href={mapUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-[11px] font-medium text-primary hover:underline flex items-center gap-0.5"
+                          >
+                            Map <ExternalLink className="h-2.5 w-2.5" />
+                          </a>
+                        );
+                      })()}
                     </div>
 
                     {loadingCustomerStats ? (
@@ -1082,9 +1104,10 @@ const EnquiryDetail = ({ enquiryId, onClose, onUpdate }) => {
                       </div>
                     ) : (
                       (() => {
-                        const area = customerInfo?.area || enquiry?.area;
-                        const city = customerInfo?.city || enquiry?.city;
-                        const addressLine = customerInfo?.address_line1 || enquiry?.address;
+                        const targetOrder = lastBookingInfo?.order || lastBookingInfo;
+                        const area = targetOrder?.address?.area || targetOrder?.area || customerInfo?.area || enquiry?.area;
+                        const city = targetOrder?.address?.city || targetOrder?.city || customerInfo?.city || enquiry?.city;
+                        const addressLine = targetOrder?.address?.address_line1 || targetOrder?.address_line1 || customerInfo?.address_line1 || enquiry?.address;
                         const locationStr = [addressLine, area, city].filter(Boolean).join(', ');
 
                         if (locationStr) {

@@ -37,6 +37,7 @@ const EmployeeWallet = lazy(() => import('./pages/EmployeeWallet'));
 const AllWallets = lazy(() => import('./pages/AllWallets'));
 const Settlements = lazy(() => import('./pages/Settlements'));
 const CashReconciliation = lazy(() => import('./pages/CashReconciliation'));
+const CashDeposits = lazy(() => import('./pages/CashDeposits'));
 const PartnerPerformance = lazy(() => import('./pages/PartnerPerformance'));
 
 // Loading fallback component
@@ -420,6 +421,17 @@ function App() {
               <ProtectedRoute allowedRoles={['admin', 'accountant']}>
                 <Layout>
                   <CashReconciliation />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/cash-deposits"
+            element={
+              <ProtectedRoute allowedRoles={['admin', 'accountant', 'sales_executive']}>
+                <Layout>
+                  <CashDeposits />
                 </Layout>
               </ProtectedRoute>
             }

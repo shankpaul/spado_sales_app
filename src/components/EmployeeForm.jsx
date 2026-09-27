@@ -211,6 +211,7 @@ const EmployeeForm = ({ employee, onSubmit, onCancel }) => {
       const submitData = {
         scheme: formData.scheme,
         status: formData.status,
+        settlement_cycle: formData.settlement_cycle || 'monthly',
       };
 
       // Add required fields

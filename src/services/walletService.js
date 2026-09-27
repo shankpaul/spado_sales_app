@@ -148,6 +148,20 @@ const walletService = {
   },
 
   /**
+   * Get single settlement by ID
+   * @param {number} id - Settlement ID
+   * @returns {Promise} API response with settlement details
+   */
+  async getSettlementByID(id) {
+    try {
+      const response = await apiClient.get(`/wallet/settlements/${id}`);
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  },
+
+  /**
    * Create a settlement for an employee
    * @param {number} employeeId - Employee ID
    * @param {Object} data - { notes, reference_number }
@@ -194,6 +208,72 @@ const walletService = {
   async receiveCompanyCash(data) {
     try {
       const response = await apiClient.post('/wallet/cash-reconciliation/receive', data);
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  },
+
+  /**
+   * List cash deposit / handover entries with filters
+   * @param {Object} filters - { employee_id, status, start_date, end_date, page, per_page }
+   * @returns {Promise} API response
+   */
+  async getCashDeposits(filters = {}) {
+    try {
+      const params = new URLSearchParams();
+      Object.keys(filters).forEach(key => {
+        if (filters[key] !== undefined && filters[key] !== null && filters[key] !== '') {
+          params.append(key, filters[key]);
+        }
+      });
+      const queryString = params.toString();
+      const url = queryString ? `/wallet/cash-deposits?${queryString}` : '/wallet/cash-deposits';
+      const response = await apiClient.get(url);
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  },
+
+  /**
+   * Create a new cash deposit / handover entry (Agent or Admin)
+   * @param {Object} data - { employee_id, payment_method, amount, transaction_date, transaction_number, remarks }
+   * @returns {Promise} API response
+   */
+  async createCashDeposit(data) {
+    try {
+      const response = await apiClient.post('/wallet/cash-deposits', data);
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  },
+
+  /**
+   * Verify an unverified cash deposit (Admin only)
+   * @param {number} depositId - Deposit ID
+   * @param {Object} data - { remarks }
+   * @returns {Promise} API response
+   */
+  async verifyCashDeposit(depositId, data = {}) {
+    try {
+      const response = await apiClient.put(`/wallet/cash-deposits/${depositId}/verify`, data);
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  },
+
+  /**
+   * Reject an unverified cash deposit (Admin only)
+   * @param {number} depositId - Deposit ID
+   * @param {Object} data - { remarks }
+   * @returns {Promise} API response
+   */
+  async rejectCashDeposit(depositId, data = {}) {
+    try {
+      const response = await apiClient.put(`/wallet/cash-deposits/${depositId}/reject`, data);
       return response.data;
     } catch (error) {
       throw error;

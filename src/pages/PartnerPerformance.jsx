@@ -70,20 +70,42 @@ export default function PartnerPerformance() {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all'); // all, draft, finalized
 
+  // Helper to compute default Sunday to Saturday cycle for calculation dialog
+  const getCurrentWeekCycle = useCallback(() => {
+    const now = new Date();
+    // Week starts on Sunday (weekStartsOn: 0) and ends on Saturday
+    const sunday = startOfWeek(now, { weekStartsOn: 0 });
+    const saturday = endOfWeek(now, { weekStartsOn: 0 });
+
+    // If today is Sunday (settlement day), default to the completed week cycle (Sunday to Saturday)
+    const isSunday = now.getDay() === 0;
+    const cycleStart = isSunday ? subWeeks(sunday, 1) : sunday;
+    const cycleEnd = isSunday ? subWeeks(saturday, 1) : saturday;
+
+    return {
+      start: format(cycleStart, 'yyyy-MM-dd'),
+      end: format(cycleEnd, 'yyyy-MM-dd'),
+    };
+  }, []);
+
   // Modals state
   const [calculating, setCalculating] = useState(false);
   const [calculateModalOpen, setCalculateModalOpen] = useState(false);
-  const [customCycleDates, setCustomCycleDates] = useState({ start: '', end: '' });
+  const [customCycleDates, setCustomCycleDates] = useState(() => getCurrentWeekCycle());
+
+  useEffect(() => {
+    if (calculateModalOpen) {
+      setCustomCycleDates(getCurrentWeekCycle());
+    }
+  }, [calculateModalOpen, getCurrentWeekCycle]);
 
   const [detailModalOpen, setDetailModalOpen] = useState(false);
   const [selectedPerformance, setSelectedPerformance] = useState(null);
 
   const [adjustModalOpen, setAdjustModalOpen] = useState(false);
   const [adjustingRecord, setAdjustingRecord] = useState(null);
-  const [adjustForm, setAdjustForm] = useState({
-    metric_name: 'acceptance',
-    adjusted_value: '',
-    adjusted_score: '',
+  const [adjustMetrics, setAdjustMetrics] = useState(null);
+  const [adjustFormMeta, setAdjustFormMeta] = useState({
     exception_type: 'emergency',
     reason: '',
     evidence_url: '',
@@ -342,39 +364,366 @@ export default function PartnerPerformance() {
     }
   };
 
-  // Open Adjust Modal
+  // Estimated Total Score for Live Preview in Adjustment Modal
+  const estimatedTotalScore = useMemo(() => {
+    if (!adjustMetrics) return adjustingRecord?.total_score || 0;
+    let sum = 0;
+    Object.values(adjustMetrics).forEach((m) => {
+      const score = parseInt(m.adjusted_score, 10);
+      if (!isNaN(score)) {
+        sum += score;
+      }
+    });
+    return Math.min(100, Math.max(0, sum));
+  }, [adjustMetrics, adjustingRecord]);
+
+  // Estimated Bonus Percentage for Live Preview in Adjustment Modal
+  const estimatedBonusPct = useMemo(() => {
+    const tiers = configData?.bonus_tiers || [
+      { min_score: 90, max_score: 100, bonus_percentage: 10 },
+      { min_score: 80, max_score: 89, bonus_percentage: 8 },
+      { min_score: 70, max_score: 79, bonus_percentage: 6 },
+      { min_score: 60, max_score: 69, bonus_percentage: 4 },
+      { min_score: 50, max_score: 59, bonus_percentage: 2 },
+    ];
+    const matched = tiers.find(
+      (t) => estimatedTotalScore >= t.min_score && estimatedTotalScore <= t.max_score
+    );
+    return matched !== undefined ? matched.bonus_percentage : 0;
+  }, [estimatedTotalScore, configData]);
+
+  // Open Adjust Modal with All Metrics
   const handleOpenAdjust = (rec) => {
     setAdjustingRecord(rec);
-    setAdjustForm({
-      metric_name: 'acceptance',
-      adjusted_value: rec.acceptance_rate || '',
-      adjusted_score: rec.acceptance_score || '',
-      exception_type: 'emergency',
-      reason: '',
+    setAdjustFormMeta({
+      exception_type: rec.adjustment_status === 'adjusted' ? 'other' : 'emergency',
+      reason: rec.adjustment_reason || '',
       evidence_url: '',
+    });
+    setAdjustMetrics({
+      acceptance: {
+        key: 'acceptance',
+        name: 'Acceptance Rate',
+        max: metricWeights.acceptance_rate,
+        unit: '%',
+        step: '0.1',
+        adjusted_value: rec.acceptance_rate ?? 0,
+        adjusted_score: rec.acceptance_score ?? 0,
+        orig_value: rec.acceptance_rate ?? 0,
+        orig_score: rec.acceptance_score ?? 0,
+      },
+      last_minute_rejection: {
+        key: 'last_minute_rejection',
+        name: 'Last-Minute Rejection',
+        max: metricWeights.last_minute_rejection,
+        unit: 'count',
+        step: '1',
+        adjusted_value: rec.qualifying_rejections ?? 0,
+        adjusted_score: rec.rejection_score ?? 0,
+        orig_value: rec.qualifying_rejections ?? 0,
+        orig_score: rec.rejection_score ?? 0,
+      },
+      rescheduling: {
+        key: 'rescheduling',
+        name: 'Partner Rescheduling',
+        max: metricWeights.agent_rescheduling,
+        unit: 'count',
+        step: '1',
+        adjusted_value: rec.partner_reschedules ?? 0,
+        adjusted_score: rec.rescheduling_score ?? 0,
+        orig_value: rec.partner_reschedules ?? 0,
+        orig_score: rec.rescheduling_score ?? 0,
+      },
+      on_time_arrival: {
+        key: 'on_time_arrival',
+        name: 'On-Time Arrival',
+        max: metricWeights.on_time_arrival,
+        unit: '%',
+        step: '0.1',
+        adjusted_value: rec.on_time_arrival_rate ?? 0,
+        adjusted_score: rec.arrival_score ?? 0,
+        orig_value: rec.on_time_arrival_rate ?? 0,
+        orig_score: rec.arrival_score ?? 0,
+      },
+      rework: {
+        key: 'rework',
+        name: 'Rework Rate',
+        max: metricWeights.rework_rate,
+        unit: 'count',
+        step: '1',
+        adjusted_value: rec.verified_reworks ?? 0,
+        adjusted_score: rec.rework_score ?? 0,
+        orig_value: rec.verified_reworks ?? 0,
+        orig_score: rec.rework_score ?? 0,
+      },
+      availability: {
+        key: 'availability',
+        name: 'Availability',
+        max: metricWeights.availability,
+        unit: '%',
+        step: '0.1',
+        adjusted_value: rec.availability_rate ?? 0,
+        adjusted_score: rec.availability_score ?? 0,
+        orig_value: rec.availability_rate ?? 0,
+        orig_score: rec.availability_score ?? 0,
+      },
     });
     setAdjustModalOpen(true);
   };
 
-  // Submit Adjustment
+  // Helper to calculate Score based on Value & Metric Tiers
+  const calculateScoreFromValue = useCallback((key, val) => {
+    const numVal = parseFloat(val);
+    if (isNaN(numVal)) return 0;
+
+    let score = 0;
+    if (key === 'acceptance') {
+      const tiers = configData?.acceptance_rate_tiers || [
+        { min_percentage: 95, points: 25 },
+        { min_percentage: 90, points: 20 },
+        { min_percentage: 85, points: 15 },
+        { min_percentage: 80, points: 10 },
+      ];
+      const matched = tiers.find((t) => numVal >= t.min_percentage);
+      score = matched ? matched.points : 0;
+    } else if (key === 'last_minute_rejection') {
+      const tiers = configData?.last_minute_rejection_tiers || [
+        { max_count: 0, points: 15 },
+        { max_count: 1, points: 10 },
+        { max_count: 2, points: 5 },
+      ];
+      const matched = tiers.find((t) => numVal <= t.max_count);
+      score = matched ? matched.points : 0;
+    } else if (key === 'rescheduling') {
+      const tiers = configData?.agent_rescheduling_tiers || [
+        { max_count: 0, points: 10 },
+        { max_count: 1, points: 5 },
+      ];
+      const matched = tiers.find((t) => numVal <= t.max_count);
+      score = matched ? matched.points : 0;
+    } else if (key === 'on_time_arrival') {
+      const tiers = configData?.on_time_arrival_tiers || [
+        { min_percentage: 90, points: 25 },
+        { min_percentage: 85, points: 20 },
+        { min_percentage: 80, points: 15 },
+        { min_percentage: 75, points: 10 },
+      ];
+      const matched = tiers.find((t) => numVal >= t.min_percentage);
+      score = matched ? matched.points : 0;
+    } else if (key === 'rework') {
+      const tiers = configData?.rework_rate_tiers || [
+        { max_count: 0, points: 20 },
+        { max_count: 1, points: 10 },
+        { max_count: 2, points: 5 },
+      ];
+      const matched = tiers.find((t) => numVal <= t.max_count);
+      score = matched ? matched.points : 0;
+    } else if (key === 'availability') {
+      const tiers = configData?.availability_tiers || [
+        { min_percentage: 95, points: 5 },
+        { min_percentage: 90, points: 4 },
+        { min_percentage: 85, points: 3 },
+        { min_percentage: 80, points: 2 },
+      ];
+      const matched = tiers.find((t) => numVal >= t.min_percentage);
+      score = matched ? matched.points : 0;
+    }
+
+    const maxPoints = metricWeights[
+      key === 'acceptance' ? 'acceptance_rate' :
+        key === 'last_minute_rejection' ? 'last_minute_rejection' :
+          key === 'rescheduling' ? 'agent_rescheduling' :
+            key === 'on_time_arrival' ? 'on_time_arrival' :
+              key === 'rework' ? 'rework_rate' : 'availability'
+    ] || 25;
+
+    return Math.min(maxPoints, Math.max(0, score));
+  }, [configData, metricWeights]);
+
+  // Helper to calculate Value based on Score & Metric Tiers
+  const calculateValueFromScore = useCallback((key, sc) => {
+    const numScore = parseInt(sc, 10);
+    if (isNaN(numScore)) return 0;
+
+    if (key === 'acceptance') {
+      const tiers = configData?.acceptance_rate_tiers || [
+        { min_percentage: 95, points: 25 },
+        { min_percentage: 90, points: 20 },
+        { min_percentage: 85, points: 15 },
+        { min_percentage: 80, points: 10 },
+      ];
+      const matched = tiers.find((t) => t.points === numScore);
+      if (matched) return matched.min_percentage;
+      if (numScore >= 25) return 100;
+      return 0;
+    } else if (key === 'last_minute_rejection') {
+      const tiers = configData?.last_minute_rejection_tiers || [
+        { max_count: 0, points: 15 },
+        { max_count: 1, points: 10 },
+        { max_count: 2, points: 5 },
+      ];
+      const matched = tiers.find((t) => t.points === numScore);
+      if (matched) return matched.max_count;
+      if (numScore >= 15) return 0;
+      return 3;
+    } else if (key === 'rescheduling') {
+      const tiers = configData?.agent_rescheduling_tiers || [
+        { max_count: 0, points: 10 },
+        { max_count: 1, points: 5 },
+      ];
+      const matched = tiers.find((t) => t.points === numScore);
+      if (matched) return matched.max_count;
+      if (numScore >= 10) return 0;
+      return 2;
+    } else if (key === 'on_time_arrival') {
+      const tiers = configData?.on_time_arrival_tiers || [
+        { min_percentage: 90, points: 25 },
+        { min_percentage: 85, points: 20 },
+        { min_percentage: 80, points: 15 },
+        { min_percentage: 75, points: 10 },
+      ];
+      const matched = tiers.find((t) => t.points === numScore);
+      if (matched) return matched.min_percentage;
+      if (numScore >= 25) return 100;
+      return 0;
+    } else if (key === 'rework') {
+      const tiers = configData?.rework_rate_tiers || [
+        { max_count: 0, points: 20 },
+        { max_count: 1, points: 10 },
+        { max_count: 2, points: 5 },
+      ];
+      const matched = tiers.find((t) => t.points === numScore);
+      if (matched) return matched.max_count;
+      if (numScore >= 20) return 0;
+      return 3;
+    } else if (key === 'availability') {
+      const tiers = configData?.availability_tiers || [
+        { min_percentage: 95, points: 5 },
+        { min_percentage: 90, points: 4 },
+        { min_percentage: 85, points: 3 },
+        { min_percentage: 80, points: 2 },
+      ];
+      const matched = tiers.find((t) => t.points === numScore);
+      if (matched) return matched.min_percentage;
+      if (numScore >= 5) return 100;
+      return 0;
+    }
+    return 0;
+  }, [configData]);
+
+  // Handle Metric Input Changes with Automatic Cross-Calculation & Clamping
+  const handleMetricChange = (key, field, val) => {
+    setAdjustMetrics((prev) => {
+      if (!prev || !prev[key]) return prev;
+      const targetMetric = prev[key];
+      const maxScore = targetMetric.max;
+      const isPercentage = targetMetric.unit === '%';
+
+      if (val === '') {
+        return {
+          ...prev,
+          [key]: {
+            ...targetMetric,
+            [field]: '',
+          },
+        };
+      }
+
+      let newAdjustedVal = targetMetric.adjusted_value;
+      let newAdjustedScore = targetMetric.adjusted_score;
+
+      if (field === 'adjusted_value') {
+        let numVal = parseFloat(val);
+        if (isNaN(numVal)) {
+          newAdjustedVal = '';
+        } else {
+          // Clamp value within bounds
+          if (isPercentage) {
+            numVal = Math.min(100, Math.max(0, numVal));
+          } else {
+            numVal = Math.min(999, Math.max(0, Math.floor(numVal)));
+          }
+          newAdjustedVal = numVal;
+          // Automatically update score from value
+          newAdjustedScore = calculateScoreFromValue(key, numVal);
+        }
+      } else if (field === 'adjusted_score') {
+        let numScore = parseInt(val, 10);
+        if (isNaN(numScore)) {
+          newAdjustedScore = '';
+        } else {
+          // Clamp score between 0 and maxScore
+          numScore = Math.min(maxScore, Math.max(0, numScore));
+          newAdjustedScore = numScore;
+          // Automatically update value from score
+          newAdjustedVal = calculateValueFromScore(key, numScore);
+        }
+      }
+
+      return {
+        ...prev,
+        [key]: {
+          ...targetMetric,
+          adjusted_value: newAdjustedVal,
+          adjusted_score: newAdjustedScore,
+        },
+      };
+    });
+  };
+
+  // Submit Adjustment for all edited metrics
   const handleSubmitAdjustment = async (e) => {
     e.preventDefault();
-    if (!adjustForm.reason.trim()) {
+    if (!adjustFormMeta.reason.trim()) {
       toast.error('Please provide a reason for the manual adjustment');
       return;
     }
+
+    if (!adjustMetrics) return;
+
+    // Find all metrics that have been modified
+    const changedMetrics = Object.values(adjustMetrics).filter((m) => {
+      const valChanged = parseFloat(m.adjusted_value) !== parseFloat(m.orig_value);
+      const scoreChanged = parseInt(m.adjusted_score, 10) !== parseInt(m.orig_score, 10);
+      return valChanged || scoreChanged;
+    });
+
+    if (changedMetrics.length === 0) {
+      toast.info('No metric values or scores were changed');
+      return;
+    }
+
+    // Validate boundaries before submission
+    for (const m of changedMetrics) {
+      const scoreNum = parseInt(m.adjusted_score, 10);
+      const valNum = parseFloat(m.adjusted_value);
+
+      if (isNaN(scoreNum) || scoreNum < 0 || scoreNum > m.max) {
+        toast.error(`Adjusted score for ${m.name} must be between 0 and ${m.max} points`);
+        return;
+      }
+      if (isNaN(valNum) || valNum < 0 || (m.unit === '%' && valNum > 100)) {
+        toast.error(`Adjusted value for ${m.name} is out of allowed range (${m.unit === '%' ? '0 - 100%' : '0 or positive count'})`);
+        return;
+      }
+    }
+
     setSubmittingAdjust(true);
     try {
-      const payload = {
-        metric_name: adjustForm.metric_name,
-        adjusted_value: parseFloat(adjustForm.adjusted_value) || 0,
-        adjusted_score: parseInt(adjustForm.adjusted_score, 10) || 0,
-        exception_type: adjustForm.exception_type,
-        reason: adjustForm.reason,
-        evidence_url: adjustForm.evidence_url || '',
-      };
-      await performanceService.submitAdjustment(adjustingRecord.id, payload);
-      toast.success('Performance score override saved successfully');
+      for (const m of changedMetrics) {
+        const payload = {
+          metric_name: m.key,
+          adjusted_value: parseFloat(m.adjusted_value) || 0,
+          adjusted_score: parseInt(m.adjusted_score, 10) || 0,
+          exception_type: adjustFormMeta.exception_type,
+          reason: adjustFormMeta.reason,
+          evidence_url: adjustFormMeta.evidence_url || '',
+        };
+        await performanceService.submitAdjustment(adjustingRecord.id, payload);
+      }
+      toast.success(
+        `${changedMetrics.length} metric score override${changedMetrics.length > 1 ? 's' : ''} saved successfully`
+      );
       setAdjustModalOpen(false);
       fetchCyclePerformances();
     } catch (err) {
@@ -796,14 +1145,14 @@ export default function PartnerPerformance() {
                     <tr>
                       <th className="py-3 px-4">Partner</th>
                       <th className="py-3 px-3 text-center">Score / Tier</th>
-                      <th className="py-3 px-3 text-right">Eligible Earnings</th>
+                      <th className="py-3 px-3 text-right">Order Total</th>
                       <th className="py-3 px-3 text-right">Bonus Amount</th>
-                      <th className="py-3 px-3 text-center">Acceptance ({metricWeights.acceptance_rate}p)</th>
-                      <th className="py-3 px-3 text-center">Rejection ({metricWeights.last_minute_rejection}p)</th>
-                      <th className="py-3 px-3 text-center">Reschedule ({metricWeights.agent_rescheduling}p)</th>
-                      <th className="py-3 px-3 text-center">Arrival ({metricWeights.on_time_arrival}p)</th>
-                      <th className="py-3 px-3 text-center">Rework ({metricWeights.rework_rate}p)</th>
-                      <th className="py-3 px-3 text-center">Availability ({metricWeights.availability}p)</th>
+                      <th className="py-3 px-3 text-center">Acceptance</th>
+                      <th className="py-3 px-3 text-center">Rejection</th>
+                      <th className="py-3 px-3 text-center">Reschedule</th>
+                      <th className="py-3 px-3 text-center">Arrival</th>
+                      <th className="py-3 px-3 text-center">Rework</th>
+                      <th className="py-3 px-3 text-center">Availability</th>
                       <th className="py-3 px-3 text-center">Status</th>
                       <th className="py-3 px-4 text-right">Actions</th>
                     </tr>
@@ -917,7 +1266,7 @@ export default function PartnerPerformance() {
                             </td>
 
                             {/* Status */}
-                            <td className="py-3 px-3 text-center">
+                            <td className="py-3 px-2 text-center">
                               {isFinalized ? (
                                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
                                   <CheckCircle2 className="h-3 w-3 text-emerald-500" />
@@ -932,26 +1281,7 @@ export default function PartnerPerformance() {
                             </td>
 
                             {/* Actions */}
-                            <td className="py-3 px-4 text-right space-x-1">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-7 text-xs px-2 text-blue-700 hover:bg-blue-50"
-                                onClick={() => {
-                                  setHistoryEmployee(
-                                    rec.employee || {
-                                      id: rec.employee_id,
-                                      name: partnerName,
-                                      employee_number: partnerCode,
-                                    }
-                                  );
-                                  setHistoryModalOpen(true);
-                                }}
-                                title="View Score History & Trend"
-                              >
-                                <TrendingUp className="h-3 w-3 mr-1" />
-                                History
-                              </Button>
+                            <td className="py-3 text-right flex justify-end space-x-1">
 
                               <Button
                                 variant="ghost"
@@ -1014,7 +1344,7 @@ export default function PartnerPerformance() {
             <div className="p-3 bg-blue-50 border border-blue-200 rounded-md text-blue-800 text-xs flex gap-2">
               <Info className="h-4 w-4 shrink-0 mt-0.5" />
               <span>
-                Leave dates empty to automatically calculate for the <strong>previous completed cycle</strong> (Sunday 00:00 to Saturday 23:59 IST).
+                Defaulted to weekly cycle starting <strong>Sunday 00:00</strong> to <strong>Saturday 23:59 IST</strong> (settlement on Sunday).
               </span>
             </div>
             <div>
@@ -1060,144 +1390,187 @@ export default function PartnerPerformance() {
 
       {/* MODAL 2: Manual Override / Adjustment */}
       <Dialog open={adjustModalOpen} onOpenChange={setAdjustModalOpen}>
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
+        <DialogContent className="sm:max-w-4xl max-h-[90vh] flex flex-col p-0 overflow-hidden gap-0">
+          <DialogHeader className="p-6 pb-4 border-b border-gray-100 shrink-0">
             <DialogTitle>Manual Score Override & Adjustment</DialogTitle>
             <DialogDescription className="text-xs text-gray-500">
-              Override an operational metric score with documented evidence and justification. The total score and bonus tier will automatically recalculate.
+              Override operational metric scores with documented evidence and justification. The total score and bonus tier will automatically recalculate.
             </DialogDescription>
           </DialogHeader>
 
-          {adjustingRecord && (
-            <form onSubmit={handleSubmitAdjustment} className="space-y-4 py-2 text-xs">
-              <div className="p-3 bg-gray-50 rounded-md border text-xs">
-                <div className="font-semibold text-gray-800">
-                  {adjustingRecord.employee?.name || 'Partner'} ({adjustingRecord.employee?.employee_number})
-                </div>
-                <div className="text-gray-500 mt-0.5">
-                  Current Score: <strong>{adjustingRecord.total_score} / {totalMaxPoints}</strong> • Current Tier: <strong>{adjustingRecord.bonus_percentage}%</strong>
-                </div>
-              </div>
+          {adjustingRecord && adjustMetrics && (
+            <form onSubmit={handleSubmitAdjustment} className="flex flex-col min-h-0 flex-1 overflow-hidden">
+              {/* Scrollable Body */}
+              <div className="flex-1 overflow-y-auto p-6 space-y-4 text-xs">
+                {/* Top Banner */}
+                <div className="p-3 bg-gradient-to-r from-gray-50 to-blue-50/50 rounded-lg border flex flex-wrap items-center justify-between gap-2 text-xs">
+                  <div>
+                    <div className="font-semibold text-gray-900 text-sm">
+                      {adjustingRecord.employee?.name || 'Partner'} ({adjustingRecord.employee?.employee_number})
+                    </div>
+                    <div className="text-gray-500 text-[11px] mt-0.5">
+                      Original Score: <strong>{adjustingRecord.total_score} / {totalMaxPoints}</strong> • Original Tier: <strong>{adjustingRecord.bonus_percentage}% Bonus</strong>
+                    </div>
+                  </div>
 
-              <div>
-                <Label className="text-xs mb-1 block">Metric to Override</Label>
-                <select
-                  value={adjustForm.metric_name}
-                  onChange={(e) => {
-                    const m = e.target.value;
-                    let val = '';
-                    let sc = '';
-                    if (m === 'acceptance') {
-                      val = adjustingRecord.acceptance_rate;
-                      sc = adjustingRecord.acceptance_score;
-                    } else if (m === 'last_minute_rejection' || m === 'rejection') {
-                      val = adjustingRecord.qualifying_rejections;
-                      sc = adjustingRecord.rejection_score;
-                    } else if (m === 'rescheduling') {
-                      val = adjustingRecord.partner_reschedules;
-                      sc = adjustingRecord.rescheduling_score;
-                    } else if (m === 'on_time_arrival' || m === 'arrival') {
-                      val = adjustingRecord.on_time_arrival_rate;
-                      sc = adjustingRecord.arrival_score;
-                    } else if (m === 'rework') {
-                      val = adjustingRecord.verified_reworks;
-                      sc = adjustingRecord.rework_score;
-                    } else if (m === 'availability') {
-                      val = adjustingRecord.availability_rate;
-                      sc = adjustingRecord.availability_score;
-                    }
-                    setAdjustForm((prev) => ({
-                      ...prev,
-                      metric_name: m,
-                      adjusted_value: val,
-                      adjusted_score: sc,
-                    }));
-                  }}
-                  className="w-full text-xs h-9 rounded-md border border-gray-300 bg-white px-3 py-1 text-gray-900 shadow-sm focus:border-primary-500 focus:outline-none"
-                >
-                  {metricsList.map((m) => (
-                    <option key={m.key} value={m.key}>
-                      {m.name} (Max {m.max} pts)
-                    </option>
-                  ))}
-                </select>
-              </div>
+                  <div className="flex items-center gap-3 bg-white px-3 py-1.5 rounded-md border shadow-sm text-xs">
+                    <div>
+                      <span className="text-gray-500 text-[10px] block uppercase font-medium">Estimated New Score</span>
+                      <span className={`font-bold text-sm ${estimatedTotalScore !== adjustingRecord.total_score ? 'text-blue-600' : 'text-gray-800'}`}>
+                        {estimatedTotalScore} / {totalMaxPoints}
+                      </span>
+                    </div>
+                    <div className="border-l pl-3">
+                      <span className="text-gray-500 text-[10px] block uppercase font-medium">Estimated Bonus</span>
+                      <span className={`font-bold text-sm ${estimatedBonusPct !== adjustingRecord.bonus_percentage ? 'text-emerald-600' : 'text-gray-800'}`}>
+                        {estimatedBonusPct}% Bonus
+                      </span>
+                    </div>
+                  </div>
+                </div>
 
-              <div className="grid grid-cols-2 gap-3">
+                {/* Table of All Metrics */}
+                <div className="border rounded-lg overflow-hidden bg-white shadow-sm">
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead>
+                      <tr className="bg-gray-50 border-b text-gray-600 font-medium">
+                        <th className="py-2.5 px-3">Metric Name</th>
+                        <th className="py-2.5 px-3 text-center">Max Pts</th>
+                        <th className="py-2.5 px-3 text-center">Original Value</th>
+                        <th className="py-2.5 px-3 text-center">Original Score</th>
+                        <th className="py-2.5 px-3 text-center w-36">Adjusted Value</th>
+                        <th className="py-2.5 px-3 text-center w-48">Adjusted Score</th>
+                        <th className="py-2.5 px-3 text-center">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y text-gray-700">
+                      {Object.values(adjustMetrics).map((m) => {
+                        const isValChanged = parseFloat(m.adjusted_value) !== parseFloat(m.orig_value);
+                        const isScoreChanged = parseInt(m.adjusted_score, 10) !== parseInt(m.orig_score, 10);
+                        const isModified = isValChanged || isScoreChanged;
+                        const scoreDelta = (parseInt(m.adjusted_score, 10) || 0) - (parseInt(m.orig_score, 10) || 0);
+
+                        return (
+                          <tr key={m.key} className={isModified ? 'bg-blue-50/40' : 'hover:bg-gray-50/50'}>
+                            <td className="py-2.5 px-3 font-medium text-gray-900">
+                              {m.name}
+                            </td>
+                            <td className="py-2.5 px-3 text-center text-gray-500 font-semibold">
+                              {m.max} pts
+                            </td>
+                            <td className="py-2.5 px-3 text-center text-gray-600">
+                              {m.unit === '%' ? `${m.orig_value}%` : `${m.orig_value}`}
+                            </td>
+                            <td className="py-2.5 px-3 text-center text-gray-600 font-medium">
+                              {m.orig_score} / {m.max}
+                            </td>
+                            <td className="py-2.5 px-2 text-center">
+                              <div className="relative flex items-center">
+                                <Input
+                                  type="number"
+                                  step={m.step}
+                                  min={0}
+                                  max={m.unit === '%' ? 100 : 999}
+                                  placeholder={m.unit === '%' ? '0-100' : '0+'}
+                                  title={m.unit === '%' ? 'Allowed value: 0% to 100%' : 'Allowed value: 0 or positive count'}
+                                  value={m.adjusted_value}
+                                  onChange={(e) => handleMetricChange(m.key, 'adjusted_value', e.target.value)}
+                                  className="h-8 text-xs pr-7 text-center font-medium"
+                                />
+                                <span className="absolute right-2 text-[10px] text-gray-400 pointer-events-none">
+                                  {m.unit}
+                                </span>
+                              </div>
+                            </td>
+                            <td className="py-2.5 px-2 text-center">
+                              <div className="flex items-center gap-1.5">
+                                <div className="relative flex-1 flex items-center">
+                                  <Input
+                                    type="number"
+                                    min={0}
+                                    max={m.max}
+                                    placeholder={`0-${m.max}`}
+                                    title={`Allowed score: 0 to ${m.max} points`}
+                                    value={m.adjusted_score}
+                                    onChange={(e) => handleMetricChange(m.key, 'adjusted_score', e.target.value)}
+                                    className="h-8 text-xs text-center font-semibold pr-7"
+                                  />
+                                  <span className="absolute right-2 text-[10px] text-gray-400 pointer-events-none">
+                                    pts
+                                  </span>
+                                </div>
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="xs"
+                                  onClick={() => handleMetricChange(m.key, 'adjusted_score', m.max)}
+                                  className="h-8 text-[11px] px-2 text-emerald-700 bg-emerald-50 border-emerald-200 hover:bg-emerald-100 font-medium whitespace-nowrap shrink-0 shadow-xs"
+                                  title={`Set max score for ${m.name} (${m.max} pts)`}
+                                >
+                                  Set Max
+                                </Button>
+                              </div>
+                            </td>
+                            <td className="py-2.5 px-3 text-center">
+                              {isModified ? (
+                                <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold ${scoreDelta > 0 ? 'bg-emerald-100 text-emerald-800' : scoreDelta < 0 ? 'bg-rose-100 text-rose-800' : 'bg-blue-100 text-blue-800'}`}>
+                                  {scoreDelta > 0 ? `+${scoreDelta} pts` : scoreDelta < 0 ? `${scoreDelta} pts` : 'Modified'}
+                                </span>
+                              ) : (
+                                <span className="text-gray-400 text-[11px]">Unchanged</span>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Exception Category, Evidence & Reason */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                  <div>
+                    <Label className="text-xs mb-1 block">Exception Category</Label>
+                    <select
+                      value={adjustFormMeta.exception_type}
+                      onChange={(e) => setAdjustFormMeta((prev) => ({ ...prev, exception_type: e.target.value }))}
+                      className="w-full text-xs h-9 rounded-md border border-gray-300 bg-white px-3 py-1 text-gray-900 shadow-sm focus:border-primary-500 focus:outline-none"
+                    >
+                      <option value="emergency">Emergency / Medical</option>
+                      <option value="breakdown">Vehicle Breakdown</option>
+                      <option value="customer_request">Customer Request / Dispute</option>
+                      <option value="force_majeure">Force Majeure / Weather</option>
+                      <option value="other">Other Validated Reason</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <Label className="text-xs mb-1 block">Evidence / Ticket URL (Optional)</Label>
+                    <Input
+                      type="url"
+                      placeholder="https://spado.in/tickets/..."
+                      value={adjustFormMeta.evidence_url}
+                      onChange={(e) => setAdjustFormMeta((prev) => ({ ...prev, evidence_url: e.target.value }))}
+                      className="text-xs h-9"
+                    />
+                  </div>
+                </div>
+
                 <div>
-                  <Label className="text-xs mb-1 block">Adjusted Value (Rate % / Count)</Label>
-                  <Input
-                    type="number"
-                    step="0.1"
+                  <Label className="text-xs mb-1 block">Reason & Justification (Required)</Label>
+                  <Textarea
                     required
-                    value={adjustForm.adjusted_value}
-                    onChange={(e) =>
-                      setAdjustForm((prev) => ({ ...prev, adjusted_value: e.target.value }))
-                    }
+                    rows={2}
+                    placeholder="Explain why score(s) are being adjusted..."
+                    value={adjustFormMeta.reason}
+                    onChange={(e) => setAdjustFormMeta((prev) => ({ ...prev, reason: e.target.value }))}
+                    className="text-xs"
                   />
                 </div>
-                <div>
-                  <Label className="text-xs mb-1 block">
-                    Adjusted Score (Max {metricsList.find((m) => m.key === adjustForm.metric_name)?.max || 25} pts)
-                  </Label>
-                  <Input
-                    type="number"
-                    min="0"
-                    max={metricsList.find((m) => m.key === adjustForm.metric_name)?.max || 100}
-                    required
-                    value={adjustForm.adjusted_score}
-                    onChange={(e) =>
-                      setAdjustForm((prev) => ({ ...prev, adjusted_score: e.target.value }))
-                    }
-                  />
-                </div>
               </div>
 
-              <div>
-                <Label className="text-xs mb-1 block">Exception Category</Label>
-                <select
-                  value={adjustForm.exception_type}
-                  onChange={(e) =>
-                    setAdjustForm((prev) => ({ ...prev, exception_type: e.target.value }))
-                  }
-                  className="w-full text-xs h-9 rounded-md border border-gray-300 bg-white px-3 py-1 text-gray-900 shadow-sm focus:border-primary-500 focus:outline-none"
-                >
-                  <option value="emergency">Emergency / Medical</option>
-                  <option value="breakdown">Vehicle Breakdown</option>
-                  <option value="customer_request">Customer Request / Dispute</option>
-                  <option value="force_majeure">Force Majeure / Weather</option>
-                  <option value="other">Other Validated Reason</option>
-                </select>
-              </div>
-
-              <div>
-                <Label className="text-xs mb-1 block">Reason & Justification (Required)</Label>
-                <Textarea
-                  required
-                  rows={2}
-                  placeholder="Explain why this score is being adjusted..."
-                  value={adjustForm.reason}
-                  onChange={(e) =>
-                    setAdjustForm((prev) => ({ ...prev, reason: e.target.value }))
-                  }
-                  className="text-xs"
-                />
-              </div>
-
-              <div>
-                <Label className="text-xs mb-1 block">Evidence / Ticket URL (Optional)</Label>
-                <Input
-                  type="url"
-                  placeholder="https://spado.in/tickets/..."
-                  value={adjustForm.evidence_url}
-                  onChange={(e) =>
-                    setAdjustForm((prev) => ({ ...prev, evidence_url: e.target.value }))
-                  }
-                  className="text-xs"
-                />
-              </div>
-
-              <DialogFooter className="gap-2 sm:gap-0 pt-2">
+              {/* Fixed Footer */}
+              <DialogFooter className="p-4 px-6 border-t border-gray-100 bg-gray-50/80 shrink-0 gap-2 sm:gap-0">
                 <Button
                   type="button"
                   variant="outline"
@@ -1211,7 +1584,7 @@ export default function PartnerPerformance() {
                   size="sm"
                   disabled={submittingAdjust}
                 >
-                  {submittingAdjust ? 'Saving Override...' : 'Apply Override'}
+                  {submittingAdjust ? 'Saving Overrides...' : 'Apply Overrides'}
                 </Button>
               </DialogFooter>
             </form>
@@ -1539,12 +1912,12 @@ export default function PartnerPerformance() {
                             <td className="py-2.5 px-3">
                               <span
                                 className={`inline-flex items-center px-2 py-0.5 rounded-full font-bold text-xs ${b.bonus_percentage >= 8
-                                    ? 'bg-emerald-100 text-emerald-800'
-                                    : b.bonus_percentage >= 4
-                                      ? 'bg-blue-100 text-blue-800'
-                                      : b.bonus_percentage > 0
-                                        ? 'bg-amber-100 text-amber-800'
-                                        : 'bg-gray-100 text-gray-600'
+                                  ? 'bg-emerald-100 text-emerald-800'
+                                  : b.bonus_percentage >= 4
+                                    ? 'bg-blue-100 text-blue-800'
+                                    : b.bonus_percentage > 0
+                                      ? 'bg-amber-100 text-amber-800'
+                                      : 'bg-gray-100 text-gray-600'
                                   }`}
                               >
                                 +{b.bonus_percentage}% Bonus

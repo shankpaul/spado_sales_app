@@ -163,7 +163,8 @@ const Layout = ({ children }) => {
             { name: 'Wallet Ledger', href: '/wallet', icon: DollarSign },
             { name: 'Partner Performance', href: '/partner-performance', icon: Award },
             { name: 'Settlements', href: '/settlements', icon: CheckCircle2 },
-            { name: 'Cash Reconciliation', href: '/cash-reconciliation', icon: Building2 }
+            { name: 'Cash Reconciliation', href: '/cash-reconciliation', icon: Building2 },
+            { name: 'Cash Deposits', href: '/cash-deposits', icon: ShieldCheck }
           ]
         },
         {

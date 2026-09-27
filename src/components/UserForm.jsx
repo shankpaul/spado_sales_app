@@ -55,8 +55,17 @@ const UserForm = ({ user, onSubmit, onCancel }) => {
 
     const fetchEmployees = async () => {
       try {
-        const response = await employeeService.getAllEmployees({ status: 0 });
-        setEmployees(response.employees || []);
+        const response = await employeeService.getAllEmployees();
+        let list = response.employees || [];
+
+        // Guarantee that if user has a linked employee record, it is present in the list
+        if (user && (user.employee || user.Employee)) {
+          const linkedEmp = user.employee || user.Employee;
+          if (linkedEmp && linkedEmp.id && !list.some(e => String(e.id) === String(linkedEmp.id))) {
+            list = [linkedEmp, ...list];
+          }
+        }
+        setEmployees(list);
       } catch (error) {
         // Don't show error toast, just log it
       }
@@ -64,20 +73,23 @@ const UserForm = ({ user, onSubmit, onCancel }) => {
 
     fetchOffices();
     fetchEmployees();
-  }, []);
+  }, [user]);
 
   // Pre-fill form if editing
   useEffect(() => {
     if (user) {
+      const extractedEmpId = user.employee_id || user.employee?.id || user.EmployeeID || user.Employee?.ID || '';
+      const extractedOfficeId = user.office_id || user.office?.id || user.OfficeID || user.Office?.ID || '';
+
       setFormData({
         name: user.name || '',
         email: user.email || '',
         phone: user.phone || '',
         address: user.address || '',
         employee_number: user.employee_number || '',
-        employee_id: user.employee_id ? user.employee_id.toString() : '',
+        employee_id: extractedEmpId ? String(extractedEmpId) : '',
         role: user.role,
-        office_id: user.office_id ? user.office_id.toString() : '',
+        office_id: extractedOfficeId ? String(extractedOfficeId) : '',
         home_latitude: user.home_latitude ? user.home_latitude.toString() : '',
         home_longitude: user.home_longitude ? user.home_longitude.toString() : '',
         password: '',
@@ -120,24 +132,25 @@ const UserForm = ({ user, onSubmit, onCancel }) => {
   const handleEmployeeChange = (value) => {
     setFormData((prev) => ({
       ...prev,
-      employee_id: value,
+      employee_id: value === 'none' ? '' : value,
     }));
   };
 
   // Handle office change and auto-fill coordinates
   const handleOfficeChange = (value) => {
+    const targetValue = value === 'none' ? '' : value;
     setFormData((prev) => ({
       ...prev,
-      office_id: value,
+      office_id: targetValue,
     }));
 
     // Auto-fill coordinates if they are empty
-    if (value && (!formData.home_latitude || !formData.home_longitude)) {
-      const selectedOffice = offices.find((office) => office.id.toString() === value);
+    if (targetValue && (!formData.home_latitude || !formData.home_longitude)) {
+      const selectedOffice = offices.find((office) => office.id.toString() === targetValue);
       if (selectedOffice) {
         setFormData((prev) => ({
           ...prev,
-          office_id: value,
+          office_id: targetValue,
           home_latitude: selectedOffice.latitude || '',
           home_longitude: selectedOffice.longitude || '',
         }));
@@ -457,13 +470,14 @@ const UserForm = ({ user, onSubmit, onCancel }) => {
         <div className="space-y-2">
           <Label htmlFor="office">Office Location (Optional)</Label>
           <Select 
-            value={formData.office_id || undefined} 
+            value={formData.office_id ? String(formData.office_id) : 'none'} 
             onValueChange={handleOfficeChange}
           >
             <SelectTrigger>
               <SelectValue placeholder="Select office" />
             </SelectTrigger>
             <SelectContent className="z-[2000]">
+              <SelectItem value="none">None (No office)</SelectItem>
               {offices.map((office) => (
                 <SelectItem key={office.id} value={office.id.toString()}>
                   {office.name}
@@ -480,16 +494,17 @@ const UserForm = ({ user, onSubmit, onCancel }) => {
         <div className="space-y-2 md:col-span-2">
           <Label htmlFor="employee">Link to Employee Record (Optional)</Label>
           <Select 
-            value={formData.employee_id || undefined} 
+            value={formData.employee_id ? String(formData.employee_id) : 'none'} 
             onValueChange={handleEmployeeChange}
           >
             <SelectTrigger>
               <SelectValue placeholder="Select employee (optional)" />
             </SelectTrigger>
             <SelectContent className="z-[2000]">
+              <SelectItem value="none">None (No linked employee)</SelectItem>
               {employees.map((employee) => (
                 <SelectItem key={employee.id} value={employee.id.toString()}>
-                  {employee.name} ({employee.employee_number})
+                  {employee.name} {employee.employee_number ? `(${employee.employee_number})` : ''}
                 </SelectItem>
               ))}
             </SelectContent>

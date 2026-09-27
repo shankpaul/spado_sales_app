@@ -132,6 +132,46 @@ import useOrderStore from '../store/orderStore';
 import ablyClient from '../services/ablyClient';
 
 /**
+ * Helper to check if an order's booking date/time is in the future relative to current time.
+ */
+const checkIsFutureBooking = (order) => {
+  if (!order) return false;
+  const now = new Date();
+
+  // 1. If booking_time_from is present and valid
+  if (order.booking_time_from) {
+    const timeFromDate = new Date(order.booking_time_from);
+    if (!isNaN(timeFromDate.getTime()) && timeFromDate.getFullYear() > 1970) {
+      return timeFromDate > now;
+    }
+
+    // If booking_time_from is HH:MM or HH:MM:SS format without date
+    if (order.booking_date) {
+      const dateStr = typeof order.booking_date === 'string'
+        ? order.booking_date.split('T')[0]
+        : new Date(order.booking_date).toISOString().split('T')[0];
+      const combined = new Date(`${dateStr}T${order.booking_time_from}`);
+      if (!isNaN(combined.getTime())) {
+        return combined > now;
+      }
+    }
+  }
+
+  // 2. Fall back to booking_date
+  if (order.booking_date) {
+    const dateStr = typeof order.booking_date === 'string'
+      ? order.booking_date.split('T')[0]
+      : new Date(order.booking_date).toISOString().split('T')[0];
+    const todayIST = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(now);
+    if (dateStr > todayIST) {
+      return true;
+    }
+  }
+
+  return false;
+};
+
+/**
  * Order Detail Page
  * Shows comprehensive order information with tabs for overview, items, timeline, reassignments
  * Real-time updates via Ably WebSocket for live order changes
@@ -474,6 +514,11 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
       return;
     }
 
+    if (newStatus === 'completed' && checkIsFutureBooking(order)) {
+      toast.error('Cannot complete an order scheduled for a future booking date/time');
+      return;
+    }
+
     // If changing to completed, show confirmation dialog
     if (newStatus === 'completed') {
       setPendingStatus(newStatus);
@@ -489,6 +534,11 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
 
   // Perform the actual status change
   const performStatusChange = async (newStatus) => {
+    if (newStatus === 'completed' && checkIsFutureBooking(order)) {
+      toast.error('Cannot complete an order scheduled for a future booking date/time');
+      return;
+    }
+
     if (newStatus === 'completed' && !paymentMethod) {
       toast.error('Payment method is mandatory');
       return;
@@ -851,6 +901,7 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
   const isAdmin = user?.role === 'admin';
   const isEditable = isAdmin || (order.status !== 'completed' && order.status !== 'cancelled');
   const canAddPaymentMethod = order && order.status !== 'cancelled' && order.status !== 'archived' && !order.archived && order.payment_status === 'pending';
+  const isFutureBooking = checkIsFutureBooking(order);
 
   // Helper variables for assigned partner / agent
   const assignedAgentObj = order?.assigned_to || agents.find(a => String(a.id) === String(order?.assigned_to?.id));
@@ -934,8 +985,9 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
                           {(order.status === 'confirmed' || order.status === 'in_progress') && (
                             <DropdownMenuItem
                               onClick={() => handleStatusChange('completed')}
-                              disabled={!order?.assigned_to}
+                              disabled={!order?.assigned_to || isFutureBooking}
                               className="text-green-600 focus:text-green-600"
+                              title={isFutureBooking ? "Cannot complete an order scheduled for a future date/time" : !order?.assigned_to ? "Assign an agent first" : ""}
                             >
                               <CheckCircle2 className="h-4 w-4 mr-2" />
                               Mark as Completed
@@ -1228,7 +1280,8 @@ const OrderDetail = ({ orderId, onClose, onUpdate }) => {
                         variant="success"
                         onClick={() => handleStatusChange('completed')}
                         className="flex-1 gap-1.5"
-                        disabled={!order?.assigned_to}
+                        disabled={!order?.assigned_to || isFutureBooking}
+                        title={isFutureBooking ? "Cannot complete an order scheduled for a future date/time" : !order?.assigned_to ? "Assign an agent first" : ""}
                       >
                         <CheckCircle2 className="h-4 w-4" />
                         Complete Order

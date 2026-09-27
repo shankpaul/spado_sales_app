@@ -960,7 +960,7 @@ const Dashboard = () => {
 
         {/* Order Detail Sheet */}
         <Sheet open={!!selectedOrderId} onOpenChange={(open) => !open && handleCloseOrderDetail()}>
-          <SheetContent side="right" className="w-full sm:max-w-4xl p-0 overflow-y-auto">
+          <SheetContent side="right" className="w-full sm:max-w-3xl md:max-w-4xl lg:max-w-5xl xl:max-w-6xl p-0 overflow-y-auto">
             {selectedOrderId && (
               <OrderDetail
                 orderId={selectedOrderId}
