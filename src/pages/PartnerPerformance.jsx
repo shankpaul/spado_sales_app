@@ -19,9 +19,16 @@ import {
   Check,
   AlertTriangle,
   Info,
-  ExternalLink,
-  ChevronDown
+  ChevronDown,
+  Trash2,
+  MoreVertical
 } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import {
   ResponsiveContainer,
   ComposedChart,
@@ -88,10 +95,76 @@ export default function PartnerPerformance() {
     };
   }, []);
 
+  // Helper to compute previous week Sunday to Saturday cycle
+  const getPreviousWeekCycle = useCallback(() => {
+    const now = new Date();
+    const isSunday = now.getDay() === 0;
+    const refDate = isSunday ? subWeeks(now, 1) : now;
+    const sunday = startOfWeek(subWeeks(refDate, 1), { weekStartsOn: 0 });
+    const saturday = endOfWeek(subWeeks(refDate, 1), { weekStartsOn: 0 });
+    return {
+      start: format(sunday, 'yyyy-MM-dd'),
+      end: format(saturday, 'yyyy-MM-dd'),
+    };
+  }, []);
+
+  // Helper to snap selected date input to Sunday and Saturday bounds
+  const handleStartDateChange = (e) => {
+    const val = e.target.value;
+    if (!val) return;
+    try {
+      const d = parseISO(val);
+      const sunday = startOfWeek(d, { weekStartsOn: 0 });
+      const saturday = endOfWeek(d, { weekStartsOn: 0 });
+      setCustomCycleDates({
+        start: format(sunday, 'yyyy-MM-dd'),
+        end: format(saturday, 'yyyy-MM-dd'),
+      });
+    } catch (err) {
+      setCustomCycleDates((prev) => ({ ...prev, start: val }));
+    }
+  };
+
+  const handleEndDateChange = (e) => {
+    const val = e.target.value;
+    if (!val) return;
+    try {
+      const d = parseISO(val);
+      const saturday = endOfWeek(d, { weekStartsOn: 0 });
+      setCustomCycleDates((prev) => ({
+        ...prev,
+        end: format(saturday, 'yyyy-MM-dd'),
+      }));
+    } catch (err) {
+      setCustomCycleDates((prev) => ({ ...prev, end: val }));
+    }
+  };
+
   // Modals state
   const [calculating, setCalculating] = useState(false);
   const [calculateModalOpen, setCalculateModalOpen] = useState(false);
   const [customCycleDates, setCustomCycleDates] = useState(() => getCurrentWeekCycle());
+
+  // Check if current customCycleDates overlap with any finalized cycle in cycles array
+  const hasFinalizedOverlap = useMemo(() => {
+    if (!customCycleDates.start || !customCycleDates.end || !cycles.length) return false;
+    const selStart = new Date(customCycleDates.start);
+    const selEnd = new Date(customCycleDates.end);
+    return cycles.some((c) => {
+      if ((c.finalized_count || 0) <= 0) return false;
+      const cStart = new Date(c.cycle_start);
+      const cEnd = new Date(c.cycle_end);
+      return selStart <= cEnd && selEnd >= cStart;
+    });
+  }, [customCycleDates, cycles]);
+  const [isDeleteCycleDialogOpen, setIsDeleteCycleDialogOpen] = useState(false);
+  const [deletingCycle, setDeletingCycle] = useState(false);
+  const [isDeleteRecordDialogOpen, setIsDeleteRecordDialogOpen] = useState(false);
+  const [deletingRecord, setDeletingRecord] = useState(null);
+  const [deletingRecordId, setDeletingRecordId] = useState(null);
+  const [isRecalculateDialogOpen, setIsRecalculateDialogOpen] = useState(false);
+  const [recalculatingRecord, setRecalculatingRecord] = useState(null);
+  const [recalculating, setRecalculating] = useState(false);
 
   useEffect(() => {
     if (calculateModalOpen) {
@@ -361,6 +434,65 @@ export default function PartnerPerformance() {
       toast.error(err.response?.data?.error || 'Failed to calculate performance scores');
     } finally {
       setCalculating(false);
+    }
+  };
+
+  // Delete Draft Cycle Entries
+  const handleDeleteDraftCycle = async () => {
+    if (!selectedCycle) return;
+    setDeletingCycle(true);
+    try {
+      const res = await performanceService.deleteDraftCycle(
+        selectedCycle.cycle_start,
+        selectedCycle.cycle_end
+      );
+      toast.success(res.message || 'Draft cycle performance entries deleted successfully');
+      setIsDeleteCycleDialogOpen(false);
+      setSelectedCycle(null);
+      await fetchCycles();
+    } catch (err) {
+      console.error(err);
+      toast.error(err.response?.data?.error || 'Failed to delete draft cycle entries');
+    } finally {
+      setDeletingCycle(false);
+    }
+  };
+
+  // Delete Individual Row Performance Entry
+  const handleDeleteRecord = async () => {
+    if (!deletingRecord?.id) return;
+    setDeletingRecordId(deletingRecord.id);
+    try {
+      await performanceService.deletePerformance(deletingRecord.id);
+      toast.success('Draft performance score entry deleted successfully');
+      setIsDeleteRecordDialogOpen(false);
+      setDeletingRecord(null);
+      await fetchCyclePerformances();
+      await fetchCycles();
+    } catch (err) {
+      console.error(err);
+      toast.error(err.response?.data?.error || 'Failed to delete draft performance entry');
+    } finally {
+      setDeletingRecordId(null);
+    }
+  };
+
+  // Recalculate Individual Row Performance Entry
+  const handleRecalculateRecord = async () => {
+    if (!recalculatingRecord?.id) return;
+    setRecalculating(true);
+    try {
+      await performanceService.recalculatePerformance(recalculatingRecord.id);
+      toast.success('Performance score recalculated successfully');
+      setIsRecalculateDialogOpen(false);
+      setRecalculatingRecord(null);
+      await fetchCyclePerformances();
+      await fetchCycles();
+    } catch (err) {
+      console.error(err);
+      toast.error(err.response?.data?.error || 'Failed to recalculate performance score');
+    } finally {
+      setRecalculating(false);
     }
   };
 
@@ -819,16 +951,6 @@ export default function PartnerPerformance() {
           <Button
             variant="outline"
             size="sm"
-            onClick={handleOpenConfigModal}
-            className="text-gray-700"
-          >
-            <Info className="h-4 w-4 mr-1.5 text-blue-600" />
-            Scoring Config {configData?.version ? `(v${configData.version})` : ''}
-          </Button>
-
-          <Button
-            variant="outline"
-            size="sm"
             onClick={() => {
               setCustomCycleDates({ start: '', end: '' });
               setCalculateModalOpen(true);
@@ -851,37 +973,43 @@ export default function PartnerPerformance() {
             <CheckCircle2 className="h-4 w-4 mr-2" />
             Confirm All ({performances.filter((p) => p.status !== 'finalized').length})
           </Button>
+
+          {/* 3-Dots Options Menu */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-9 w-9 p-0 cursor-pointer"
+                title="More Options"
+              >
+                <MoreVertical className="h-4 w-4 text-gray-600" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56">
+              <DropdownMenuItem onClick={handleOpenConfigModal} className="cursor-pointer">
+                <Info className="h-4 w-4 mr-2 text-blue-600" />
+                <span>Scoring Config {configData?.version ? `(v${configData.version})` : ''}</span>
+              </DropdownMenuItem>
+
+              {selectedCycle && selectedCycle.finalized_count === 0 && (
+                <DropdownMenuItem
+                  onClick={() => setIsDeleteCycleDialogOpen(true)}
+                  className="text-destructive focus:text-destructive cursor-pointer"
+                >
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  <span>Delete Draft Cycle</span>
+                </DropdownMenuItem>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 
       {/* Filter Bar */}
       <Card className="shadow-sm border-gray-200">
         <CardContent className="p-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 items-center">
-            {/* X-Weeks Presets */}
-            <div>
-              <Label className="text-xs font-semibold text-gray-600 mb-1 block">
-                Historical Window
-              </Label>
-              <div className="flex rounded-md shadow-sm">
-                {WEEKS_PRESETS.map((p) => {
-                  const isSelected = weeksFilter === p.value;
-                  return (
-                    <button
-                      key={p.value}
-                      type="button"
-                      onClick={() => setWeeksFilter(p.value)}
-                      className={`flex-1 cursor-pointer py-1.5 text-xs font-medium border first:rounded-l-md last:rounded-r-md transition-colors ${isSelected
-                        ? 'bg-primary text-primary-foreground border-primary z-10 font-semibold shadow-sm'
-                        : 'bg-white text-gray-700 hover:bg-gray-50 border-gray-300'
-                        }`}
-                    >
-                      {p.value}w
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 items-center">
 
             {/* Cycle Selector */}
             <div>
@@ -1017,16 +1145,9 @@ export default function PartnerPerformance() {
         </Card>
       </div>
 
-      {/* Main Content Tabs: Trend Chart & Partner Scores */}
+      {/* Main Content Tabs: Partner Scores & Trend Chart */}
       <Tabs defaultValue="scores" className="w-full space-y-4">
         <TabsList className="grid grid-cols-1 sm:grid-cols-2 w-full sm:w-[650px] h-11 p-1 bg-gray-100 rounded-xl">
-          <TabsTrigger
-            value="trend"
-            className="text-xs font-semibold flex items-center justify-center gap-2 rounded-lg data-[state=active]:bg-white data-[state=active]:text-gray-900 data-[state=active]:shadow-sm transition-all"
-          >
-            <TrendingUp className="h-4 w-4 text-blue-600" />
-            <span>Weekly Performance Score & Bonus Trend ({weeksFilter} Weeks)</span>
-          </TabsTrigger>
           <TabsTrigger
             value="scores"
             className="text-xs font-semibold flex items-center justify-center gap-2 rounded-lg data-[state=active]:bg-white data-[state=active]:text-gray-900 data-[state=active]:shadow-sm transition-all"
@@ -1034,13 +1155,20 @@ export default function PartnerPerformance() {
             <Award className="h-4 w-4 text-blue-600" />
             <span>Partner Scores & Overrides ({filteredPerformances.length})</span>
           </TabsTrigger>
+          <TabsTrigger
+            value="trend"
+            className="text-xs font-semibold flex items-center justify-center gap-2 rounded-lg data-[state=active]:bg-white data-[state=active]:text-gray-900 data-[state=active]:shadow-sm transition-all"
+          >
+            <TrendingUp className="h-4 w-4 text-blue-600" />
+            <span>Weekly Performance Score & Bonus Trend ({weeksFilter} Weeks)</span>
+          </TabsTrigger>
         </TabsList>
 
         {/* TAB 1: Trend Chart */}
         <TabsContent value="trend" className="mt-0">
           <Card className="shadow-sm border-gray-200">
             <CardHeader className="pb-2">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                 <div>
                   <CardTitle className="text-base font-semibold text-gray-900 flex items-center gap-2">
                     <TrendingUp className="h-4 w-4 text-blue-600" />
@@ -1049,6 +1177,30 @@ export default function PartnerPerformance() {
                   <CardDescription className="text-xs text-gray-500">
                     Track historical weekly score progression alongside total bonus distributions.
                   </CardDescription>
+                </div>
+
+                {/* Historical Window Presets */}
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-semibold text-gray-600 whitespace-nowrap">Historical Window:</span>
+                  <div className="flex rounded-md shadow-2xs">
+                    {WEEKS_PRESETS.map((p) => {
+                      const isSelected = weeksFilter === p.value;
+                      return (
+                        <button
+                          key={p.value}
+                          type="button"
+                          onClick={() => setWeeksFilter(p.value)}
+                          className={`cursor-pointer px-2.5 py-1 text-xs font-medium border first:rounded-l-md last:rounded-r-md transition-colors ${
+                            isSelected
+                              ? 'bg-primary text-primary-foreground border-primary z-10 font-semibold shadow-2xs'
+                              : 'bg-white text-gray-700 hover:bg-gray-50 border-gray-300'
+                          }`}
+                        >
+                          {p.value}w
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
             </CardHeader>
@@ -1144,6 +1296,7 @@ export default function PartnerPerformance() {
                   <thead className="bg-gray-50/80 border-b border-gray-200 text-gray-600 uppercase text-[10px] tracking-wider font-semibold">
                     <tr>
                       <th className="py-3 px-4">Partner</th>
+                      <th className="py-3 px-3 text-center">Weekly Cycle</th>
                       <th className="py-3 px-3 text-center">Score / Tier</th>
                       <th className="py-3 px-3 text-right">Order Total</th>
                       <th className="py-3 px-3 text-right">Bonus Amount</th>
@@ -1160,14 +1313,14 @@ export default function PartnerPerformance() {
                   <tbody className="divide-y divide-gray-100">
                     {loading ? (
                       <tr>
-                        <td colSpan="12" className="text-center py-12 text-gray-500">
+                        <td colSpan="13" className="text-center py-12 text-gray-500">
                           <RefreshCw className="h-6 w-6 animate-spin mx-auto text-primary-500 mb-2" />
                           Loading performance records...
                         </td>
                       </tr>
                     ) : filteredPerformances.length === 0 ? (
                       <tr>
-                        <td colSpan="12" className="text-center py-12 text-gray-500">
+                        <td colSpan="13" className="text-center py-12 text-gray-500">
                           <AlertCircle className="h-8 w-8 text-gray-300 mx-auto mb-2" />
                           No performance scores found for this cycle or filter.
                         </td>
@@ -1207,6 +1360,20 @@ export default function PartnerPerformance() {
                                   {partnerCode} {rec.employee?.contact_number && `• ${rec.employee.contact_number}`}
                                 </div>
                               </button>
+                            </td>
+
+                            {/* Weekly Cycle */}
+                            <td className="py-3 px-3 text-center">
+                              <span className="inline-flex items-center gap-1 text-[11px] font-medium text-gray-700 bg-gray-50 border border-gray-200 px-2 py-0.5 rounded-md">
+                                <Calendar className="h-3 w-3 text-gray-400" />
+                                <span>
+                                  {rec.cycle_start && rec.cycle_end
+                                    ? `${format(parseISO(rec.cycle_start), 'dd MMM')} – ${format(parseISO(rec.cycle_end), 'dd MMM yyyy')}`
+                                    : selectedCycle
+                                    ? `${format(parseISO(selectedCycle.cycle_start), 'dd MMM')} – ${format(parseISO(selectedCycle.cycle_end), 'dd MMM yyyy')}`
+                                    : 'N/A'}
+                                </span>
+                              </span>
                             </td>
 
                             {/* Total Score & Tier */}
@@ -1307,6 +1474,19 @@ export default function PartnerPerformance() {
                                   </Button>
 
                                   <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="h-7 text-xs px-2 text-amber-700 border-amber-300 hover:bg-amber-50"
+                                    onClick={() => {
+                                      setRecalculatingRecord(rec);
+                                      setIsRecalculateDialogOpen(true);
+                                    }}
+                                    title="Recalculate score from system metrics"
+                                  >
+                                    Recalculate
+                                  </Button>
+
+                                  <Button
                                     size="sm"
                                     className="h-7 text-xs px-2.5 bg-emerald-600 hover:bg-emerald-700 text-white"
                                     onClick={() => {
@@ -1315,6 +1495,19 @@ export default function PartnerPerformance() {
                                     }}
                                   >
                                     Confirm
+                                  </Button>
+
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="h-7 text-xs px-2 text-destructive border-destructive/30 hover:bg-destructive/10 cursor-pointer"
+                                    onClick={() => {
+                                      setDeletingRecord(rec);
+                                      setIsDeleteRecordDialogOpen(true);
+                                    }}
+                                    title="Delete draft score entry"
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" />
                                   </Button>
                                 </>
                               )}
@@ -1341,20 +1534,53 @@ export default function PartnerPerformance() {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2 text-xs">
+            {/* Week Shortcuts */}
+            <div className="flex items-center justify-between gap-2 p-2 bg-gray-50 border rounded-md">
+              <span className="text-xs font-medium text-gray-700">Quick Select:</span>
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="xs"
+                  className="h-7 text-xs"
+                  onClick={() => setCustomCycleDates(getCurrentWeekCycle())}
+                >
+                  Current Week
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="xs"
+                  className="h-7 text-xs"
+                  onClick={() => setCustomCycleDates(getPreviousWeekCycle())}
+                >
+                  Previous Week
+                </Button>
+              </div>
+            </div>
+
             <div className="p-3 bg-blue-50 border border-blue-200 rounded-md text-blue-800 text-xs flex gap-2">
               <Info className="h-4 w-4 shrink-0 mt-0.5" />
               <span>
-                Defaulted to weekly cycle starting <strong>Sunday 00:00</strong> to <strong>Saturday 23:59 IST</strong> (settlement on Sunday).
+                Selecting any date will automatically snap the cycle to <strong>Sunday 00:00</strong> - <strong>Saturday 23:59 IST</strong>.
               </span>
             </div>
+
+            {hasFinalizedOverlap && (
+              <div className="p-3 bg-amber-50 border border-amber-200 rounded-md text-amber-800 text-xs flex gap-2">
+                <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5 text-amber-600" />
+                <span>
+                  <strong>Warning:</strong> Selected range overlaps with an already finalized cycle. Order earnings in finalized cycles will be automatically excluded to prevent double payouts.
+                </span>
+              </div>
+            )}
+
             <div>
               <Label className="text-xs mb-1 block">Cycle Start (Sunday 00:00)</Label>
               <Input
                 type="date"
                 value={customCycleDates.start}
-                onChange={(e) =>
-                  setCustomCycleDates((prev) => ({ ...prev, start: e.target.value }))
-                }
+                onChange={handleStartDateChange}
               />
             </div>
             <div>
@@ -1362,9 +1588,7 @@ export default function PartnerPerformance() {
               <Input
                 type="date"
                 value={customCycleDates.end}
-                onChange={(e) =>
-                  setCustomCycleDates((prev) => ({ ...prev, end: e.target.value }))
-                }
+                onChange={handleEndDateChange}
               />
             </div>
           </div>
@@ -2120,7 +2344,143 @@ export default function PartnerPerformance() {
         </DialogContent>
       </Dialog>
 
-      {/* MODAL 6: Employee Partner Score History Dialog */}
+      {/* MODAL 6: Confirm Delete Draft Cycle Dialog */}
+      <Dialog open={isDeleteCycleDialogOpen} onOpenChange={setIsDeleteCycleDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-destructive">
+              <Trash2 className="h-5 w-5" />
+              Delete Draft Cycle Entries
+            </DialogTitle>
+            <DialogDescription className="text-xs text-gray-500 pt-1">
+              Are you sure you want to delete all draft performance score entries for the cycle{' '}
+              <strong>
+                {selectedCycle &&
+                  `${format(parseISO(selectedCycle.cycle_start), 'dd MMM')} – ${format(
+                    parseISO(selectedCycle.cycle_end),
+                    'dd MMM yyyy'
+                  )}`}
+              </strong>
+              ?
+            </DialogDescription>
+          </DialogHeader>
+          <div className="p-3 bg-amber-50 border border-amber-200 rounded-md text-amber-900 text-xs flex gap-2">
+            <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600 mt-0.5" />
+            <span>
+              This will remove all draft score records and remove this cycle from the selection menu. You can re-run performance calculations afterwards.
+            </span>
+          </div>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setIsDeleteCycleDialogOpen(false)}
+              disabled={deletingCycle}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={handleDeleteDraftCycle}
+              disabled={deletingCycle}
+            >
+              {deletingCycle && <RefreshCw className="h-3.5 w-3.5 mr-1.5 animate-spin" />}
+              {deletingCycle ? 'Deleting...' : 'Delete Draft Entries'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* MODAL 7: Confirm Delete Single Row Draft Record Dialog */}
+      <Dialog open={isDeleteRecordDialogOpen} onOpenChange={setIsDeleteRecordDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-destructive">
+              <Trash2 className="h-5 w-5" />
+              Delete Draft Score Entry
+            </DialogTitle>
+            <DialogDescription className="text-xs text-gray-500 pt-1">
+              Are you sure you want to delete the draft performance score entry for{' '}
+              <strong>
+                {deletingRecord?.employee?.name || deletingRecord?.employee?.user?.name || 'this partner'}
+              </strong>
+              ?
+            </DialogDescription>
+          </DialogHeader>
+          <div className="p-3 bg-amber-50 border border-amber-200 rounded-md text-amber-900 text-xs flex gap-2">
+            <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600 mt-0.5" />
+            <span>
+              This will remove this partner's draft score record from the current cycle evaluation list.
+            </span>
+          </div>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setIsDeleteRecordDialogOpen(false)}
+              disabled={Boolean(deletingRecordId)}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={handleDeleteRecord}
+              disabled={Boolean(deletingRecordId)}
+            >
+              {deletingRecordId && <RefreshCw className="h-3.5 w-3.5 mr-1.5 animate-spin" />}
+              {deletingRecordId ? 'Delete Draft Entry' : 'Delete Draft Entry'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* MODAL 8: Confirm Recalculate Single Row Draft Record Dialog */}
+      <Dialog open={isRecalculateDialogOpen} onOpenChange={setIsRecalculateDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-amber-700">
+              <RefreshCw className="h-5 w-5 text-amber-600" />
+              Recalculate Performance Score
+            </DialogTitle>
+            <DialogDescription className="text-xs text-gray-500 pt-1">
+              Are you sure you want to recalculate the performance score for{' '}
+              <strong>
+                {recalculatingRecord?.employee?.name || recalculatingRecord?.employee?.user?.name || 'this partner'}
+              </strong>
+              ?
+            </DialogDescription>
+          </DialogHeader>
+          <div className="p-3 bg-amber-50 border border-amber-200 rounded-md text-amber-900 text-xs flex gap-2">
+            <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600 mt-0.5" />
+            <span>
+              This will re-evaluate raw operational metrics (Acceptance, On-Time Arrival, Rejections, Availability, Reworks) from live system logs and reset any manual score overrides for this record.
+            </span>
+          </div>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setIsRecalculateDialogOpen(false)}
+              disabled={recalculating}
+            >
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              className="bg-amber-600 hover:bg-amber-700 text-white"
+              onClick={handleRecalculateRecord}
+              disabled={recalculating}
+            >
+              {recalculating && <RefreshCw className="h-3.5 w-3.5 mr-1.5 animate-spin" />}
+              {recalculating ? 'Recalculating...' : 'Confirm Recalculate'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* MODAL 7: Employee Partner Score History Dialog */}
       <PartnerScoreHistoryDialog
         open={historyModalOpen}
         onOpenChange={setHistoryModalOpen}

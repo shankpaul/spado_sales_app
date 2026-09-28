@@ -136,6 +136,54 @@ const performanceService = {
   },
 
   /**
+   * Delete draft performance entries for a specific cycle
+   * @param {string} cycleStart
+   * @param {string} cycleEnd
+   * @returns {Promise} API response
+   */
+  async deleteDraftCycle(cycleStart, cycleEnd) {
+    try {
+      const response = await apiClient.delete('/admin/performance/cycle', {
+        params: {
+          start_date: cycleStart,
+          end_date: cycleEnd,
+        },
+      });
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  },
+
+  /**
+   * Delete an individual draft performance score entry
+   * @param {number} id - Performance Record ID
+   * @returns {Promise} API response
+   */
+  async deletePerformance(id) {
+    try {
+      const response = await apiClient.delete(`/admin/performance/${id}`);
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  },
+
+  /**
+   * Recalculate an individual draft performance score entry
+   * @param {number} id - Performance Record ID
+   * @returns {Promise} API response
+   */
+  async recalculatePerformance(id) {
+    try {
+      const response = await apiClient.post(`/admin/performance/${id}/recalculate`);
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  },
+
+  /**
    * Get active performance scoring configuration
    * @returns {Promise} API response
    */
